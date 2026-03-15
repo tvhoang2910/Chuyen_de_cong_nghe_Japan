@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BookOpen, Search as SearchIcon, Bell, Star, Flame, LogOut, ChartLine, Clock, Zap, Crown } from 'lucide-react';
-import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer } from 'recharts';
+import axios from 'axios';
+import { BookOpen, Search as SearchIcon, Bell, Star, Flame, LogOut, ChartLine, Clock, Zap, Crown, UserRound, KeyRound, X } from 'lucide-react';
+import { Radar, RadarChart, PolarGrid, PolarAngleAxis } from 'recharts';
 import toast from 'react-hot-toast';
-import axiosClient, { clearAuthSession, fetchCurrentUserProfile, type UserProfile } from '../api/axiosClient';
+import axiosClient, { clearAuthSession, fetchCurrentUserProfile, updateCurrentUserProfile, type UserProfile } from '../api/axiosClient';
 
 // Mock Data cho Radar Chart
 const radarData = [
@@ -26,8 +27,27 @@ const Dashboard: React.FC = () => {
     role: 'USER',
     premium: false,
   });
-  const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.fullName || user.email)}&background=2563eb&color=fff`;
+  const [displayNameInput, setDisplayNameInput] = useState('');
+  const [profileForm, setProfileForm] = useState({
+    avatarUrl: '',
+    phoneNumber: '',
+    school: '',
+    subject: '',
+  });
+  const [isSavingName, setIsSavingName] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+  const [isSavingPassword, setIsSavingPassword] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [chartSize, setChartSize] = useState({ width: 0, height: 0 });
+  const avatar = user.avatarUrl?.trim()
+    ? user.avatarUrl
+    : `https://ui-avatars.com/api/?name=${encodeURIComponent(user.fullName || user.email)}&background=2563eb&color=fff`;
   const hasRequestedProfileRef = useRef(false);
+  const chartContainerRef = useRef<HTMLDivElement>(null);
 
   const points = 1250;
   const streak = 15;
@@ -42,6 +62,13 @@ const Dashboard: React.FC = () => {
       try {
         const profile = await fetchCurrentUserProfile();
         setUser(profile);
+        setDisplayNameInput(profile.fullName);
+        setProfileForm({
+          avatarUrl: profile.avatarUrl ?? '',
+          phoneNumber: profile.phoneNumber ?? '',
+          school: profile.school ?? '',
+          subject: profile.subject ?? '',
+        });
         localStorage.setItem('user_email', profile.email);
       } catch (error) {
         console.error('Failed to load profile:', error);
@@ -57,6 +84,29 @@ const Dashboard: React.FC = () => {
     return () => clearTimeout(timer);
   }, []);
 
+  useEffect(() => {
+    const element = chartContainerRef.current;
+    if (!element) {
+      return;
+    }
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) {
+        return;
+      }
+
+      const width = Math.floor(entry.contentRect.width);
+      const height = Math.floor(entry.contentRect.height);
+      if (width > 0 && height > 0) {
+        setChartSize({ width, height });
+      }
+    });
+
+    resizeObserver.observe(element);
+    return () => resizeObserver.disconnect();
+  }, []);
+
   const handleLogout = async () => {
     try {
       await axiosClient.post('/logout');
@@ -66,6 +116,96 @@ const Dashboard: React.FC = () => {
     }
     clearAuthSession();
     navigate('/login');
+  };
+
+  const extractErrorMessage = (error: unknown, fallbackMessage: string) => {
+    if (axios.isAxiosError(error) && typeof error.response?.data?.message === 'string') {
+      return error.response.data.message;
+    }
+    return fallbackMessage;
+  };
+
+  const handleUpdateDisplayName = async (event: React.SyntheticEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const nextName = displayNameInput.trim();
+    if (nextName.length < 3) {
+      toast.error('Tên hiển thị phải có ít nhất 3 ký tự.');
+      return;
+    }
+
+    try {
+      setIsSavingName(true);
+      const updatedProfile = await updateCurrentUserProfile({
+        fullName: nextName,
+        avatarUrl: profileForm.avatarUrl.trim() || null,
+        phoneNumber: profileForm.phoneNumber.trim() || null,
+        school: profileForm.school.trim() || null,
+        subject: profileForm.subject.trim() || null,
+      });
+      setUser(updatedProfile);
+      setDisplayNameInput(updatedProfile.fullName);
+      setProfileForm({
+        avatarUrl: updatedProfile.avatarUrl ?? '',
+        phoneNumber: updatedProfile.phoneNumber ?? '',
+        school: updatedProfile.school ?? '',
+        subject: updatedProfile.subject ?? '',
+      });
+      setIsProfileModalOpen(false);
+      toast.success('Đã cập nhật hồ sơ cá nhân.');
+    } catch (error) {
+      toast.error(extractErrorMessage(error, 'Không thể cập nhật hồ sơ.'));
+    } finally {
+      setIsSavingName(false);
+    }
+  };
+
+  const handleProfileFieldChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = event.target;
+    setProfileForm((previous) => ({
+      ...previous,
+      [name]: value,
+    }));
+  };
+
+  const handlePasswordFieldChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = event.target;
+    setPasswordForm((previous) => ({
+      ...previous,
+      [name]: value,
+    }));
+  };
+
+  const handleUpdatePassword = async (event: React.SyntheticEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!passwordForm.currentPassword || !passwordForm.newPassword) {
+      toast.error('Vui lòng nhập đủ mật khẩu hiện tại và mật khẩu mới.');
+      return;
+    }
+    if (passwordForm.newPassword.length < 8) {
+      toast.error('Mật khẩu mới phải có ít nhất 8 ký tự.');
+      return;
+    }
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      toast.error('Mật khẩu xác nhận không khớp.');
+      return;
+    }
+
+    try {
+      setIsSavingPassword(true);
+      await updateCurrentUserProfile({
+        currentPassword: passwordForm.currentPassword,
+        newPassword: passwordForm.newPassword,
+      });
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      clearAuthSession();
+      setIsProfileModalOpen(false);
+      toast.success('Đổi mật khẩu thành công. Vui lòng đăng nhập lại.');
+      navigate('/login');
+    } catch (error) {
+      toast.error(extractErrorMessage(error, 'Không thể cập nhật mật khẩu.'));
+    } finally {
+      setIsSavingPassword(false);
+    }
   };
 
   return (
@@ -114,7 +254,11 @@ const Dashboard: React.FC = () => {
 
         {/* User profile bottom */}
         <div className="p-4 border-t border-slate-100">
-          <button onClick={handleLogout} className="w-full flex items-center justify-between px-3 py-2 text-slate-600 hover:bg-red-50 hover:text-red-600 rounded-xl font-medium transition-colors group">
+          <button
+            id="sidebar-logout-button"
+            onClick={handleLogout}
+            className="w-full flex items-center justify-between px-3 py-2 text-slate-600 hover:bg-red-50 hover:text-red-600 rounded-xl font-medium transition-colors group"
+          >
             <div className="flex items-center gap-3 truncate">
               <img src={avatar} alt="avatar" className="w-8 h-8 rounded-full" />
               <span className="truncate text-sm" title={user.fullName}>{user.fullName}</span>
@@ -154,7 +298,15 @@ const Dashboard: React.FC = () => {
               <Bell className="w-6 h-6" />
               <span className="absolute top-1 right-1.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-white"></span>
             </button>
-            <img src={avatar} className="w-10 h-10 rounded-full border-2 border-white shadow-sm md:hidden" alt="User" />
+            <button
+              id="profile-settings-trigger"
+              type="button"
+              onClick={() => setIsProfileModalOpen(true)}
+              className="flex items-center gap-2 rounded-full border border-slate-200 bg-white py-1 pr-1 pl-2 hover:border-blue-300 transition-colors"
+            >
+              <span className="hidden lg:block max-w-28 truncate text-sm font-semibold text-slate-700" title={user.fullName}>{user.fullName}</span>
+              <img src={avatar} className="w-9 h-9 rounded-full border-2 border-white shadow-sm" alt="User" />
+            </button>
           </div>
         </header>
 
@@ -193,14 +345,23 @@ const Dashboard: React.FC = () => {
                   <h3 className="font-bold text-slate-900">Năng lực môn học</h3>
                   <button className="text-slate-400 hover:text-blue-600"><ChartLine className="w-4 h-4" /></button>
                 </div>
-                <div className="h-64 w-full min-w-0 mt-2">
-                  <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                    <RadarChart cx="50%" cy="50%" outerRadius="70%" data={radarData}>
+                <div ref={chartContainerRef} className="h-64 w-full min-w-0 mt-2">
+                  {chartSize.width > 0 && chartSize.height > 0 ? (
+                    <RadarChart
+                      width={chartSize.width}
+                      height={chartSize.height}
+                      cx="50%"
+                      cy="50%"
+                      outerRadius="70%"
+                      data={radarData}
+                    >
                       <PolarGrid stroke="#e2e8f0" />
                       <PolarAngleAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 12 }} />
                       <Radar name="Học viên" dataKey="A" stroke="#2563eb" fill="#3b82f6" fillOpacity={0.3} />
                     </RadarChart>
-                  </ResponsiveContainer>
+                  ) : (
+                    <div className="h-full w-full animate-pulse rounded-2xl bg-slate-100" />
+                  )}
                 </div>
               </div>
             </div>
@@ -244,6 +405,160 @@ const Dashboard: React.FC = () => {
 
           </div>
         </div>
+
+        {isProfileModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <button
+              aria-label="close-profile-modal"
+              type="button"
+              onClick={() => setIsProfileModalOpen(false)}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-[1px]"
+            />
+            <div className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-3xl bg-white border border-slate-200 shadow-2xl p-6 md:p-8">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-900">Cập nhật thông tin cá nhân</h2>
+                  <p className="text-sm text-slate-500 mt-1">Bạn có thể đổi tên hiển thị và mật khẩu tại đây.</p>
+                </div>
+                <button
+                  aria-label="close-profile-settings"
+                  type="button"
+                  onClick={() => setIsProfileModalOpen(false)}
+                  className="w-10 h-10 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors flex items-center justify-center"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                <form onSubmit={handleUpdateDisplayName} className="rounded-2xl border border-slate-200 p-6 space-y-4 bg-slate-50/40">
+                  <div className="flex items-center gap-2 text-slate-900">
+                    <UserRound className="w-5 h-5 text-blue-600" />
+                    <h3 className="font-bold text-lg">Đổi tên hiển thị</h3>
+                  </div>
+                  <p className="text-sm text-slate-500">Cập nhật thông tin hồ sơ hiển thị của bạn.</p>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5" htmlFor="display-name-input">Họ và tên</label>
+                    <input
+                      id="display-name-input"
+                      type="text"
+                      value={displayNameInput}
+                      onChange={(event) => setDisplayNameInput(event.target.value)}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all bg-white"
+                      placeholder="Nguyen Van A"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5" htmlFor="profile-avatar-input">Avatar URL</label>
+                    <input
+                      id="profile-avatar-input"
+                      type="url"
+                      name="avatarUrl"
+                      value={profileForm.avatarUrl}
+                      onChange={handleProfileFieldChange}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all bg-white"
+                      placeholder="https://example.com/avatar.png"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5" htmlFor="profile-phone-input">Số điện thoại</label>
+                    <input
+                      id="profile-phone-input"
+                      type="text"
+                      name="phoneNumber"
+                      value={profileForm.phoneNumber}
+                      onChange={handleProfileFieldChange}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all bg-white"
+                      placeholder="0901234567"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5" htmlFor="profile-school-input">Đơn vị trường</label>
+                    <input
+                      id="profile-school-input"
+                      type="text"
+                      name="school"
+                      value={profileForm.school}
+                      onChange={handleProfileFieldChange}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all bg-white"
+                      placeholder="Dai hoc ABC"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5" htmlFor="profile-subject-input">Bộ môn</label>
+                    <input
+                      id="profile-subject-input"
+                      type="text"
+                      name="subject"
+                      value={profileForm.subject}
+                      onChange={handleProfileFieldChange}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all bg-white"
+                      placeholder="Cong nghe thong tin"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={isSavingName}
+                    className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors disabled:opacity-70"
+                  >
+                    {isSavingName ? 'Đang lưu...' : 'Lưu hồ sơ'}
+                  </button>
+                </form>
+
+                <form onSubmit={handleUpdatePassword} className="rounded-2xl border border-slate-200 p-6 space-y-4 bg-slate-50/40">
+                  <div className="flex items-center gap-2 text-slate-900">
+                    <KeyRound className="w-5 h-5 text-emerald-600" />
+                    <h3 className="font-bold text-lg">Đổi mật khẩu</h3>
+                  </div>
+                  <p className="text-sm text-slate-500">Nhập mật khẩu hiện tại để đặt mật khẩu mới.</p>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5" htmlFor="current-password-input">Mật khẩu hiện tại</label>
+                    <input
+                      id="current-password-input"
+                      type="password"
+                      name="currentPassword"
+                      value={passwordForm.currentPassword}
+                      onChange={handlePasswordFieldChange}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all bg-white"
+                      placeholder="••••••••"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5" htmlFor="new-password-input">Mật khẩu mới</label>
+                    <input
+                      id="new-password-input"
+                      type="password"
+                      name="newPassword"
+                      value={passwordForm.newPassword}
+                      onChange={handlePasswordFieldChange}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all bg-white"
+                      placeholder="Tối thiểu 8 ký tự"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1.5" htmlFor="confirm-password-input">Xác nhận mật khẩu mới</label>
+                    <input
+                      id="confirm-password-input"
+                      type="password"
+                      name="confirmPassword"
+                      value={passwordForm.confirmPassword}
+                      onChange={handlePasswordFieldChange}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all bg-white"
+                      placeholder="Nhập lại mật khẩu mới"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={isSavingPassword}
+                    className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-70"
+                  >
+                    {isSavingPassword ? 'Đang cập nhật...' : 'Cập nhật mật khẩu'}
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

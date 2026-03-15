@@ -12,13 +12,38 @@ import ForgotPasswordVerifyOtp from './pages/ForgotPasswordVerifyOtp';
 import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import OAuth2Success from './pages/OAuth2Success';
-import { AUTH_SESSION_CHANGED_EVENT } from './api/axiosClient';
+import AdminUsers from './pages/AdminUsers';
+import { AUTH_SESSION_CHANGED_EVENT, getCurrentSessionRole } from './api/axiosClient';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => Boolean(localStorage.getItem('access_token')));
+  const [role, setRole] = useState(() => getCurrentSessionRole());
+  const hasTokenInStorage = Boolean(localStorage.getItem('access_token'));
+  const effectiveIsAuthenticated = isAuthenticated || hasTokenInStorage;
+  const effectiveRole = role ?? getCurrentSessionRole();
+  const defaultAuthenticatedPath = effectiveRole === 'ADMIN' ? '/admin/users' : '/dashboard';
+
+  let adminUsersElement = <Navigate to="/login" />;
+  if (effectiveIsAuthenticated && effectiveRole === 'ADMIN') {
+    adminUsersElement = <AdminUsers />;
+  }
+  if (effectiveIsAuthenticated && effectiveRole !== 'ADMIN') {
+    adminUsersElement = <Navigate to="/dashboard" />;
+  }
+
+  let dashboardElement = <Navigate to="/login" />;
+  if (effectiveIsAuthenticated && effectiveRole === 'ADMIN') {
+    dashboardElement = <Navigate to="/admin/users" />;
+  }
+  if (effectiveIsAuthenticated && effectiveRole !== 'ADMIN') {
+    dashboardElement = <Dashboard />;
+  }
 
   useEffect(() => {
-    const syncAuthState = () => setIsAuthenticated(Boolean(localStorage.getItem('access_token')));
+    const syncAuthState = () => {
+      setIsAuthenticated(Boolean(localStorage.getItem('access_token')));
+      setRole(getCurrentSessionRole());
+    };
 
     globalThis.addEventListener('storage', syncAuthState);
     globalThis.addEventListener(AUTH_SESSION_CHANGED_EVENT, syncAuthState);
@@ -38,13 +63,14 @@ function App() {
           <Route path="/features" element={<Features />} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/about" element={<About />} />
-          <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" /> : <Login />} />
-          <Route path="/register" element={isAuthenticated ? <Navigate to="/dashboard" /> : <Register />} />
+          <Route path="/login" element={effectiveIsAuthenticated ? <Navigate to={defaultAuthenticatedPath} /> : <Login />} />
+          <Route path="/register" element={effectiveIsAuthenticated ? <Navigate to={defaultAuthenticatedPath} /> : <Register />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/forgot-password/verify" element={<ForgotPasswordVerifyOtp />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/oauth2/success" element={<OAuth2Success />} />
-          <Route path="/dashboard" element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" />} />
+          <Route path="/dashboard" element={dashboardElement} />
+          <Route path="/admin/users" element={adminUsersElement} />
         </Routes>
       </div>
     </BrowserRouter>

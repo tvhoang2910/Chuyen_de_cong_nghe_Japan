@@ -1,32 +1,34 @@
 import React, { useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { clearAuthSession, persistAuthSession } from '../api/axiosClient';
 
 const OAuth2Success: React.FC = () => {
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
 
   useEffect(() => {
     const token = searchParams.get('token');
     const refreshToken = searchParams.get('refreshToken');
     const email = searchParams.get('email');
+    const role = searchParams.get('role');
 
     if (token) {
+      const nextPath = role === 'ADMIN' ? '/admin/users' : '/dashboard';
       persistAuthSession({
         accessToken: token,
         refreshToken: refreshToken || undefined,
         email: email || undefined,
+        role: role || undefined,
       });
       toast.success('Đăng nhập Google thành công!');
-      navigate('/dashboard', { replace: true });
+      globalThis.location.replace(nextPath);
       return;
     }
 
     clearAuthSession();
     toast.error('Đăng nhập Google thất bại. Vui lòng thử lại.');
-    navigate('/login', { replace: true });
-  }, [navigate, searchParams]);
+    globalThis.location.replace('/login');
+  }, [searchParams]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50">

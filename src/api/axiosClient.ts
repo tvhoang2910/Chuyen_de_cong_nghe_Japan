@@ -5,14 +5,107 @@ type AuthPayload = {
   accessToken: string;
   refreshToken?: string;
   email?: string;
+  role?: string;
 };
+
+export type AppRole = 'USER' | 'CONTRIBUTOR' | 'ADMIN';
 
 export type UserProfile = {
   id: number;
   email: string;
   fullName: string;
-  role: string;
+  avatarUrl?: string | null;
+  phoneNumber?: string | null;
+  school?: string | null;
+  subject?: string | null;
+  role: AppRole;
   premium: boolean;
+};
+
+export type UpdateMyProfilePayload = {
+  fullName?: string;
+  avatarUrl?: string | null;
+  phoneNumber?: string | null;
+  school?: string | null;
+  subject?: string | null;
+  currentPassword?: string;
+  newPassword?: string;
+};
+
+export type AdminUserItem = {
+  id: number;
+  email: string;
+  fullName: string;
+  avatarUrl?: string | null;
+  phoneNumber?: string | null;
+  school?: string | null;
+  subject?: string | null;
+  role: AppRole;
+  status: boolean;
+  statusCode: number;
+  statusReason?: string | null;
+  statusChangedBy?: string | null;
+  createdAt: string;
+};
+
+export type AdminUsersPage = {
+  content: AdminUserItem[];
+  totalPages: number;
+  totalElements: number;
+  number: number;
+  size: number;
+};
+
+export type FetchAdminUsersParams = {
+  page?: number;
+  size?: number;
+  search?: string;
+  role?: AppRole | '';
+};
+
+export type CreateAdminUserPayload = {
+  email: string;
+  fullName: string;
+  password: string;
+  role?: AppRole;
+};
+
+export type UpdateAdminUserStatusPayload = {
+  active?: boolean;
+  status?: number;
+  reason: string;
+};
+
+export type UpdateAdminUserRolePayload = {
+  role: AppRole;
+};
+
+export type ImportAdminUserItemPayload = {
+  email: string;
+  fullName: string;
+  password: string;
+  role?: AppRole;
+  avatarUrl?: string;
+  phoneNumber?: string;
+  school?: string;
+  subject?: string;
+};
+
+export type ImportAdminUsersPayload = {
+  users: ImportAdminUserItemPayload[];
+  skipExisting?: boolean;
+};
+
+export type ImportAdminUsersResponse = {
+  total: number;
+  created: number;
+  skipped: number;
+  failed: number;
+  errors: Array<{
+    index: number;
+    email: string;
+    reason: string;
+  }>;
 };
 
 type RetryableRequestConfig = InternalAxiosRequestConfig & {
@@ -58,6 +151,9 @@ export const persistAuthSession = (payload: AuthPayload) => {
   if (payload.email) {
     localStorage.setItem('user_email', payload.email);
   }
+  if (payload.role) {
+    localStorage.setItem('user_role', payload.role);
+  }
   notifyAuthSessionChanged();
 };
 
@@ -65,11 +161,63 @@ export const clearAuthSession = () => {
   localStorage.removeItem('access_token');
   localStorage.removeItem('refresh_token');
   localStorage.removeItem('user_email');
+  localStorage.removeItem('user_role');
   notifyAuthSessionChanged();
+};
+
+export const getCurrentSessionRole = (): AppRole | null => {
+  const role = localStorage.getItem('user_role');
+  return role === 'USER' || role === 'CONTRIBUTOR' || role === 'ADMIN' ? role : null;
 };
 
 export const fetchCurrentUserProfile = async (): Promise<UserProfile> => {
   const response = await axiosClient.get<UserProfile>('/me');
+  return response.data;
+};
+
+export const updateCurrentUserProfile = async (payload: UpdateMyProfilePayload): Promise<UserProfile> => {
+  const response = await axiosClient.patch<UserProfile>('/me', payload);
+  return response.data;
+};
+
+export const fetchAdminUsers = async (params: FetchAdminUsersParams): Promise<AdminUsersPage> => {
+  const query = new URLSearchParams();
+  query.set('page', String(params.page ?? 0));
+  query.set('size', String(params.size ?? 10));
+  if (params.search?.trim()) {
+    query.set('search', params.search.trim());
+  }
+  if (params.role) {
+    query.set('role', params.role);
+  }
+
+  const response = await axiosClient.get<AdminUsersPage>(`/admin/users?${query.toString()}`);
+  return response.data;
+};
+
+export const createAdminUser = async (payload: CreateAdminUserPayload): Promise<AdminUserItem> => {
+  const response = await axiosClient.post<AdminUserItem>('/admin/users', payload);
+  return response.data;
+};
+
+export const updateAdminUserStatus = async (
+  userId: number,
+  payload: UpdateAdminUserStatusPayload,
+): Promise<AdminUserItem> => {
+  const response = await axiosClient.put<AdminUserItem>(`/admin/users/${userId}/status`, payload);
+  return response.data;
+};
+
+export const updateAdminUserRole = async (
+  userId: number,
+  payload: UpdateAdminUserRolePayload,
+): Promise<AdminUserItem> => {
+  const response = await axiosClient.put<AdminUserItem>(`/admin/users/${userId}/role`, payload);
+  return response.data;
+};
+
+export const importAdminUsers = async (payload: ImportAdminUsersPayload): Promise<ImportAdminUsersResponse> => {
+  const response = await axiosClient.post<ImportAdminUsersResponse>('/admin/users/import-json', payload);
   return response.data;
 };
 
@@ -103,6 +251,7 @@ const requestNewAccessToken = async (): Promise<string | null> => {
     accessToken,
     refreshToken: response.data?.refreshToken,
     email: response.data?.email,
+    role: response.data?.role,
   });
 
   return accessToken;
