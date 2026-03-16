@@ -180,6 +180,18 @@ export const updateCurrentUserProfile = async (payload: UpdateMyProfilePayload):
   return response.data;
 };
 
+export const uploadCurrentUserAvatar = async (file: File): Promise<UserProfile> => {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await axiosClient.post<UserProfile>('/me/avatar', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  return response.data;
+};
+
 export const fetchAdminUsers = async (params: FetchAdminUsersParams): Promise<AdminUsersPage> => {
   const query = new URLSearchParams();
   query.set('page', String(params.page ?? 0));

@@ -1,42 +1,55 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { Toaster } from 'react-hot-toast';
-import Home from './pages/Home';
-import About from './pages/About';
-import Features from './pages/Features';
-import Pricing from './pages/Pricing';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import ForgotPassword from './pages/ForgotPassword';
-import ForgotPasswordVerifyOtp from './pages/ForgotPasswordVerifyOtp';
-import ResetPassword from './pages/ResetPassword';
-import Dashboard from './pages/Dashboard';
-import OAuth2Success from './pages/OAuth2Success';
-import AdminUsers from './pages/AdminUsers';
 import { AUTH_SESSION_CHANGED_EVENT, getCurrentSessionRole } from './api/axiosClient';
+
+const Home = lazy(() => import('./pages/Home'));
+const About = lazy(() => import('./pages/About'));
+const Features = lazy(() => import('./pages/Features'));
+const Pricing = lazy(() => import('./pages/Pricing'));
+const Login = lazy(() => import('./pages/Login'));
+const Register = lazy(() => import('./pages/Register'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const ForgotPasswordVerifyOtp = lazy(() => import('./pages/ForgotPasswordVerifyOtp'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const OAuth2Success = lazy(() => import('./pages/OAuth2Success'));
+const AdminUsers = lazy(() => import('./pages/AdminUsers'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+
+const RouteLoader = () => (
+  <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-600 font-semibold italic animate-pulse">
+    Đang tải hệ thống...
+  </div>
+);
+
+interface ProtectedRouteProps {
+  children: React.ReactNode;
+  allowedRoles?: string[];
+  isAuthenticated: boolean;
+  userRole: string | null;
+  defaultPath: string;
+}
+
+const ProtectedRoute = ({ children, allowedRoles, isAuthenticated, userRole, defaultPath }: ProtectedRouteProps) => {
+  if (!isAuthenticated) return <Navigate to="/login" />;
+  if (allowedRoles && !allowedRoles.includes(userRole || '')) return <Navigate to={defaultPath} />;
+  return <>{children}</>;
+};
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => Boolean(localStorage.getItem('access_token')));
   const [role, setRole] = useState(() => getCurrentSessionRole());
+  
   const hasTokenInStorage = Boolean(localStorage.getItem('access_token'));
   const effectiveIsAuthenticated = isAuthenticated || hasTokenInStorage;
   const effectiveRole = role ?? getCurrentSessionRole();
-  const defaultAuthenticatedPath = effectiveRole === 'ADMIN' ? '/admin/users' : '/dashboard';
-
-  let adminUsersElement = <Navigate to="/login" />;
-  if (effectiveIsAuthenticated && effectiveRole === 'ADMIN') {
-    adminUsersElement = <AdminUsers />;
-  }
-  if (effectiveIsAuthenticated && effectiveRole !== 'ADMIN') {
-    adminUsersElement = <Navigate to="/dashboard" />;
-  }
-
-  let dashboardElement = <Navigate to="/login" />;
-  if (effectiveIsAuthenticated && effectiveRole === 'ADMIN') {
-    dashboardElement = <Navigate to="/admin/users" />;
-  }
-  if (effectiveIsAuthenticated && effectiveRole !== 'ADMIN') {
-    dashboardElement = <Dashboard />;
+  
+  let defaultAuthenticatedPath = '/dashboard';
+  if (effectiveRole === 'ADMIN') {
+    defaultAuthenticatedPath = '/admin/users';
+  } else if (effectiveRole === 'CONTRIBUTOR') {
+    defaultAuthenticatedPath = '/contributor';
   }
 
   useEffect(() => {
@@ -58,20 +71,87 @@ function App() {
     <BrowserRouter>
       <div className="min-h-screen flex flex-col font-sans bg-slate-50 text-slate-900">
         <Toaster position="top-right" />
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/features" element={<Features />} />
-          <Route path="/pricing" element={<Pricing />} />
-          <Route path="/about" element={<About />} />
-          <Route path="/login" element={effectiveIsAuthenticated ? <Navigate to={defaultAuthenticatedPath} /> : <Login />} />
-          <Route path="/register" element={effectiveIsAuthenticated ? <Navigate to={defaultAuthenticatedPath} /> : <Register />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/forgot-password/verify" element={<ForgotPasswordVerifyOtp />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/oauth2/success" element={<OAuth2Success />} />
-          <Route path="/dashboard" element={dashboardElement} />
-          <Route path="/admin/users" element={adminUsersElement} />
-        </Routes>
+        <Suspense fallback={<RouteLoader />}>
+          <Routes>
+            {/* Public Routes */}
+            <Route path="/" element={<Home />} />
+            <Route path="/features" element={<Features />} />
+            <Route path="/pricing" element={<Pricing />} />
+            <Route path="/about" element={<About />} />
+            <Route 
+              path="/login" 
+              element={effectiveIsAuthenticated ? <Navigate to={defaultAuthenticatedPath} /> : <Login />} 
+            />
+            <Route 
+              path="/register" 
+              element={effectiveIsAuthenticated ? <Navigate to={defaultAuthenticatedPath} /> : <Register />} 
+            />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/forgot-password/verify" element={<ForgotPasswordVerifyOtp />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/oauth2/success" element={<OAuth2Success />} />
+
+            {/* User/Contributor Routes */}
+            <Route 
+              path="/dashboard" 
+              element={
+                <ProtectedRoute 
+                  isAuthenticated={effectiveIsAuthenticated} 
+                  userRole={effectiveRole} 
+                  defaultPath={defaultAuthenticatedPath} 
+                  allowedRoles={['USER']}
+                >
+                  <Dashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/contributor" 
+              element={
+                <ProtectedRoute 
+                  isAuthenticated={effectiveIsAuthenticated} 
+                  userRole={effectiveRole} 
+                  defaultPath={defaultAuthenticatedPath} 
+                  allowedRoles={['CONTRIBUTOR']}
+                >
+                  <Dashboard />
+                </ProtectedRoute>
+              } 
+            />
+
+            {/* Admin Routes */}
+            <Route 
+              path="/admin/users" 
+              element={
+                <ProtectedRoute 
+                  isAuthenticated={effectiveIsAuthenticated} 
+                  userRole={effectiveRole} 
+                  defaultPath={defaultAuthenticatedPath} 
+                  allowedRoles={['ADMIN']}
+                >
+                  <AdminUsers />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/admin/dashboard" 
+              element={
+                <ProtectedRoute 
+                  isAuthenticated={effectiveIsAuthenticated} 
+                  userRole={effectiveRole} 
+                  defaultPath={defaultAuthenticatedPath} 
+                  allowedRoles={['ADMIN']}
+                >
+                  <AdminDashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route path="/admin" element={<Navigate to="/admin/users" />} />
+
+            {/* Fallback */}
+            <Route path="*" element={<Navigate to="/" />} />
+          </Routes>
+        </Suspense>
       </div>
     </BrowserRouter>
   );

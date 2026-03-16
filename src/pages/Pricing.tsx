@@ -129,19 +129,19 @@ const Pricing: React.FC = () => {
                  <div className="w-12 h-12 rounded-2xl bg-white shadow-xl flex items-center justify-center border border-slate-100">
                     <ShieldCheck className="w-6 h-6 text-emerald-500" />
                  </div>
-                 <h4 className="font-black text-sm uppercase tracking-widest text-slate-400">An toàn tuyệt đối</h4>
+                  <h4 className="font-black text-sm uppercase tracking-widest text-slate-600">An toàn tuyệt đối</h4>
               </div>
               <div className="flex flex-col items-center gap-4">
                  <div className="w-12 h-12 rounded-2xl bg-white shadow-xl flex items-center justify-center border border-slate-100">
                     <Zap className="w-6 h-6 text-amber-500" />
                  </div>
-                 <h4 className="font-black text-sm uppercase tracking-widest text-slate-400">Xử lý tức thì</h4>
+                  <h4 className="font-black text-sm uppercase tracking-widest text-slate-600">Xử lý tức thì</h4>
               </div>
               <div className="flex flex-col items-center gap-4">
                  <div className="w-12 h-12 rounded-2xl bg-white shadow-xl flex items-center justify-center border border-slate-100">
                     <Sparkles className="w-6 h-6 text-blue-500" />
                  </div>
-                 <h4 className="font-black text-sm uppercase tracking-widest text-slate-400">Thông minh vượt trội</h4>
+                  <h4 className="font-black text-sm uppercase tracking-widest text-slate-600">Thông minh vượt trội</h4>
               </div>
            </div>
         </section>

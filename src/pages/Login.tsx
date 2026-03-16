@@ -1,222 +1,216 @@
 import React, { useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import axios from 'axios';
-import { useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, BookOpen, Loader2, Mail, Lock, Sparkles } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Mail, Lock, ArrowRight, BookOpen, Loader2, Sparkles, Orbit, ShieldCheck } from 'lucide-react';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
-import axiosClient, { persistAuthSession } from '../api/axiosClient';
+import axiosClient, { fetchCurrentUserProfile, persistAuthSession } from '../api/axiosClient';
 
-const GOOGLE_AUTH_URL = `${import.meta.env.VITE_AUTH_BASE_URL || 'http://localhost:8080/api/v1/auth'}/oauth2/authorization/google`;
-
-const loginSchema = z.object({
-  email: z.email('Email không hợp lệ'),
-  password: z.string().min(1, 'Vui lòng nhập mật khẩu'),
-});
-
-type LoginFormData = z.infer<typeof loginSchema>;
+const GoogleIcon: React.FC = () => (
+  <svg viewBox="0 0 24 24" className="w-5 h-5" aria-hidden="true" focusable="false">
+    <path fill="#EA4335" d="M12 10.2v3.9h5.5c-.2 1.3-1.5 3.9-5.5 3.9-3.3 0-6-2.7-6-6s2.7-6 6-6c1.9 0 3.2.8 3.9 1.5l2.7-2.6C16.9 3.3 14.7 2.4 12 2.4 6.8 2.4 2.6 6.6 2.6 11.8s4.2 9.4 9.4 9.4c5.4 0 9-3.8 9-9.2 0-.6-.1-1.1-.2-1.8H12z"/>
+    <path fill="#34A853" d="M3.7 7.7l3.2 2.3C7.8 8.1 9.7 6.6 12 6.6c1.9 0 3.2.8 3.9 1.5l2.7-2.6C16.9 3.3 14.7 2.4 12 2.4 8.4 2.4 5.2 4.4 3.7 7.7z"/>
+    <path fill="#FBBC05" d="M2.6 11.8c0 1.5.4 2.9 1.1 4.1l3.6-2.8c-.2-.5-.3-.9-.3-1.3 0-.5.1-1 .3-1.4L3.7 7.7c-.7 1.2-1.1 2.6-1.1 4.1z"/>
+    <path fill="#4285F4" d="M12 21.2c2.7 0 4.9-.9 6.5-2.4L15.5 16c-.8.6-1.9 1-3.5 1-2.3 0-4.2-1.5-4.9-3.6l-3.6 2.8c1.5 3.3 4.7 5 8.5 5z"/>
+  </svg>
+);
 
 const Login: React.FC = () => {
-  const { register, handleSubmit, formState: { errors } } = useForm<LoginFormData>({
-    resolver: zodResolver(loginSchema)
-  });
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
-  const [lockMessage, setLockMessage] = useState<string | null>(null);
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+  });
 
-  const handleGoogleLogin = () => {
-    globalThis.location.href = GOOGLE_AUTH_URL;
+  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = event.target;
+    setFormData((previous) => ({ ...previous, [name]: value }));
   };
 
-  const onSubmit = async (data: LoginFormData) => {
+  const handleLogin = async (event: React.SyntheticEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!formData.email || !formData.password) {
+      toast.error('Vui lòng nhập đầy đủ email và mật khẩu.');
+      return;
+    }
+
     try {
       setIsLoading(true);
-      setLockMessage(null);
-      const res = await axiosClient.post('/login', data);
-      if (res.status === 200 && res.data.accessToken) {
-        const nextPath = res.data.role === 'ADMIN' ? '/admin/users' : '/dashboard';
+      const response = await axiosClient.post('/login', formData);
+      persistAuthSession(response.data);
+
+      let userRole = response.data.role as string | undefined;
+      if (!userRole) {
+        const profile = await fetchCurrentUserProfile();
+        userRole = profile.role;
         persistAuthSession({
-          accessToken: res.data.accessToken,
-          refreshToken: res.data.refreshToken,
-          email: res.data.email,
-          role: res.data.role,
+          accessToken: response.data.accessToken,
+          refreshToken: response.data.refreshToken,
+          email: response.data.email,
+          role: profile.role,
         });
-        toast.success('Chào mừng bạn quay trở lại!', { icon: '✨' });
-        setTimeout(() => {
-          navigate(nextPath);
-        }, 500);
       }
-    } catch (err) {
-      console.error(err);
-      if (axios.isAxiosError(err) && err.response?.status === 429) {
-        const messageFromServer =
-          typeof err.response.data?.message === 'string'
-            ? err.response.data.message
-            : 'Tài khoản tạm khóa do đăng nhập sai nhiều lần. Thử lại sau 30 phút.';
-        setLockMessage(messageFromServer);
-        toast.error(messageFromServer);
-      } else {
-        toast.error('Email hoặc mật khẩu không chính xác.');
+
+      let targetPath = '/dashboard';
+      if (userRole === 'ADMIN') {
+        targetPath = '/admin/users';
+      } else if (userRole === 'CONTRIBUTOR') {
+        targetPath = '/contributor';
       }
+      
+      toast.success('Đăng nhập thành công!');
+      navigate(targetPath);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại.');
     } finally {
       setIsLoading(false);
     }
   };
 
+  const handleGoogleLogin = () => {
+    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1/auth';
+    globalThis.location.href = `${apiBaseUrl}/oauth2/authorization/google`;
+  };
+
   return (
-    <motion.div 
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="min-h-screen flex bg-white font-sans overflow-hidden"
-    >
-      {/* Left Pane - Premium Graphic */}
-      <div className="hidden lg:flex w-1/2 bg-slate-900 relative items-center justify-center overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,#3b82f6,transparent_50%)] opacity-20"></div>
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_80%,#6366f1,transparent_50%)] opacity-20"></div>
-        <div className="absolute top-[-10%] right-[-10%] w-[600px] h-[600px] bg-blue-500/10 rounded-full blur-[120px] animate-float"></div>
-        
-        <div className="relative z-10 p-16 max-w-xl">
-          <motion.div 
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ duration: 0.5 }}
-            className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mb-10 shadow-2xl shadow-blue-600/40"
-          >
-            <BookOpen className="w-8 h-8 text-white" />
-          </motion.div>
-          <motion.h1 
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.2 }}
-            className="text-6xl font-black text-white mb-8 leading-[1.1] tracking-tight"
-          >
-            Hành trình chinh phục <br /> <span className="text-blue-500">tri thức VNU.</span>
-          </motion.h1>
-          <motion.p 
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.3 }}
-            className="text-slate-400 text-xl leading-relaxed font-medium"
-          >
-            Đăng nhập để tiếp tục lộ trình ôn tập cá nhân hóa và vượt qua mọi kỳ thi với kết quả xuất sắc nhất.
-          </motion.p>
+    <div className="relative min-h-screen overflow-hidden bg-slate-950 text-white">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,#2563eb55_0%,transparent_38%),radial-gradient(circle_at_88%_14%,#22d3ee3f_0%,transparent_30%),radial-gradient(circle_at_40%_90%,#7c3aed3d_0%,transparent_35%)]" />
+      <div className="absolute inset-0 bg-noise opacity-30" />
+      <motion.div className="auth-orb auth-orb-one" animate={{ x: [0, 18, -12, 0], y: [0, -18, 12, 0] }} transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut' }} />
+      <motion.div className="auth-orb auth-orb-two" animate={{ x: [0, -16, 20, 0], y: [0, 16, -16, 0] }} transition={{ duration: 16, repeat: Infinity, ease: 'easeInOut' }} />
 
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.5 }}
-            className="mt-12 flex items-center gap-4 p-4 glass border-white/5 rounded-2xl"
-          >
-            <div className="w-12 h-12 bg-blue-600/20 rounded-xl flex items-center justify-center">
-               <Sparkles className="w-6 h-6 text-blue-400" />
-            </div>
-            <div>
-               <p className="text-white font-bold">SM-2 Algorithm Active</p>
-               <p className="text-slate-400 text-sm">Tối ưu hóa khả năng ghi nhớ của bạn.</p>
-            </div>
-          </motion.div>
-        </div>
-      </div>
-
-      {/* Right Pane - Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 sm:p-12 bg-slate-50">
-        <div className="w-full max-w-md">
-          <div className="mb-8">
-            <Link to="/" className="inline-flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-blue-600 transition-all group">
-              <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" /> Quay lại trang chủ
-            </Link>
-          </div>
-
-          <div className="mb-10">
-            <h2 className="text-4xl font-black text-slate-900 mb-3 tracking-tight">Chào mừng trở lại</h2>
-            <p className="text-slate-500 font-medium">Bắt đầu phiên học tập mới của bạn ngay bây giờ.</p>
-          </div>
-
-          <motion.button
-            whileHover={{ scale: 1.01 }}
-            whileTap={{ scale: 0.99 }}
-            type="button"
-            onClick={handleGoogleLogin}
-            className="w-full flex items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white px-6 py-4 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-sm mb-8"
-          >
-            <svg className="h-5 w-5" viewBox="0 0 24 24">
-              <path fill="#EA4335" d="M12 10.2v3.9h5.5c-.2 1.2-.9 2.3-1.9 3.1l3 2.3c1.8-1.6 2.8-4 2.8-6.8 0-.6-.1-1.2-.2-1.8H12z" />
-              <path fill="#34A853" d="M12 21c2.6 0 4.8-.9 6.4-2.5l-3-2.3c-.8.6-1.9 1-3.4 1-2.6 0-4.9-1.8-5.7-4.3l-3.1 2.4C4.7 18.8 8.1 21 12 21z" />
-              <path fill="#FBBC05" d="M6.3 12.9c0-.7.1-1.3.3-1.9L3.5 8.6C2.9 9.9 2.5 11.4 2.5 12.9c0 1.5.4 3 1 4.3l3.1-2.4c-.2-.6-.3-1.2-.3-1.9z" />
-              <path fill="#4285F4" d="M12 8.6c1.4 0 2.7.5 3.7 1.4l2.8-2.8C16.8 5.7 14.6 4.8 12 4.8c-3.9 0-7.3 2.2-8.9 5.4L6.2 12c.8-2.5 3.1-3.4 5.8-3.4z" />
-            </svg>
-            Đăng nhập với Google
-          </motion.button>
-
-          <div className="relative mb-8">
-            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200"></div></div>
-            <div className="relative flex justify-center text-xs uppercase tracking-widest font-black text-slate-400">
-              <span className="px-4 bg-slate-50">Hoặc sử dụng Email</span>
-            </div>
-          </div>
-
-          <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-700 ml-1">Email của bạn</label>
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                <input
-                  {...register('email')}
-                  type="email"
-                  className="w-full pl-12 pr-4 py-4 rounded-2xl border border-slate-200 bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/5 outline-none transition-all font-medium"
-                  placeholder="name@student.vnu.edu.vn"
-                />
-              </div>
-              {errors.email && <p className="text-red-500 text-xs font-bold mt-1 ml-1">{errors.email.message}</p>}
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex justify-between items-center ml-1">
-                <label className="text-sm font-bold text-slate-700">Mật khẩu</label>
-                <Link to="/forgot-password" size="sm" className="text-xs font-bold text-blue-600 hover:text-blue-700">Quên mật khẩu?</Link>
-              </div>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                <input
-                  {...register('password')}
-                  type="password"
-                  className="w-full pl-12 pr-4 py-4 rounded-2xl border border-slate-200 bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/5 outline-none transition-all font-medium"
-                  placeholder="••••••••"
-                />
-              </div>
-              {errors.password && <p className="text-red-500 text-xs font-bold mt-1 ml-1">{errors.password.message}</p>}
-            </div>
-
-            <div className="pt-2">
-              {lockMessage && (
-                <div className="mb-4 p-4 rounded-2xl bg-red-50 border border-red-100 text-sm text-red-700 font-bold flex items-center gap-3">
-                  <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
-                  {lockMessage}
+      <div className="relative z-10 grid min-h-screen grid-cols-1 lg:grid-cols-2">
+        <div className="hidden lg:flex items-center justify-center p-14 xl:p-20">
+          <div className="auth-perspective w-full max-w-xl">
+            <motion.div
+              initial={{ opacity: 0, y: 24, rotateX: 12 }}
+              animate={{ opacity: 1, y: 0, rotateX: 0 }}
+              transition={{ duration: 0.8 }}
+              className="auth-tilt-card rounded-[2rem] border border-white/20 bg-white/10 p-8 backdrop-blur-xl"
+            >
+              <Link to="/" className="mb-8 inline-flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-cyan-200/40 bg-cyan-300/20">
+                  <BookOpen className="h-6 w-6 text-cyan-100" />
                 </div>
-              )}
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+                <span className="text-2xl font-black tracking-tight">ExamBank</span>
+              </Link>
+
+              <h2 className="text-5xl font-black leading-tight">Chào mừng trở lại</h2>
+              <p className="mt-4 max-w-lg text-base leading-7 text-slate-200">
+                Kích hoạt lại nhịp học tập của bạn với dashboard thông minh, lộ trình bám sát tiến độ và kho đề thi liên tục cập nhật.
+              </p>
+
+              <div className="mt-8 grid grid-cols-2 gap-4">
+                {[
+                  { icon: Orbit, label: 'SM-2 Engine', value: '92% nhớ lâu' },
+                  { icon: Sparkles, label: 'Smart Insights', value: 'AI gợi ý đề' },
+                  { icon: ShieldCheck, label: 'Secure Login', value: 'JWT + Refresh' },
+                  { icon: BookOpen, label: 'Question Bank', value: '10k+ câu hỏi' },
+                ].map((item) => (
+                  <div key={item.label} className="rounded-2xl border border-white/15 bg-slate-900/30 p-4">
+                    <item.icon className="h-5 w-5 text-cyan-200" />
+                    <p className="mt-3 text-xs uppercase tracking-[0.18em] text-slate-300">{item.label}</p>
+                    <p className="mt-1 text-sm font-bold text-white">{item.value}</p>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-center p-6 sm:p-10 lg:p-14">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+            className="w-full max-w-xl rounded-[2rem] border border-white/25 bg-white/90 p-7 text-slate-900 shadow-[0_30px_100px_-30px_rgba(14,116,144,0.65)] backdrop-blur-xl sm:p-10"
+          >
+            <div className="mb-8 flex items-center justify-between">
+              <div>
+                <h1 className="text-3xl font-black tracking-tight">Đăng nhập</h1>
+                <p className="mt-1 text-sm font-medium text-slate-500">Sẵn sàng quay lại guồng học tập chưa?</p>
+              </div>
+              <Link to="/" className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black uppercase tracking-[0.14em] text-slate-600 hover:border-cyan-200 hover:text-cyan-700">
+                Home
+              </Link>
+            </div>
+
+            <form onSubmit={handleLogin} className="space-y-5">
+              <div>
+                <label htmlFor="email-input" className="mb-2 ml-1 block text-xs font-black uppercase tracking-[0.14em] text-slate-500">Địa chỉ Email</label>
+                <div className="group relative">
+                  <Mail className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-cyan-600" />
+                  <input
+                    id="email-input"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    placeholder="name@university.edu"
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-4 pl-12 pr-4 text-sm font-semibold outline-none transition-all focus:border-cyan-500 focus:bg-white focus:ring-4 focus:ring-cyan-600/10"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div className="mb-2 ml-1 flex items-center justify-between">
+                  <label htmlFor="password-input" className="block text-xs font-black uppercase tracking-[0.14em] text-slate-500">Mật khẩu</label>
+                  <Link to="/forgot-password" className="text-xs font-black uppercase tracking-[0.1em] text-cyan-700 hover:text-cyan-800">Quên mật khẩu?</Link>
+                </div>
+                <div className="group relative">
+                  <Lock className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-cyan-600" />
+                  <input
+                    id="password-input"
+                    name="password"
+                    type="password"
+                    autoComplete="current-password"
+                    value={formData.password}
+                    onChange={handleInputChange}
+                    placeholder="••••••••"
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-4 pl-12 pr-4 text-sm font-semibold outline-none transition-all focus:border-cyan-500 focus:bg-white focus:ring-4 focus:ring-cyan-600/10"
+                  />
+                </div>
+              </div>
+
+              <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full flex justify-center items-center py-4 px-6 rounded-2xl text-base font-black text-white bg-slate-900 hover:bg-blue-600 focus:outline-none transition-all disabled:opacity-70 shadow-xl shadow-slate-900/10"
+                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 py-4 font-black text-white shadow-lg shadow-slate-900/25 transition-all hover:bg-cyan-700 disabled:opacity-60"
               >
-                {isLoading ? <><Loader2 className="animate-spin w-5 h-5 mr-2" /> Đang xác thực...</> : 'Đăng nhập ngay'}
-              </motion.button>
-            </div>
-          </form>
+                {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Xác nhận đăng nhập'}
+                {!isLoading && <ArrowRight className="h-5 w-5" />}
+              </button>
+            </form>
 
-          <p className="mt-10 text-center text-sm font-medium text-slate-500">
-            Bạn là thành viên mới?{' '}
-            <Link to="/register" className="font-black text-blue-600 hover:text-blue-700 underline underline-offset-4">
-              Tạo tài khoản miễn phí
-            </Link>
-          </p>
+            <div className="relative my-8">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-slate-200" />
+              </div>
+              <div className="relative flex justify-center text-xs font-black uppercase tracking-[0.16em] text-slate-400">
+                <span className="bg-white px-4">Hoặc tiếp tục với</span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleGoogleLogin}
+              className="group flex w-full items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 transition-all hover:-translate-y-0.5 hover:border-cyan-200 hover:bg-cyan-50/60 hover:text-cyan-800"
+            >
+              <GoogleIcon />
+              <span>Google</span>
+            </button>
+
+            <p className="mt-8 text-center text-sm font-semibold text-slate-500">
+              Chưa có tài khoản?{' '}
+              <Link to="/register" className="font-black text-cyan-700 underline decoration-2 underline-offset-4 hover:text-cyan-800">
+                Đăng ký ngay
+              </Link>
+            </p>
+          </motion.div>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 };
 

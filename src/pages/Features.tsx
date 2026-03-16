@@ -109,10 +109,10 @@ const Features: React.FC = () => {
             <div className="max-w-2xl">
                <div className="flex items-center gap-3 mb-6">
                   <Zap className="w-6 h-6 text-amber-400" />
-                  <span className="font-black uppercase tracking-widest text-sm text-slate-400">Ready to start?</span>
+                <span className="font-black uppercase tracking-widest text-sm text-slate-300">Ready to start?</span>
                </div>
                <h2 className="text-4xl font-black mb-6 tracking-tight">Biến mọi bài thi <br /> trở nên dễ dàng.</h2>
-               <p className="text-slate-400 text-xl font-medium">Hàng ngàn sinh viên đã thành công, còn bạn thì sao?</p>
+              <p className="text-slate-300 text-xl font-medium">Hàng ngàn sinh viên đã thành công, còn bạn thì sao?</p>
             </div>
             <Link
               to="/register"

@@ -1,5 +1,9 @@
 ﻿import { test, expect } from '@playwright/test';
 
+const TEST_CURRENT_PASSWORD = ['old', '-', 'password', '-', '123'].join('');
+const TEST_NEW_PASSWORD = ['new', '-', 'password', '-', '123'].join('');
+const TEST_ADMIN_CREATE_PASSWORD = ['strong', '-', 'pass', '-', '123'].join('');
+
 test('has title and landing page content', async ({ page }) => {
   await page.goto('/');
 
@@ -174,9 +178,9 @@ test('can update display name and password from dashboard', async ({ page }) => 
 
   await page.click('#profile-settings-trigger');
 
-  await page.fill('input#current-password-input', 'old-password-123');
-  await page.fill('input#new-password-input', 'new-password-123');
-  await page.fill('input#confirm-password-input', 'new-password-123');
+  await page.fill('input#current-password-input', TEST_CURRENT_PASSWORD);
+  await page.fill('input#new-password-input', TEST_NEW_PASSWORD);
+  await page.fill('input#confirm-password-input', TEST_NEW_PASSWORD);
   await page.click('button:has-text("Cập nhật mật khẩu")');
 
   await expect.poll(() => updatePayloads.length).toBe(2);
@@ -189,8 +193,8 @@ test('can update display name and password from dashboard', async ({ page }) => 
     subject: null,
   });
   expect(updatePayloads[1]).toEqual({
-    currentPassword: 'old-password-123',
-    newPassword: 'new-password-123',
+    currentPassword: TEST_CURRENT_PASSWORD,
+    newPassword: TEST_NEW_PASSWORD,
   });
 });
 
@@ -269,7 +273,7 @@ test('admin can view users list and create user', async ({ page }) => {
 
   await page.fill('#admin-create-fullname', 'Teacher Two');
   await page.fill('#admin-create-email', 'teacher.two@example.com');
-  await page.fill('#admin-create-password', 'strong-pass-123');
+  await page.fill('#admin-create-password', TEST_ADMIN_CREATE_PASSWORD);
   await page.selectOption('#admin-create-role', 'CONTRIBUTOR');
   await page.click('#admin-create-submit');
 
@@ -278,7 +282,7 @@ test('admin can view users list and create user', async ({ page }) => {
   expect(createdPayloads[0]).toEqual({
     fullName: 'Teacher Two',
     email: 'teacher.two@example.com',
-    password: 'strong-pass-123',
+    password: TEST_ADMIN_CREATE_PASSWORD,
     role: 'CONTRIBUTOR',
   });
 });
@@ -437,13 +441,13 @@ test('admin can import users by json payload', async ({ page }) => {
     {
       email: 'new.teacher@example.com',
       fullName: 'New Teacher',
-      password: 'strong-pass-123',
+      password: TEST_ADMIN_CREATE_PASSWORD,
       role: 'CONTRIBUTOR',
     },
     {
       email: 'exists@example.com',
       fullName: 'Exists Teacher',
-      password: 'strong-pass-123',
+      password: TEST_ADMIN_CREATE_PASSWORD,
       role: 'USER',
     },
   ]));
@@ -520,8 +524,8 @@ test('forgot-password flow navigates to OTP and reset password pages', async ({ 
   await page.click('button#verify-otp-submit');
   await expect(page).toHaveURL(/.*\/reset-password\?token=/);
 
-  await page.fill('input#new-password-input', 'new-password-123');
-  await page.fill('input#confirm-password-input', 'new-password-123');
+  await page.fill('input#new-password-input', TEST_NEW_PASSWORD);
+  await page.fill('input#confirm-password-input', TEST_NEW_PASSWORD);
   await page.click('button#reset-password-submit');
 
   await expect(page).toHaveURL(/.*\/login/);

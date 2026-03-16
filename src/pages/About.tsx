@@ -54,7 +54,7 @@ const About: React.FC = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
-              className="text-slate-400 text-xl font-medium leading-relaxed max-w-2xl"
+              className="text-slate-300 text-xl font-medium leading-relaxed max-w-2xl"
             >
               ExamBank không chỉ là một ngân hàng đề thi. Chúng tôi kết hợp khoa học ghi nhớ và AI để giúp sinh viên Việt Nam học tập thông minh, hiệu quả và bền vững hơn.
             </motion.p>

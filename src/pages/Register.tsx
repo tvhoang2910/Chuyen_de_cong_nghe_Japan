@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, BookOpen, Loader2, User, Mail, Lock, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, BookOpen, Loader2, User, Mail, Lock, CheckCircle2, Rocket, Sparkles, Layers } from 'lucide-react';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import axiosClient from '../api/axiosClient';
@@ -38,8 +38,7 @@ const Register: React.FC = () => {
         toast.success('Tạo tài khoản thành công! Đang chuyển hướng...', { icon: '🚀' });
         setTimeout(() => navigate('/login'), 1500);
       }
-    } catch (err) {
-      console.error(err);
+    } catch {
       toast.error('Email này đã được sử dụng. Vui lòng thử email khác.');
     } finally {
       setIsLoading(false);
@@ -47,152 +46,166 @@ const Register: React.FC = () => {
   };
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="min-h-screen flex bg-white font-sans overflow-hidden"
+      className="relative min-h-screen overflow-hidden bg-slate-950 text-white"
     >
-      {/* Left Pane */}
-      <div className="hidden lg:flex w-1/2 bg-blue-600 relative items-center justify-center overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-700 to-indigo-900"></div>
-        <div className="absolute top-[10%] left-[-10%] w-[500px] h-[500px] bg-white/10 rounded-full blur-[120px] animate-float"></div>
-        <div className="absolute bottom-[-10%] right-[-10%] w-[400px] h-[400px] bg-blue-400/20 rounded-full blur-[100px] animate-float" style={{ animationDelay: '-2s' }}></div>
-        
-        <div className="relative z-10 p-16 max-w-xl text-white">
-          <motion.div 
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="w-16 h-16 bg-white/20 backdrop-blur-xl rounded-2xl flex items-center justify-center mb-10 border border-white/20"
-          >
-            <BookOpen className="w-8 h-8 text-white" />
-          </motion.div>
-          <h1 className="text-6xl font-black mb-8 leading-[1.1] tracking-tight">Gia nhập cộng đồng học tập thông minh.</h1>
-          <p className="text-blue-100 text-xl leading-relaxed font-medium mb-12">
-            Hàng ngàn sinh viên VNU đang sử dụng ExamBank để tối ưu hóa thời gian ôn luyện và đạt kết quả cao nhất.
-          </p>
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_22%_15%,#0ea5e94d_0%,transparent_35%),radial-gradient(circle_at_85%_10%,#6366f14d_0%,transparent_30%),radial-gradient(circle_at_50%_85%,#22c55e33_0%,transparent_40%)]" />
+      <div className="absolute inset-0 bg-noise opacity-35" />
 
-          <div className="space-y-6">
-             {[
-               "Kho đề thi khổng lồ từ các học phần VNU",
-               "Thuật toán SM-2 giúp ghi nhớ lâu bền",
-               "Phân tích năng lực cá nhân bằng AI"
-             ].map((text, i) => (
-               <motion.div 
-                 key={i}
-                 initial={{ x: -20, opacity: 0 }}
-                 animate={{ opacity: 1, x: 0 }}
-                 transition={{ delay: 0.5 + i * 0.1 }}
-                 className="flex items-center gap-4"
-               >
-                 <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center shrink-0">
-                    <CheckCircle2 className="w-4 h-4 text-white" />
-                 </div>
-                 <span className="font-bold text-white/90">{text}</span>
-               </motion.div>
-             ))}
+      <motion.div className="auth-orb auth-orb-three" animate={{ x: [0, 12, -16, 0], y: [0, -16, 10, 0] }} transition={{ duration: 15, repeat: Infinity, ease: 'easeInOut' }} />
+
+      <div className="relative z-10 flex min-h-screen flex-col lg:flex-row">
+        <div className="hidden w-1/2 items-center justify-center p-12 lg:flex xl:p-16">
+          <div className="auth-perspective w-full max-w-2xl">
+            <motion.div
+              initial={{ opacity: 0, rotateX: 10, y: 24 }}
+              animate={{ opacity: 1, rotateX: 0, y: 0 }}
+              transition={{ duration: 0.8 }}
+              className="auth-tilt-card rounded-[2rem] border border-white/20 bg-white/10 p-8 backdrop-blur-xl"
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-emerald-200/40 bg-emerald-300/20">
+                  <Rocket className="h-6 w-6 text-emerald-100" />
+                </div>
+                <p className="text-sm font-black uppercase tracking-[0.2em] text-slate-200">Launch New Account</p>
+              </div>
+
+              <h1 className="mt-7 text-5xl font-black leading-tight">Gia nhập cộng đồng học tập thông minh.</h1>
+              <p className="mt-5 max-w-xl text-lg leading-8 text-slate-200">
+                Tạo tài khoản trong vài giây để dùng kho đề thi lớn, hệ thống ôn tập cá nhân hóa và lộ trình ghi nhớ dài hạn.
+              </p>
+
+              <div className="mt-8 grid grid-cols-3 gap-4">
+                {[
+                  { icon: Sparkles, title: 'Fast Start', value: '30s đăng ký' },
+                  { icon: Layers, title: 'Deep Practice', value: 'Nhiều chế độ' },
+                  { icon: CheckCircle2, title: 'Progress', value: 'Theo dõi realtime' },
+                ].map((item) => (
+                  <div key={item.title} className="rounded-2xl border border-white/15 bg-slate-900/30 p-4">
+                    <item.icon className="h-5 w-5 text-emerald-200" />
+                    <p className="mt-3 text-[11px] font-black uppercase tracking-[0.14em] text-slate-300">{item.title}</p>
+                    <p className="mt-1 text-sm font-bold text-white">{item.value}</p>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
           </div>
         </div>
-      </div>
 
-      {/* Right Pane */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 sm:p-12 bg-slate-50">
-        <div className="w-full max-w-md">
-          <div className="mb-8">
-            <Link to="/" className="inline-flex items-center gap-2 text-sm font-bold text-slate-500 hover:text-blue-600 transition-all group">
-              <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" /> Quay lại trang chủ
-            </Link>
-          </div>
-
-          <div className="mb-10 text-center lg:text-left">
-            <h2 className="text-4xl font-black text-slate-900 mb-3 tracking-tight">Tạo tài khoản mới</h2>
-            <p className="text-slate-500 font-medium">Bắt đầu hành trình học tập của bạn hoàn toàn miễn phí.</p>
-          </div>
-
-          <motion.button
-            whileHover={{ scale: 1.01 }}
-            whileTap={{ scale: 0.99 }}
-            type="button"
-            onClick={handleGoogleSignup}
-            className="w-full flex items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white px-6 py-4 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-all shadow-sm mb-8"
+        <div className="flex w-full items-center justify-center p-6 sm:p-10 lg:w-1/2 lg:p-14">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+            className="w-full max-w-xl rounded-[2rem] border border-white/20 bg-white/90 p-7 text-slate-900 shadow-[0_30px_100px_-30px_rgba(6,182,212,0.65)] backdrop-blur-xl sm:p-10"
           >
-            <svg className="h-5 w-5" viewBox="0 0 24 24">
-              <path fill="#EA4335" d="M12 10.2v3.9h5.5c-.2 1.2-.9 2.3-1.9 3.1l3 2.3c1.8-1.6 2.8-4 2.8-6.8 0-.6-.1-1.2-.2-1.8H12z" />
-              <path fill="#34A853" d="M12 21c2.6 0 4.8-.9 6.4-2.5l-3-2.3c-.8.6-1.9 1-3.4 1-2.6 0-4.9-1.8-5.7-4.3l-3.1 2.4C4.7 18.8 8.1 21 12 21z" />
-              <path fill="#FBBC05" d="M6.3 12.9c0-.7.1-1.3.3-1.9L3.5 8.6C2.9 9.9 2.5 11.4 2.5 12.9c0 1.5.4 3 1 4.3l3.1-2.4c-.2-.6-.3-1.2-.3-1.9z" />
-              <path fill="#4285F4" d="M12 8.6c1.4 0 2.7.5 3.7 1.4l2.8-2.8C16.8 5.7 14.6 4.8 12 4.8c-3.9 0-7.3 2.2-8.9 5.4L6.2 12c.8-2.5 3.1-3.4 5.8-3.4z" />
-            </svg>
-            Tiếp tục với Google
-          </motion.button>
-
-          <div className="relative mb-8">
-            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200"></div></div>
-            <div className="relative flex justify-center text-xs uppercase tracking-widest font-black text-slate-400">
-              <span className="px-4 bg-slate-50">Hoặc đăng ký bằng Email</span>
-            </div>
-          </div>
-
-          <form className="space-y-5" onSubmit={handleSubmit(onSubmit)}>
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-700 ml-1">Họ và tên</label>
-              <div className="relative">
-                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                <input
-                  {...register('fullName')}
-                  type="text"
-                  className="w-full pl-12 pr-4 py-4 rounded-2xl border border-slate-200 bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/5 outline-none transition-all font-medium"
-                  placeholder="Nguyễn Văn A"
-                />
+            <div className="mb-8 flex items-center justify-between">
+              <Link to="/" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-600 hover:border-emerald-200 hover:text-emerald-700">
+                <ArrowLeft className="h-4 w-4" />
+                Trang chủ
+              </Link>
+              <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.14em] text-emerald-700">
+                <BookOpen className="h-4 w-4" />
+                ExamBank
               </div>
-              {errors.fullName && <p className="text-red-500 text-xs font-bold mt-1 ml-1">{errors.fullName.message}</p>}
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-700 ml-1">Email sinh viên</label>
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                <input
-                  {...register('email')}
-                  type="email"
-                  className="w-full pl-12 pr-4 py-4 rounded-2xl border border-slate-200 bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/5 outline-none transition-all font-medium"
-                  placeholder="name@student.vnu.edu.vn"
-                />
+            <div className="mb-8">
+              <h2 className="text-4xl font-black tracking-tight">Tạo tài khoản mới</h2>
+              <p className="mt-2 text-sm font-medium text-slate-500">Thiết lập hồ sơ học tập của bạn và bắt đầu ngay.</p>
+            </div>
+
+            <motion.button
+              whileHover={{ scale: 1.01 }}
+              whileTap={{ scale: 0.99 }}
+              type="button"
+              onClick={handleGoogleSignup}
+              className="mb-7 flex w-full items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white px-6 py-4 text-sm font-black text-slate-700 transition-all hover:-translate-y-0.5 hover:border-emerald-200 hover:bg-emerald-50/60 hover:text-emerald-800"
+            >
+              <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path fill="#EA4335" d="M12 10.2v3.9h5.5c-.2 1.2-.9 2.3-1.9 3.1l3 2.3c1.8-1.6 2.8-4 2.8-6.8 0-.6-.1-1.2-.2-1.8H12z" />
+                <path fill="#34A853" d="M12 21c2.6 0 4.8-.9 6.4-2.5l-3-2.3c-.8.6-1.9 1-3.4 1-2.6 0-4.9-1.8-5.7-4.3l-3.1 2.4C4.7 18.8 8.1 21 12 21z" />
+                <path fill="#FBBC05" d="M6.3 12.9c0-.7.1-1.3.3-1.9L3.5 8.6C2.9 9.9 2.5 11.4 2.5 12.9c0 1.5.4 3 1 4.3l3.1-2.4c-.2-.6-.3-1.2-.3-1.9z" />
+                <path fill="#4285F4" d="M12 8.6c1.4 0 2.7.5 3.7 1.4l2.8-2.8C16.8 5.7 14.6 4.8 12 4.8c-3.9 0-7.3 2.2-8.9 5.4L6.2 12c.8-2.5 3.1-3.4 5.8-3.4z" />
+              </svg>
+              Tiếp tục với Google
+            </motion.button>
+
+            <div className="relative mb-7">
+              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200" /></div>
+              <div className="relative flex justify-center text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">
+                <span className="bg-white px-4">Hoặc đăng ký bằng Email</span>
               </div>
-              {errors.email && <p className="text-red-500 text-xs font-bold mt-1 ml-1">{errors.email.message}</p>}
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-700 ml-1">Mật khẩu</label>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                <input
-                  {...register('password')}
-                  type="password"
-                  className="w-full pl-12 pr-4 py-4 rounded-2xl border border-slate-200 bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/5 outline-none transition-all font-medium"
-                  placeholder="Tối thiểu 8 ký tự"
-                />
+            <form className="space-y-5" onSubmit={handleSubmit(onSubmit)}>
+              <div className="space-y-2">
+                <label htmlFor="register-fullname" className="ml-1 text-xs font-black uppercase tracking-[0.14em] text-slate-500">Họ và tên</label>
+                <div className="relative">
+                  <User className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+                  <input
+                    id="register-fullname"
+                    {...register('fullName')}
+                    type="text"
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-4 pl-12 pr-4 text-sm font-semibold outline-none transition-all focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
+                    placeholder="Nguyễn Văn A"
+                  />
+                </div>
+                {errors.fullName && <p className="ml-1 mt-1 text-xs font-bold text-rose-500">{errors.fullName.message}</p>}
               </div>
-              {errors.password && <p className="text-red-500 text-xs font-bold mt-1 ml-1">{errors.password.message}</p>}
-            </div>
 
-            <div className="pt-4">
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                type="submit"
-                disabled={isLoading}
-                className="w-full flex justify-center items-center py-4 px-6 rounded-2xl text-base font-black text-white bg-blue-600 hover:bg-blue-700 focus:outline-none transition-all disabled:opacity-70 shadow-xl shadow-blue-600/20"
-              >
-                {isLoading ? <><Loader2 className="animate-spin w-5 h-5 mr-2" /> Đang tạo tài khoản...</> : 'Bắt đầu ngay bây giờ'}
-              </motion.button>
-            </div>
-          </form>
+              <div className="space-y-2">
+                <label htmlFor="register-email" className="ml-1 text-xs font-black uppercase tracking-[0.14em] text-slate-500">Email sinh viên</label>
+                <div className="relative">
+                  <Mail className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+                  <input
+                    id="register-email"
+                    {...register('email')}
+                    type="email"
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-4 pl-12 pr-4 text-sm font-semibold outline-none transition-all focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
+                    placeholder="name@student.vnu.edu.vn"
+                  />
+                </div>
+                {errors.email && <p className="ml-1 mt-1 text-xs font-bold text-rose-500">{errors.email.message}</p>}
+              </div>
 
-          <p className="mt-8 text-center text-sm font-medium text-slate-500">
-            Đã có tài khoản?{' '}
-            <Link to="/login" className="font-black text-blue-600 hover:text-blue-700 underline underline-offset-4">
-              Đăng nhập
-            </Link>
-          </p>
+              <div className="space-y-2">
+                <label htmlFor="register-password" className="ml-1 text-xs font-black uppercase tracking-[0.14em] text-slate-500">Mật khẩu</label>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+                  <input
+                    id="register-password"
+                    {...register('password')}
+                    type="password"
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-4 pl-12 pr-4 text-sm font-semibold outline-none transition-all focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
+                    placeholder="Tối thiểu 8 ký tự"
+                  />
+                </div>
+                {errors.password && <p className="ml-1 mt-1 text-xs font-bold text-rose-500">{errors.password.message}</p>}
+              </div>
+
+              <div className="pt-3">
+                <motion.button
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.99 }}
+                  type="submit"
+                  disabled={isLoading}
+                  className="flex w-full items-center justify-center rounded-2xl bg-slate-900 px-6 py-4 text-base font-black text-white transition-all hover:bg-emerald-700 disabled:opacity-70"
+                >
+                  {isLoading ? <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Đang tạo tài khoản...</> : 'Bắt đầu ngay bây giờ'}
+                </motion.button>
+              </div>
+            </form>
+
+            <p className="mt-7 text-center text-sm font-semibold text-slate-500">
+              Đã có tài khoản?{' '}
+              <Link to="/login" className="font-black text-emerald-700 underline decoration-2 underline-offset-4 hover:text-emerald-800">
+                Đăng nhập
+              </Link>
+            </p>
+          </motion.div>
         </div>
       </div>
     </motion.div>

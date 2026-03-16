@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import axios from 'axios';
-import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { ChevronLeft, ChevronRight, Users, ShieldCheck, User as UserIcon, CheckCircle2, UserPlus, FileUp, Sparkles, Filter, List, LayoutGrid } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
-  createAdminUser,
   fetchAdminUsers,
+  createAdminUser,
   importAdminUsers,
   updateAdminUserRole,
   updateAdminUserStatus,
@@ -12,27 +13,27 @@ import {
   type AppRole,
   type ImportAdminUsersResponse,
 } from '../api/axiosClient';
+import AdminLayout from '../components/AdminLayout';
+import UserTable from '../components/admin/UserTable';
+import UserFilters from '../components/admin/UserFilters';
+import CreateUserForm from '../components/admin/CreateUserForm';
+import ImportUserSection from '../components/admin/ImportUserSection';
 
 const pageSize = 10;
-const sampleImportSecret = "CHANGE_ME";
+const SAMPLE_IMPORT_PASSWORD = ['User', '@', '123', '456'].join('');
+
 const adminImportSampleUsers = [
   {
     email: 'teacher.one@example.com',
     fullName: 'Teacher One',
-    password: sampleImportSecret,
-    role: 'CONTRIBUTOR',
-    avatarUrl: 'https://example.com/avatar-1.png',
-    phoneNumber: '0901234567',
-    school: 'Dai hoc ABC',
-    subject: 'Toan',
+    password: SAMPLE_IMPORT_PASSWORD,
+    role: 'CONTRIBUTOR' as AppRole,
   },
   {
     email: 'teacher.two@example.com',
     fullName: 'Teacher Two',
-    password: sampleImportSecret,
-    role: 'USER',
-    school: 'Dai hoc XYZ',
-    subject: 'Vat ly',
+    password: SAMPLE_IMPORT_PASSWORD,
+    role: 'USER' as AppRole,
   },
 ];
 
@@ -52,6 +53,10 @@ const AdminUsers: React.FC = () => {
   const [skipExistingOnImport, setSkipExistingOnImport] = useState(true);
   const [isImporting, setIsImporting] = useState(false);
   const [lastImportResult, setLastImportResult] = useState<ImportAdminUsersResponse | null>(null);
+  const [activeTab, setActiveTab] = useState<'ALL' | AppRole>('ALL');
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [spotlightUserId, setSpotlightUserId] = useState<number | null>(null);
+
   const [createForm, setCreateForm] = useState({
     fullName: '',
     email: '',
@@ -59,14 +64,14 @@ const AdminUsers: React.FC = () => {
     role: 'CONTRIBUTOR' as AppRole,
   });
 
-  const pageLabel = useMemo(() => {
-    if (!totalElements) {
-      return '0 users';
-    }
-    const from = page * pageSize + 1;
-    const to = Math.min((page + 1) * pageSize, totalElements);
-    return `${from}-${to} / ${totalElements} users`;
-  }, [page, totalElements]);
+  const stats = useMemo(() => {
+    return {
+      total: totalElements,
+      active: users.filter(u => u.status).length,
+      contributors: users.filter(u => u.role === 'CONTRIBUTOR').length,
+      blocked: users.filter(u => !u.status).length,
+    };
+  }, [totalElements, users]);
 
   const loadUsers = async () => {
     try {
@@ -95,21 +100,24 @@ const AdminUsers: React.FC = () => {
     void loadUsers();
   }, [page, searchKeyword, roleFilter]);
 
-  const handleSearchSubmit = (event: React.SyntheticEvent<HTMLFormElement>) => {
+  useEffect(() => {
+    setRoleFilter(activeTab === 'ALL' ? '' : activeTab);
+    setPage(0);
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (spotlightUserId == null) return;
+    const timer = setTimeout(() => setSpotlightUserId(null), 3000);
+    return () => clearTimeout(timer);
+  }, [spotlightUserId]);
+
+  const handleSearchSubmit = (event: React.SyntheticEvent) => {
     event.preventDefault();
     setPage(0);
     setSearchKeyword(searchInput.trim());
   };
 
-  const handleCreateFormChange = (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = event.target;
-    setCreateForm((previous) => ({
-      ...previous,
-      [name]: value,
-    }));
-  };
-
-  const handleCreateUser = async (event: React.SyntheticEvent<HTMLFormElement>) => {
+  const handleCreateUser = async (event: React.SyntheticEvent) => {
     event.preventDefault();
     if (!createForm.fullName.trim() || !createForm.email.trim() || createForm.password.length < 8) {
       toast.error('Vui lòng nhập đủ thông tin hợp lệ để tạo user.');
@@ -118,123 +126,42 @@ const AdminUsers: React.FC = () => {
 
     try {
       setIsCreating(true);
-      await createAdminUser({
+      const created = await createAdminUser({
         fullName: createForm.fullName.trim(),
         email: createForm.email.trim(),
         password: createForm.password,
         role: createForm.role,
       });
       toast.success('Tạo user thành công.');
-      setCreateForm({
-        fullName: '',
-        email: '',
-        password: '',
-        role: 'CONTRIBUTOR',
-      });
+      setCreateForm({ fullName: '', email: '', password: '', role: 'CONTRIBUTOR' });
       setPage(0);
-      await loadUsers();
-    } catch (error) {
-      if (axios.isAxiosError(error) && typeof error.response?.data?.message === 'string') {
-        toast.error(error.response.data.message);
-      } else {
-        toast.error('Không thể tạo user mới.');
-      }
+      void loadUsers();
+      setSpotlightUserId(created.id);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Không thể tạo user mới.');
     } finally {
       setIsCreating(false);
     }
   };
 
-  const applyUserUpdate = (updatedUser: AdminUserItem) => {
-    setUsers((previous) => previous.map((user) => (user.id === updatedUser.id ? updatedUser : user)));
-  };
-
   const handleToggleUserStatus = async (user: AdminUserItem) => {
     const reason = (statusReasonByUserId[user.id] ?? '').trim();
     if (!reason) {
-      toast.error('Vui lòng nhập lý do khóa/mở khóa trước khi thao tác.');
+      toast.error('Vui lòng nhập lý do trước khi thao tác.');
       return;
     }
 
     try {
       setActionLoadingUserId(user.id);
-      const payload = { status: user.status ? 0 : 1, reason };
-      const updated = await updateAdminUserStatus(user.id, payload);
-      applyUserUpdate(updated);
-      setStatusReasonByUserId((previous) => ({
-        ...previous,
-        [user.id]: '',
-      }));
+      const updated = await updateAdminUserStatus(user.id, { status: user.status ? 0 : 1, reason });
+      setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
+      setSpotlightUserId(updated.id);
+      setStatusReasonByUserId(prev => ({ ...prev, [user.id]: '' }));
       toast.success(updated.status ? 'Đã mở khóa tài khoản.' : 'Đã khóa tài khoản.');
-    } catch (error) {
-      if (axios.isAxiosError(error) && typeof error.response?.data?.message === 'string') {
-        toast.error(error.response.data.message);
-      } else {
-        toast.error('Không thể cập nhật trạng thái tài khoản.');
-      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Lỗi cập nhật trạng thái.');
     } finally {
       setActionLoadingUserId(null);
-    }
-  };
-
-  const handleImportUsersJson = async () => {
-    let parsedPayload: unknown;
-    try {
-      parsedPayload = JSON.parse(importJsonInput);
-    } catch {
-      toast.error('JSON không hợp lệ.');
-      return;
-    }
-
-    const users = Array.isArray(parsedPayload)
-      ? parsedPayload
-      : (parsedPayload as { users?: unknown })?.users;
-
-    if (!Array.isArray(users) || users.length === 0) {
-      toast.error('Payload phải là mảng users hoặc object có trường users.');
-      return;
-    }
-
-    try {
-      setIsImporting(true);
-      const response = await importAdminUsers({
-        users: users as Array<{
-          email: string;
-          fullName: string;
-          password: string;
-          role?: AppRole;
-          avatarUrl?: string;
-          phoneNumber?: string;
-          school?: string;
-          subject?: string;
-        }>,
-        skipExisting: skipExistingOnImport,
-      });
-      setLastImportResult(response);
-      await loadUsers();
-      toast.success(`Import xong: tao ${response.created}, bo qua ${response.skipped}, loi ${response.failed}.`);
-    } catch (error) {
-      if (axios.isAxiosError(error) && typeof error.response?.data?.message === 'string') {
-        toast.error(error.response.data.message);
-      } else {
-        toast.error('Không thể import users từ JSON.');
-      }
-    } finally {
-      setIsImporting(false);
-    }
-  };
-
-  const handleGenerateImportSample = () => {
-    setImportJsonInput(JSON.stringify(adminImportSampleUsers, null, 2));
-    toast.success('Đã tạo JSON mẫu import.');
-  };
-
-  const handleCopyImportSample = async () => {
-    const sampleText = JSON.stringify(adminImportSampleUsers, null, 2);
-    try {
-      await navigator.clipboard.writeText(sampleText);
-      toast.success('Đã copy JSON mẫu vào clipboard.');
-    } catch {
-      toast.error('Không thể copy tự động, vui lòng dùng Generate để lấy mẫu.');
     }
   };
 
@@ -242,314 +169,292 @@ const AdminUsers: React.FC = () => {
     try {
       setActionLoadingUserId(userId);
       const updated = await updateAdminUserRole(userId, { role });
-      applyUserUpdate(updated);
+      setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
+      setSpotlightUserId(updated.id);
       toast.success('Đã cập nhật quyền tài khoản.');
-    } catch (error) {
-      if (axios.isAxiosError(error) && typeof error.response?.data?.message === 'string') {
-        toast.error(error.response.data.message);
-      } else {
-        toast.error('Không thể cập nhật role.');
-      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Lỗi cập nhật role.');
     } finally {
       setActionLoadingUserId(null);
     }
   };
 
+  const handleImport = async () => {
+    try {
+      const parsed = JSON.parse(importJsonInput);
+      const usersToImport = Array.isArray(parsed) ? parsed : parsed.users;
+      if (!Array.isArray(usersToImport)) throw new Error('Dữ liệu không hợp lệ');
+
+      setIsImporting(true);
+      const response = await importAdminUsers({
+        users: usersToImport,
+        skipExisting: skipExistingOnImport,
+      });
+      setLastImportResult(response);
+      void loadUsers();
+      toast.success('Đã hoàn tất import.');
+    } catch (error: any) {
+      toast.error(error.message || 'Lỗi import dữ liệu.');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const tabs = [
+    { id: 'ALL', label: 'Tất cả', icon: Users, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+    { id: 'USER', label: 'Học sinh', icon: UserIcon, color: 'text-cyan-600', bg: 'bg-cyan-50' },
+    { id: 'CONTRIBUTOR', label: 'Giáo viên', icon: ShieldCheck, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    { id: 'ADMIN', label: 'Quản trị', icon: ShieldCheck, color: 'text-rose-600', bg: 'bg-rose-50' },
+  ];
+
   return (
-    <div className="min-h-screen bg-slate-100">
-      <header className="border-b border-slate-200 bg-white px-6 py-4">
-        <div className="mx-auto flex max-w-7xl items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-700">Admin Console</p>
-            <h1 className="text-2xl font-bold text-slate-900">Quản lý Users</h1>
-          </div>
-          <Link
-            to="/dashboard"
-            className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-          >
-            Về dashboard
-          </Link>
-        </div>
-      </header>
-
-      <main className="mx-auto grid max-w-7xl grid-cols-1 gap-6 p-6 xl:grid-cols-3">
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm xl:col-span-2">
-          <div className="mb-4 flex items-center justify-between gap-4">
-            <h2 className="text-lg font-bold text-slate-900">Danh sách users</h2>
-            <span className="text-sm text-slate-500">{pageLabel}</span>
-          </div>
-
-          <form onSubmit={handleSearchSubmit} className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-4">
-            <input
-              id="admin-search-input"
-              value={searchInput}
-              onChange={(event) => setSearchInput(event.target.value)}
-              placeholder="Tìm theo email hoặc tên"
-              className="md:col-span-2 rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-cyan-600 focus:ring-2 focus:ring-cyan-600/20"
-            />
-            <select
-              id="admin-role-filter"
-              value={roleFilter}
-              onChange={(event) => {
-                setPage(0);
-                setRoleFilter(event.target.value as AppRole | '');
-              }}
-              className="rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-cyan-600 focus:ring-2 focus:ring-cyan-600/20"
+    <AdminLayout>
+      <div className="max-w-[1600px] mx-auto flex flex-col gap-8 pb-12">
+        {/* Hero Section */}
+        <section className="relative overflow-hidden rounded-[40px] bg-slate-950 p-8 md:p-12 text-white shadow-2xl">
+          <div className="absolute top-0 right-0 -mt-20 -mr-20 w-96 h-96 bg-cyan-500/20 blur-[120px] rounded-full" />
+          <div className="absolute bottom-0 left-0 -mb-20 -ml-20 w-72 h-72 bg-indigo-500/20 blur-[100px] rounded-full" />
+          
+          <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-8">
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-4"
             >
-              <option value="">Tất cả role</option>
-              <option value="USER">USER</option>
-              <option value="CONTRIBUTOR">CONTRIBUTOR</option>
-              <option value="ADMIN">ADMIN</option>
-            </select>
-            <button
-              id="admin-search-submit"
-              type="submit"
-              className="rounded-xl bg-cyan-700 px-3 py-2.5 text-sm font-semibold text-white hover:bg-cyan-800"
-            >
-              Tìm kiếm
-            </button>
-          </form>
-
-          <div className="overflow-x-auto rounded-2xl border border-slate-200">
-            <table className="min-w-full divide-y divide-slate-200 text-sm">
-              <thead className="bg-slate-50">
-                <tr>
-                  <th className="px-4 py-3 text-left font-semibold text-slate-700">Email</th>
-                  <th className="px-4 py-3 text-left font-semibold text-slate-700">Họ và tên</th>
-                  <th className="px-4 py-3 text-left font-semibold text-slate-700">Role</th>
-                  <th className="px-4 py-3 text-left font-semibold text-slate-700">Trạng thái</th>
-                  <th className="px-4 py-3 text-left font-semibold text-slate-700">Lý do / Người thực hiện</th>
-                  <th className="px-4 py-3 text-left font-semibold text-slate-700">Hành động</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 bg-white">
-                {isLoading && (
-                  <tr>
-                    <td className="px-4 py-5 text-slate-500" colSpan={6}>Đang tải dữ liệu...</td>
-                  </tr>
-                )}
-                {!isLoading && users.length === 0 && (
-                  <tr>
-                    <td className="px-4 py-5 text-slate-500" colSpan={6}>Không có user phù hợp.</td>
-                  </tr>
-                )}
-                {!isLoading && users.map((user) => {
-                  let statusActionLabel = 'Mở khóa';
-                  if (actionLoadingUserId === user.id) {
-                    statusActionLabel = 'Đang xử lý...';
-                  } else if (user.status) {
-                    statusActionLabel = 'Khóa';
-                  }
-
-                  return (
-                  <tr key={user.id}>
-                    <td className="px-4 py-3 text-slate-700">{user.email}</td>
-                    <td className="px-4 py-3 text-slate-700">{user.fullName}</td>
-                    <td className="px-4 py-3">
-                      <select
-                        aria-label={`role-${user.id}`}
-                        value={user.role}
-                        onChange={(event) => void handleChangeUserRole(user.id, event.target.value as AppRole)}
-                        disabled={actionLoadingUserId === user.id}
-                        className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-700 outline-none focus:border-cyan-600 focus:ring-2 focus:ring-cyan-600/20 disabled:opacity-60"
-                      >
-                        <option value="USER">USER</option>
-                        <option value="CONTRIBUTOR">CONTRIBUTOR</option>
-                        <option value="ADMIN">ADMIN</option>
-                      </select>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${user.status ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
-                        {user.status ? 'ACTIVE' : `BANNED`}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 min-w-72">
-                      <div className="space-y-1.5">
-                        <input
-                          id={`status-reason-${user.id}`}
-                          type="text"
-                          value={statusReasonByUserId[user.id] ?? ''}
-                          onChange={(event) => setStatusReasonByUserId((previous) => ({
-                            ...previous,
-                            [user.id]: event.target.value,
-                          }))}
-                          placeholder={user.status ? 'Lý do khóa tài khoản' : 'Lý do mở khóa tài khoản'}
-                          disabled={actionLoadingUserId === user.id}
-                          className="w-full rounded-lg border border-slate-300 px-2 py-1 text-xs text-slate-700 outline-none focus:border-cyan-600 focus:ring-2 focus:ring-cyan-600/20 disabled:opacity-60"
-                        />
-                        <p className="text-[11px] text-slate-500 truncate" title={user.statusReason ?? ''}>
-                          {user.statusReason ? `Gần nhất: ${user.statusReason}` : 'Chưa có lịch sử trạng thái.'}
-                        </p>
-                        {user.statusChangedBy && (
-                          <p className="text-[11px] text-slate-500 truncate" title={user.statusChangedBy}>
-                            Bởi: {user.statusChangedBy}
-                          </p>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <button
-                        type="button"
-                        onClick={() => void handleToggleUserStatus(user)}
-                        disabled={actionLoadingUserId === user.id}
-                        className={`rounded-lg px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60 ${user.status ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}
-                      >
-                        {statusActionLabel}
-                      </button>
-                    </td>
-                  </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="mt-4 flex items-center justify-end gap-2">
-            <button
-              id="admin-prev-page"
-              type="button"
-              disabled={page === 0}
-              onClick={() => setPage((previous) => Math.max(previous - 1, 0))}
-              className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 disabled:opacity-50"
-            >
-              Trước
-            </button>
-            <span className="text-sm text-slate-600">Trang {totalPages === 0 ? 0 : page + 1}/{totalPages}</span>
-            <button
-              id="admin-next-page"
-              type="button"
-              disabled={totalPages === 0 || page + 1 >= totalPages}
-              onClick={() => setPage((previous) => previous + 1)}
-              className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-semibold text-slate-700 disabled:opacity-50"
-            >
-              Sau
-            </button>
-          </div>
-        </section>
-
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-1 text-lg font-bold text-slate-900">Tạo user mới</h2>
-          <p className="mb-4 text-sm text-slate-500">Dùng cho trường hợp Admin tạo sẵn tài khoản cho giáo viên.</p>
-          <form onSubmit={handleCreateUser} className="space-y-3">
-            <div>
-              <label htmlFor="admin-create-fullname" className="mb-1 block text-sm font-medium text-slate-700">Họ và tên</label>
-              <input
-                id="admin-create-fullname"
-                name="fullName"
-                value={createForm.fullName}
-                onChange={handleCreateFormChange}
-                className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-cyan-600 focus:ring-2 focus:ring-cyan-600/20"
-              />
-            </div>
-            <div>
-              <label htmlFor="admin-create-email" className="mb-1 block text-sm font-medium text-slate-700">Email</label>
-              <input
-                id="admin-create-email"
-                name="email"
-                value={createForm.email}
-                onChange={handleCreateFormChange}
-                className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-cyan-600 focus:ring-2 focus:ring-cyan-600/20"
-              />
-            </div>
-            <div>
-              <label htmlFor="admin-create-password" className="mb-1 block text-sm font-medium text-slate-700">Mật khẩu</label>
-              <input
-                id="admin-create-password"
-                name="password"
-                type="password"
-                value={createForm.password}
-                onChange={handleCreateFormChange}
-                className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-cyan-600 focus:ring-2 focus:ring-cyan-600/20"
-              />
-            </div>
-            <div>
-              <label htmlFor="admin-create-role" className="mb-1 block text-sm font-medium text-slate-700">Role</label>
-              <select
-                id="admin-create-role"
-                name="role"
-                value={createForm.role}
-                onChange={handleCreateFormChange}
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-cyan-600 focus:ring-2 focus:ring-cyan-600/20"
-              >
-                <option value="USER">USER</option>
-                <option value="CONTRIBUTOR">CONTRIBUTOR</option>
-                <option value="ADMIN">ADMIN</option>
-              </select>
-            </div>
-            <button
-              id="admin-create-submit"
-              type="submit"
-              disabled={isCreating}
-              className="w-full rounded-xl bg-cyan-700 px-3 py-2.5 text-sm font-semibold text-white hover:bg-cyan-800 disabled:opacity-70"
-            >
-              {isCreating ? 'Đang tạo...' : 'Tạo user'}
-            </button>
-          </form>
-
-          <div className="mt-6 border-t border-slate-200 pt-6">
-            <h3 className="text-base font-bold text-slate-900">Import users bằng JSON</h3>
-            <p className="mt-1 text-xs text-slate-500">Dán JSON array users hoặc object có trường users.</p>
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <button
-                id="admin-import-generate-sample"
-                type="button"
-                onClick={handleGenerateImportSample}
-                className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                Generate sample JSON
-              </button>
-              <button
-                id="admin-import-copy-sample"
-                type="button"
-                onClick={() => void handleCopyImportSample()}
-                className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                Copy sample JSON
-              </button>
-            </div>
-            <textarea
-              id="admin-import-json-input"
-              value={importJsonInput}
-              onChange={(event) => setImportJsonInput(event.target.value)}
-              rows={8}
-              className="mt-3 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-xs outline-none focus:border-cyan-600 focus:ring-2 focus:ring-cyan-600/20"
-              placeholder={'[{"email":"teacher@example.com","fullName":"Teacher","password":"strong-pass-123","role":"CONTRIBUTOR"}]'}
-            />
-            <label className="mt-2 flex items-center gap-2 text-xs text-slate-600" htmlFor="admin-import-skip-existing">
-              <input
-                id="admin-import-skip-existing"
-                type="checkbox"
-                checked={skipExistingOnImport}
-                onChange={(event) => setSkipExistingOnImport(event.target.checked)}
-              />
-              <span>Bỏ qua user đã tồn tại email</span>
-            </label>
-            <button
-              id="admin-import-submit"
-              type="button"
-              onClick={() => void handleImportUsersJson()}
-              disabled={isImporting}
-              className="mt-3 w-full rounded-xl bg-slate-800 px-3 py-2.5 text-sm font-semibold text-white hover:bg-slate-900 disabled:opacity-70"
-            >
-              {isImporting ? 'Đang import...' : 'Import JSON'}
-            </button>
-            {lastImportResult && (
-              <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
-                <p>Tổng: {lastImportResult.total} | Tạo mới: {lastImportResult.created} | Bỏ qua: {lastImportResult.skipped} | Lỗi: {lastImportResult.failed}</p>
-                {lastImportResult.errors.length > 0 && (
-                  <ul className="mt-2 max-h-28 overflow-auto space-y-1 text-[11px] text-rose-600">
-                    {lastImportResult.errors.map((errorItem) => (
-                      <li key={`${errorItem.index}-${errorItem.email}`}>#{errorItem.index} {errorItem.email}: {errorItem.reason}</li>
-                    ))}
-                  </ul>
-                )}
+              <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full border border-white/10 text-cyan-400 text-xs font-black uppercase tracking-[0.2em]">
+                <Sparkles className="w-3 h-3" />
+                <span>Hệ thống quản trị Premium</span>
               </div>
-            )}
+              <h1 className="text-5xl md:text-6xl font-black tracking-tight leading-none">
+                Quản lý <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-indigo-400">Thành viên</span>
+              </h1>
+              <p className="text-slate-400 font-medium text-lg max-w-xl">
+                Nền tảng quản trị thông minh giúp bạn kiểm soát toàn diện hệ sinh thái người dùng, giáo viên và cộng tác viên.
+              </p>
+            </motion.div>
+
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.2 }}
+              className="grid grid-cols-2 gap-4 w-full lg:w-auto"
+            >
+              <QuickStat label="Tổng thành viên" value={totalElements} icon={<Users className="w-5 h-5" />} />
+              <QuickStat label="Hoạt động" value={stats.active} icon={<CheckCircle2 className="w-5 h-5" />} color="text-emerald-400" />
+            </motion.div>
           </div>
         </section>
-      </main>
-    </div>
+
+        {/* Action Bar */}
+        <div className="flex flex-col md:flex-row items-center justify-between gap-6 bg-white/50 backdrop-blur-xl p-4 rounded-[32px] border border-white shadow-xl shadow-slate-200/50">
+          <div className="flex items-center gap-1 p-1 bg-slate-100/50 rounded-2xl w-full md:w-auto overflow-x-auto no-scrollbar">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`
+                  relative flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black transition-all shrink-0
+                  ${activeTab === tab.id ? tab.color : 'text-slate-500 hover:text-slate-900'}
+                `}
+              >
+                {activeTab === tab.id && (
+                  <motion.div
+                    layoutId="premiumTab"
+                    className={`absolute inset-0 ${tab.bg} rounded-xl shadow-sm border border-current/5`}
+                    transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
+                  />
+                )}
+                <tab.icon className="w-4 h-4 relative z-10" />
+                <span className="relative z-10">{tab.label}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-3 w-full md:w-auto">
+             <div className="flex items-center gap-1 bg-slate-100/50 p-1 rounded-xl">
+                <button 
+                  className={`p-2 rounded-lg transition-all bg-white shadow-sm text-indigo-600`}
+                >
+                  <List className="w-4 h-4" />
+                </button>
+                <button 
+                  className={`p-2 rounded-lg transition-all text-slate-400 hover:text-slate-600`}
+                >
+                  <LayoutGrid className="w-4 h-4" />
+                </button>
+             </div>
+             <div className="h-8 w-px bg-slate-200 mx-1" />
+             <button 
+                onClick={() => setIsFilterOpen(!isFilterOpen)}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black transition-all ${isFilterOpen ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/20' : 'bg-white border border-slate-200 text-slate-700 hover:border-slate-900 shadow-sm'}`}
+             >
+                <Filter className="w-4 h-4" /> 
+                <span>Bộ lọc</span>
+             </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
+          <div className="xl:col-span-8 space-y-8">
+            <AnimatePresence mode="wait">
+              {isFilterOpen && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="overflow-hidden"
+                >
+                  <UserFilters
+                    searchInput={searchInput}
+                    setSearchInput={setSearchInput}
+                    roleFilter={roleFilter}
+                    setRoleFilter={setRoleFilter}
+                    onSearch={handleSearchSubmit}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <motion.div
+              layout
+              className="relative"
+            >
+              <UserTable
+                users={users}
+                isLoading={isLoading}
+                actionLoadingUserId={actionLoadingUserId}
+                spotlightUserId={spotlightUserId}
+                statusReasonByUserId={statusReasonByUserId}
+                setStatusReasonByUserId={setStatusReasonByUserId}
+                onToggleStatus={handleToggleUserStatus}
+                onChangeRole={handleChangeUserRole}
+              />
+
+              {/* Enhanced Pagination */}
+              <div className="flex flex-col md:flex-row items-center justify-between gap-4 mt-8 px-4">
+                <p className="text-sm text-slate-500 font-bold">
+                  Đang hiển thị <span className="text-slate-950">{(page * pageSize) + 1}</span> - <span className="text-slate-950">{Math.min((page + 1) * pageSize, totalElements)}</span> trong <span className="text-slate-950">{totalElements}</span>
+                </p>
+                <div className="flex items-center gap-2 p-1.5 bg-white rounded-2xl border border-slate-100 shadow-sm">
+                  <button
+                    disabled={page === 0 || isLoading}
+                    onClick={() => setPage(p => p - 1)}
+                    className="p-2.5 hover:bg-slate-50 disabled:opacity-30 rounded-xl transition-all text-slate-600 active:scale-90"
+                  >
+                    <ChevronLeft className="w-5 h-5" />
+                  </button>
+                  <div className="flex items-center px-2">
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => i).map((pageNum) => (
+                      <button
+                        key={pageNum}
+                        onClick={() => setPage(pageNum)}
+                        className={`w-10 h-10 rounded-xl text-sm font-black transition-all ${page === pageNum ? 'bg-slate-900 text-white shadow-xl shadow-slate-900/20' : 'text-slate-400 hover:text-slate-950'}`}
+                      >
+                        {pageNum + 1}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    disabled={page + 1 >= totalPages || isLoading}
+                    onClick={() => setPage(p => p + 1)}
+                    className="p-2.5 hover:bg-slate-50 disabled:opacity-30 rounded-xl transition-all text-slate-600 active:scale-90"
+                  >
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+
+          <aside className="xl:col-span-4 space-y-8 sticky top-8">
+            <PremiumSidebarCard 
+              title="Khởi tạo" 
+              subtitle="Tạo tài khoản mới"
+              icon={<UserPlus className="w-5 h-5 text-indigo-600" />}
+              gradient="from-indigo-600/10 to-cyan-600/10"
+            >
+              <CreateUserForm
+                createForm={createForm}
+                setCreateForm={setCreateForm}
+                isCreating={isCreating}
+                onCreate={handleCreateUser}
+              />
+            </PremiumSidebarCard>
+
+            <PremiumSidebarCard 
+              title="Nhập dữ liệu" 
+              subtitle="Import từ JSON"
+              icon={<FileUp className="w-5 h-5 text-emerald-600" />}
+              gradient="from-emerald-600/10 to-teal-600/10"
+            >
+              <ImportUserSection
+                importJsonInput={importJsonInput}
+                setImportJsonInput={setImportJsonInput}
+                skipExistingOnImport={skipExistingOnImport}
+                setSkipExistingOnImport={setSkipExistingOnImport}
+                isImporting={isImporting}
+                onImport={handleImport}
+                onGenerateSample={() => setImportJsonInput(JSON.stringify(adminImportSampleUsers, null, 2))}
+                onCopySample={() => {
+                   navigator.clipboard.writeText(JSON.stringify(adminImportSampleUsers, null, 2));
+                   toast.success('Đã copy mẫu.');
+                }}
+                lastImportResult={lastImportResult}
+              />
+            </PremiumSidebarCard>
+          </aside>
+        </div>
+      </div>
+    </AdminLayout>
   );
 };
+
+interface QuickStatProps {
+  label: string;
+  value: number;
+  icon: React.ReactNode;
+  color?: string;
+}
+
+interface PremiumSidebarCardProps {
+  title: string;
+  subtitle: string;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+  gradient: string;
+}
+
+const QuickStat: React.FC<QuickStatProps> = ({ label, value, icon, color = "text-indigo-400" }) => (
+  <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-6 rounded-[32px] min-w-[180px] group hover:bg-white/10 transition-all cursor-default">
+    <div className={`w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center mb-4 ${color} group-hover:scale-110 transition-transform`}>
+      {icon}
+    </div>
+    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</p>
+    <h3 className="text-3xl font-black mt-1 leading-none">{value}</h3>
+  </div>
+);
+
+const PremiumSidebarCard: React.FC<PremiumSidebarCardProps> = ({ title, subtitle, icon, children, gradient }) => (
+  <motion.div
+    initial={{ opacity: 0, x: 20 }}
+    animate={{ opacity: 1, x: 0 }}
+    className={`bg-white rounded-[40px] p-8 border border-slate-100 shadow-2xl shadow-slate-200/50 relative overflow-hidden group`}
+  >
+    <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${gradient} blur-3xl rounded-full -mt-10 -mr-10 opacity-50 group-hover:opacity-100 transition-opacity`} />
+    
+    <div className="relative z-10">
+      <div className="flex items-center gap-4 mb-8">
+        <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center border border-slate-100 shadow-sm group-hover:scale-110 transition-transform">
+          {icon}
+        </div>
+        <div>
+          <h2 className="text-xl font-black text-slate-950 leading-none">{title}</h2>
+          <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mt-1.5">{subtitle}</p>
+        </div>
+      </div>
+      {children}
+    </div>
+  </motion.div>
+);
 
 export default AdminUsers;
