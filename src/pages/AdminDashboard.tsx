@@ -39,7 +39,16 @@ const subjectData = [
   { name: 'Sinh', count: 30, color: '#f59e0b' },
 ];
 
-const StatCard = ({ title, value, icon: Icon, trend, trendValue, color }: any) => (
+type StatCardProps = {
+  title: string;
+  value: string;
+  icon: React.ComponentType<{ className?: string }>;
+  trend: 'up' | 'down';
+  trendValue: string;
+  color: string;
+};
+
+const StatCard: React.FC<StatCardProps> = ({ title, value, icon: Icon, trend, trendValue, color }) => (
   <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm group hover:border-cyan-300 transition-all">
     <div className="flex items-center justify-between mb-4">
       <div className={`p-3 rounded-2xl ${color} bg-opacity-10 group-hover:scale-110 transition-transform`}>

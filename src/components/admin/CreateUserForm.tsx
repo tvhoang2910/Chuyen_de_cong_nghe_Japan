@@ -7,12 +7,14 @@ interface CreateUserFormProps {
     fullName: string;
     email: string;
     password: string;
+    confirmPassword: string;
     role: AppRole;
   };
   setCreateForm: React.Dispatch<React.SetStateAction<{
     fullName: string;
     email: string;
     password: string;
+    confirmPassword: string;
     role: AppRole;
   }>>;
   isCreating: boolean;
@@ -82,6 +84,22 @@ const CreateUserForm: React.FC<CreateUserFormProps> = ({
               value={createForm.password}
               onChange={handleChange}
               placeholder="Ít nhất 8 ký tự..."
+              className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border-2 border-transparent rounded-[20px] focus:bg-white focus:border-cyan-600 focus:ring-0 outline-none transition-all font-medium text-slate-700 placeholder:text-slate-300"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Nhập lại mật khẩu</label>
+          <div className="relative group">
+            <Lock className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 group-focus-within:text-cyan-600 transition-colors" />
+            <input
+              id="admin-create-confirm-password"
+              name="confirmPassword"
+              type="password"
+              value={createForm.confirmPassword}
+              onChange={handleChange}
+              placeholder="Nhập lại mật khẩu..."
               className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border-2 border-transparent rounded-[20px] focus:bg-white focus:border-cyan-600 focus:ring-0 outline-none transition-all font-medium text-slate-700 placeholder:text-slate-300"
             />
           </div>

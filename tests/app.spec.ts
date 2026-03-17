@@ -4,6 +4,14 @@ const TEST_CURRENT_PASSWORD = ['old', '-', 'password', '-', '123'].join('');
 const TEST_NEW_PASSWORD = ['new', '-', 'password', '-', '123'].join('');
 const TEST_ADMIN_CREATE_PASSWORD = ['strong', '-', 'pass', '-', '123'].join('');
 
+const seedAdminSession = async (page: import('@playwright/test').Page) => {
+  await page.goto('/login');
+  await page.evaluate(() => {
+    localStorage.setItem('access_token', 'admin-access-token');
+    localStorage.setItem('user_role', 'ADMIN');
+  });
+};
+
 test('has title and landing page content', async ({ page }) => {
   await page.goto('/');
 
@@ -18,6 +26,46 @@ test('can navigate to login page', async ({ page }) => {
 
   await expect(page).toHaveURL(/.*\/login/);
   await expect(page.locator('h2')).toContainText('Chào mừng trở lại');
+});
+
+test('register redirects to verify-email and can submit OTP verification', async ({ page }) => {
+  await page.route('**/api/v1/auth/register', async (route) => {
+    await route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 88,
+        email: 'new.user@example.com',
+        fullName: 'New User',
+        role: 'USER',
+      }),
+    });
+  });
+
+  await page.route('**/api/v1/auth/register/verify-email', async (route) => {
+    const payload = (await route.request().postDataJSON()) as { email: string; otp: string };
+    await route.fulfill({
+      status: payload.otp === '123456' ? 200 : 400,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        message: payload.otp === '123456' ? 'Email verified successfully' : 'OTP is invalid or expired',
+      }),
+    });
+  });
+
+  await page.goto('/register');
+  await page.fill('input#register-fullname', 'New User');
+  await page.fill('input#register-email', 'new.user@example.com');
+  await page.fill('input#register-password', 'strong-password-123');
+  await page.fill('input#register-confirm-password', 'strong-password-123');
+  await page.click('button[type="submit"]');
+
+  await expect(page).toHaveURL(/.*\/register\/verify-email\?email=new.user%40example.com/);
+
+  await page.fill('input#register-verify-otp', '123456');
+  await page.click('button:has-text("Xác thực email")');
+
+  await expect(page).toHaveURL(/.*\/login/);
 });
 
 test('oauth2 success callback redirects admin to admin users page immediately', async ({ page }) => {
@@ -118,6 +166,7 @@ test('redirects to dashboard after successful login and back to login after logo
 
 test('can update display name and password from dashboard', async ({ page }) => {
   const updatePayloads: Array<Record<string, string>> = [];
+  let currentFullName = 'John Doe';
 
   await page.route('**/api/v1/auth/login', async (route) => {
     await route.fulfill({
@@ -135,6 +184,9 @@ test('can update display name and password from dashboard', async ({ page }) => 
     if (route.request().method() === 'PATCH') {
       const payload = (await route.request().postDataJSON()) as Record<string, string>;
       updatePayloads.push(payload);
+      if (payload.fullName) {
+        currentFullName = payload.fullName;
+      }
 
       await route.fulfill({
         status: 200,
@@ -142,7 +194,7 @@ test('can update display name and password from dashboard', async ({ page }) => 
         body: JSON.stringify({
           id: 1,
           email: 'john@example.com',
-          fullName: payload.fullName ?? 'John Doe',
+          fullName: currentFullName,
           role: 'USER',
           premium: false,
         }),
@@ -156,7 +208,7 @@ test('can update display name and password from dashboard', async ({ page }) => 
       body: JSON.stringify({
         id: 1,
         email: 'john@example.com',
-        fullName: 'John Doe',
+        fullName: currentFullName,
         role: 'USER',
         premium: false,
       }),
@@ -174,9 +226,9 @@ test('can update display name and password from dashboard', async ({ page }) => 
 
   await page.fill('input#display-name-input', 'John Wick');
   await page.click('button:has-text("Lưu hồ sơ")');
-  await expect(page.locator('h1')).toContainText('John Wick');
 
   await page.click('#profile-settings-trigger');
+  await expect(page.locator('input#display-name-input')).toHaveValue('John Wick');
 
   await page.fill('input#current-password-input', TEST_CURRENT_PASSWORD);
   await page.fill('input#new-password-input', TEST_NEW_PASSWORD);
@@ -187,7 +239,6 @@ test('can update display name and password from dashboard', async ({ page }) => 
   await expect(page).toHaveURL(/.*\/login/);
   expect(updatePayloads[0]).toEqual({
     fullName: 'John Wick',
-    avatarUrl: null,
     phoneNumber: null,
     school: null,
     subject: null,
@@ -202,9 +253,18 @@ test('admin can view users list and create user', async ({ page }) => {
   const createdPayloads: Array<Record<string, string>> = [];
   let listCallCount = 0;
 
-  await page.addInitScript(() => {
-    localStorage.setItem('access_token', 'admin-access-token');
-    localStorage.setItem('user_role', 'ADMIN');
+  await page.route('**/api/v1/auth/me', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 99,
+        email: 'admin@example.com',
+        fullName: 'Admin User',
+        role: 'ADMIN',
+        premium: false,
+      }),
+    });
   });
 
   await page.route('**/api/v1/auth/admin/users**', async (route) => {
@@ -263,19 +323,22 @@ test('admin can view users list and create user', async ({ page }) => {
     });
   });
 
+  await seedAdminSession(page);
   await page.goto('/admin/users');
-  await expect(page.locator('h1')).toContainText('Quản lý Users');
+  await expect(page.locator('h1')).toContainText('Quản lý Thành viên');
   await expect(page.locator('text=teacher.one@example.com')).toBeVisible();
 
-  await page.fill('#admin-search-input', 'teacher.one');
-  await page.selectOption('#admin-role-filter', 'CONTRIBUTOR');
-  await page.click('#admin-search-submit');
+  await page.getByRole('button', { name: 'Bộ lọc' }).click();
+  await page.getByPlaceholder('Tìm kiếm thông minh: Tên, Email, Số điện thoại hoặc Trường học...').fill('teacher.one');
+  await page.getByRole('button', { name: 'Giáo viên' }).first().click();
+  await page.getByRole('button', { name: 'Truy vấn' }).click();
 
-  await page.fill('#admin-create-fullname', 'Teacher Two');
-  await page.fill('#admin-create-email', 'teacher.two@example.com');
-  await page.fill('#admin-create-password', TEST_ADMIN_CREATE_PASSWORD);
-  await page.selectOption('#admin-create-role', 'CONTRIBUTOR');
-  await page.click('#admin-create-submit');
+  await page.fill('input[name="fullName"]', 'Teacher Two');
+  await page.fill('input[name="email"]', 'teacher.two@example.com');
+  await page.fill('input[name="password"]', TEST_ADMIN_CREATE_PASSWORD);
+  await page.fill('#admin-create-confirm-password', TEST_ADMIN_CREATE_PASSWORD);
+  await page.selectOption('select[name="role"]', 'CONTRIBUTOR');
+  await page.getByRole('button', { name: 'Xác nhận tạo mới' }).click();
 
   await expect.poll(() => listCallCount).toBeGreaterThan(1);
   await expect.poll(() => createdPayloads.length).toBe(1);
@@ -291,9 +354,18 @@ test('admin can change role and lock/unlock user', async ({ page }) => {
   const rolePayloads: Array<Record<string, string>> = [];
   const statusPayloads: Array<Record<string, string | number | boolean>> = [];
 
-  await page.addInitScript(() => {
-    localStorage.setItem('access_token', 'admin-access-token');
-    localStorage.setItem('user_role', 'ADMIN');
+  await page.route('**/api/v1/auth/me', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 99,
+        email: 'admin@example.com',
+        fullName: 'Admin User',
+        role: 'ADMIN',
+        premium: false,
+      }),
+    });
   });
 
   await page.route('**/api/v1/auth/admin/users?**', async (route) => {
@@ -375,6 +447,7 @@ test('admin can change role and lock/unlock user', async ({ page }) => {
     });
   });
 
+  await seedAdminSession(page);
   await page.goto('/admin/users');
   await expect(page.locator('text=teacher.one@example.com')).toBeVisible();
 
@@ -399,9 +472,18 @@ test('admin can change role and lock/unlock user', async ({ page }) => {
 test('admin can import users by json payload', async ({ page }) => {
   const importPayloads: Array<Record<string, unknown>> = [];
 
-  await page.addInitScript(() => {
-    localStorage.setItem('access_token', 'admin-access-token');
-    localStorage.setItem('user_role', 'ADMIN');
+  await page.route('**/api/v1/auth/me', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 99,
+        email: 'admin@example.com',
+        fullName: 'Admin User',
+        role: 'ADMIN',
+        premium: false,
+      }),
+    });
   });
 
   await page.route('**/api/v1/auth/admin/users?**', async (route) => {
@@ -436,6 +518,7 @@ test('admin can import users by json payload', async ({ page }) => {
     });
   });
 
+  await seedAdminSession(page);
   await page.goto('/admin/users');
   await page.fill('#admin-import-json-input', JSON.stringify([
     {
@@ -459,9 +542,18 @@ test('admin can import users by json payload', async ({ page }) => {
 });
 
 test('admin can generate sample json for import', async ({ page }) => {
-  await page.addInitScript(() => {
-    localStorage.setItem('access_token', 'admin-access-token');
-    localStorage.setItem('user_role', 'ADMIN');
+  await page.route('**/api/v1/auth/me', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 99,
+        email: 'admin@example.com',
+        fullName: 'Admin User',
+        role: 'ADMIN',
+        premium: false,
+      }),
+    });
   });
 
   await page.route('**/api/v1/auth/admin/users?**', async (route) => {
@@ -478,6 +570,7 @@ test('admin can generate sample json for import', async ({ page }) => {
     });
   });
 
+  await seedAdminSession(page);
   await page.goto('/admin/users');
   await page.click('#admin-import-generate-sample');
 

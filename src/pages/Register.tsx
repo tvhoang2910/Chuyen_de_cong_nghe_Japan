@@ -14,6 +14,10 @@ const registerSchema = z.object({
   fullName: z.string().min(3, 'Họ tên phải có ít nhất 3 ký tự'),
   email: z.email('Email không hợp lệ'),
   password: z.string().min(8, 'Mật khẩu phải từ 8 ký tự trở lên'),
+  confirmPassword: z.string().min(8, 'Xác nhận mật khẩu phải từ 8 ký tự trở lên'),
+}).refine((data) => data.password === data.confirmPassword, {
+  path: ['confirmPassword'],
+  message: 'Mật khẩu xác nhận không khớp',
 });
 
 type RegisterFormData = z.infer<typeof registerSchema>;
@@ -32,11 +36,16 @@ const Register: React.FC = () => {
   const onSubmit = async (data: RegisterFormData) => {
     try {
       setIsLoading(true);
-      const payload = { ...data, role: "USER" };
+      const payload = {
+        fullName: data.fullName,
+        email: data.email,
+        password: data.password,
+        role: 'USER',
+      };
       const res = await axiosClient.post('/register', payload);
       if (res.status === 201) {
-        toast.success('Tạo tài khoản thành công! Đang chuyển hướng...', { icon: '🚀' });
-        setTimeout(() => navigate('/login'), 1500);
+        toast.success('Đăng ký thành công. Vui lòng xác thực email để kích hoạt tài khoản.');
+        navigate(`/register/verify-email?email=${encodeURIComponent(data.email.trim().toLowerCase())}`);
       }
     } catch {
       toast.error('Email này đã được sử dụng. Vui lòng thử email khác.');
@@ -184,6 +193,21 @@ const Register: React.FC = () => {
                   />
                 </div>
                 {errors.password && <p className="ml-1 mt-1 text-xs font-bold text-rose-500">{errors.password.message}</p>}
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="register-confirm-password" className="ml-1 text-xs font-black uppercase tracking-[0.14em] text-slate-500">Nhập lại mật khẩu</label>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+                  <input
+                    id="register-confirm-password"
+                    {...register('confirmPassword')}
+                    type="password"
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-4 pl-12 pr-4 text-sm font-semibold outline-none transition-all focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
+                    placeholder="Nhập lại mật khẩu"
+                  />
+                </div>
+                {errors.confirmPassword && <p className="ml-1 mt-1 text-xs font-bold text-rose-500">{errors.confirmPassword.message}</p>}
               </div>
 
               <div className="pt-3">

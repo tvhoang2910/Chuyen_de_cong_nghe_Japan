@@ -9,6 +9,7 @@ const Features = lazy(() => import('./pages/Features'));
 const Pricing = lazy(() => import('./pages/Pricing'));
 const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
+const VerifyRegisterEmail = lazy(() => import('./pages/VerifyRegisterEmail'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const ForgotPasswordVerifyOtp = lazy(() => import('./pages/ForgotPasswordVerifyOtp'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
@@ -86,6 +87,7 @@ function App() {
               path="/register" 
               element={effectiveIsAuthenticated ? <Navigate to={defaultAuthenticatedPath} /> : <Register />} 
             />
+            <Route path="/register/verify-email" element={<VerifyRegisterEmail />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/forgot-password/verify" element={<ForgotPasswordVerifyOtp />} />
             <Route path="/reset-password" element={<ResetPassword />} />

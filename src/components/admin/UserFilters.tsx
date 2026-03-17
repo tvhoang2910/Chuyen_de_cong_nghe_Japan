@@ -4,8 +4,6 @@ import { Search, Sparkles } from 'lucide-react';
 interface UserFiltersProps {
   searchInput: string;
   setSearchInput: React.Dispatch<React.SetStateAction<string>>;
-  roleFilter: string;
-  setRoleFilter: (role: any) => void;
   onSearch: (e: React.FormEvent) => void;
 }
 

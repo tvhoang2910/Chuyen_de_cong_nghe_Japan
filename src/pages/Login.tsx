@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, ArrowRight, BookOpen, Loader2, Sparkles, Orbit, ShieldCheck } from 'lucide-react';
 import { motion } from 'framer-motion';
+import type { AxiosError } from 'axios';
 import toast from 'react-hot-toast';
 import axiosClient, { fetchCurrentUserProfile, persistAuthSession } from '../api/axiosClient';
 
@@ -60,8 +61,18 @@ const Login: React.FC = () => {
       
       toast.success('Đăng nhập thành công!');
       navigate(targetPath);
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại.');
+    } catch (error) {
+      const axiosError = error as AxiosError<{ message?: string }>;
+      const backendMessage = axiosError.response?.data?.message;
+      if (backendMessage === 'Email is not verified') {
+        const normalizedEmail = formData.email.trim().toLowerCase();
+        toast.error('Email chưa xác thực. Vui lòng xác thực OTP để kích hoạt tài khoản.');
+        if (normalizedEmail) {
+          navigate(`/register/verify-email?email=${encodeURIComponent(normalizedEmail)}`);
+        }
+      } else {
+        toast.error(backendMessage || 'Đăng nhập thất bại. Vui lòng kiểm tra lại.');
+      }
     } finally {
       setIsLoading(false);
     }

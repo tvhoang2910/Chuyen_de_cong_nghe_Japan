@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import axios from 'axios';
+import React, { useCallback, useEffect, useState, useMemo } from 'react';
+import axios, { type AxiosError } from 'axios';
 import toast from 'react-hot-toast';
 import { ChevronLeft, ChevronRight, Users, ShieldCheck, User as UserIcon, CheckCircle2, UserPlus, FileUp, Sparkles, Filter, List, LayoutGrid } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -61,6 +61,7 @@ const AdminUsers: React.FC = () => {
     fullName: '',
     email: '',
     password: '',
+    confirmPassword: '',
     role: 'CONTRIBUTOR' as AppRole,
   });
 
@@ -73,7 +74,7 @@ const AdminUsers: React.FC = () => {
     };
   }, [totalElements, users]);
 
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     try {
       setIsLoading(true);
       const response = await fetchAdminUsers({
@@ -94,11 +95,11 @@ const AdminUsers: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [page, searchKeyword, roleFilter]);
 
   useEffect(() => {
     void loadUsers();
-  }, [page, searchKeyword, roleFilter]);
+  }, [loadUsers]);
 
   useEffect(() => {
     setRoleFilter(activeTab === 'ALL' ? '' : activeTab);
@@ -117,10 +118,25 @@ const AdminUsers: React.FC = () => {
     setSearchKeyword(searchInput.trim());
   };
 
+  const resolveErrorMessage = (error: unknown, fallbackMessage: string): string => {
+    const axiosError = error as AxiosError<{ message?: string }>;
+    if (axiosError.response?.data?.message) {
+      return axiosError.response.data.message;
+    }
+    if (error instanceof Error && error.message) {
+      return error.message;
+    }
+    return fallbackMessage;
+  };
+
   const handleCreateUser = async (event: React.SyntheticEvent) => {
     event.preventDefault();
     if (!createForm.fullName.trim() || !createForm.email.trim() || createForm.password.length < 8) {
       toast.error('Vui lòng nhập đủ thông tin hợp lệ để tạo user.');
+      return;
+    }
+    if (createForm.password !== createForm.confirmPassword) {
+      toast.error('Mật khẩu xác nhận không khớp.');
       return;
     }
 
@@ -133,12 +149,12 @@ const AdminUsers: React.FC = () => {
         role: createForm.role,
       });
       toast.success('Tạo user thành công.');
-      setCreateForm({ fullName: '', email: '', password: '', role: 'CONTRIBUTOR' });
+      setCreateForm({ fullName: '', email: '', password: '', confirmPassword: '', role: 'CONTRIBUTOR' });
       setPage(0);
       void loadUsers();
       setSpotlightUserId(created.id);
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Không thể tạo user mới.');
+    } catch (error) {
+      toast.error(resolveErrorMessage(error, 'Không thể tạo user mới.'));
     } finally {
       setIsCreating(false);
     }
@@ -158,8 +174,8 @@ const AdminUsers: React.FC = () => {
       setSpotlightUserId(updated.id);
       setStatusReasonByUserId(prev => ({ ...prev, [user.id]: '' }));
       toast.success(updated.status ? 'Đã mở khóa tài khoản.' : 'Đã khóa tài khoản.');
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Lỗi cập nhật trạng thái.');
+    } catch (error) {
+      toast.error(resolveErrorMessage(error, 'Lỗi cập nhật trạng thái.'));
     } finally {
       setActionLoadingUserId(null);
     }
@@ -172,8 +188,8 @@ const AdminUsers: React.FC = () => {
       setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
       setSpotlightUserId(updated.id);
       toast.success('Đã cập nhật quyền tài khoản.');
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Lỗi cập nhật role.');
+    } catch (error) {
+      toast.error(resolveErrorMessage(error, 'Lỗi cập nhật role.'));
     } finally {
       setActionLoadingUserId(null);
     }
@@ -193,14 +209,14 @@ const AdminUsers: React.FC = () => {
       setLastImportResult(response);
       void loadUsers();
       toast.success('Đã hoàn tất import.');
-    } catch (error: any) {
-      toast.error(error.message || 'Lỗi import dữ liệu.');
+    } catch (error) {
+      toast.error(resolveErrorMessage(error, 'Lỗi import dữ liệu.'));
     } finally {
       setIsImporting(false);
     }
   };
 
-  const tabs = [
+  const tabs: Array<{ id: 'ALL' | AppRole; label: string; icon: typeof Users; color: string; bg: string }> = [
     { id: 'ALL', label: 'Tất cả', icon: Users, color: 'text-indigo-600', bg: 'bg-indigo-50' },
     { id: 'USER', label: 'Học sinh', icon: UserIcon, color: 'text-cyan-600', bg: 'bg-cyan-50' },
     { id: 'CONTRIBUTOR', label: 'Giáo viên', icon: ShieldCheck, color: 'text-emerald-600', bg: 'bg-emerald-50' },
@@ -251,7 +267,7 @@ const AdminUsers: React.FC = () => {
             {tabs.map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => setActiveTab(tab.id)}
                 className={`
                   relative flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black transition-all shrink-0
                   ${activeTab === tab.id ? tab.color : 'text-slate-500 hover:text-slate-900'}
@@ -307,8 +323,6 @@ const AdminUsers: React.FC = () => {
                   <UserFilters
                     searchInput={searchInput}
                     setSearchInput={setSearchInput}
-                    roleFilter={roleFilter}
-                    setRoleFilter={setRoleFilter}
                     onSearch={handleSearchSubmit}
                   />
                 </motion.div>

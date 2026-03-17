@@ -7,6 +7,14 @@ type PublicHeaderProps = {
   active: 'home' | 'features' | 'pricing' | 'about';
 };
 
+type NavLinkId = PublicHeaderProps['active'];
+
+type NavLink = {
+  name: string;
+  path: string;
+  id: NavLinkId;
+};
+
 const linkClass = (isActive: boolean) =>
   `relative text-sm font-semibold transition-all duration-300 ${
     isActive
@@ -26,7 +34,7 @@ const PublicHeader: React.FC<PublicHeaderProps> = ({ active }) => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const navLinks = [
+  const navLinks: NavLink[] = [
     { name: 'Home', path: '/', id: 'home' },
     { name: 'Features', path: '/features', id: 'features' },
     { name: 'Pricing', path: '/pricing', id: 'pricing' },
@@ -64,7 +72,7 @@ const PublicHeader: React.FC<PublicHeaderProps> = ({ active }) => {
               <Link 
                 key={link.id} 
                 to={link.path} 
-                className={linkClass(active === link.id as any)}
+                className={linkClass(active === link.id)}
               >
                 {link.name}
                 {active === link.id && (

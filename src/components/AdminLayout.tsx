@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
+import type { AxiosError } from 'axios';
 import { 
   Users, 
   LayoutDashboard, 
@@ -107,8 +108,9 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       setUser(updated);
       setIsProfileModalOpen(false);
       toast.success('Đã cập nhật hồ sơ.');
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Lỗi cập nhật hồ sơ.');
+    } catch (error) {
+      const axiosError = error as AxiosError<{ message?: string }>;
+      toast.error(axiosError.response?.data?.message || 'Lỗi cập nhật hồ sơ.');
     } finally {
       setIsSavingProfile(false);
     }
@@ -144,8 +146,9 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       });
       toast.success('Đã đổi mật khẩu. Vui lòng đăng nhập lại.');
       handleLogout();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Lỗi đổi mật khẩu.');
+    } catch (error) {
+      const axiosError = error as AxiosError<{ message?: string }>;
+      toast.error(axiosError.response?.data?.message || 'Lỗi đổi mật khẩu.');
     } finally {
       setIsSavingPassword(false);
     }
@@ -311,6 +314,24 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                         type="text" 
                         value={profileForm.phoneNumber} 
                         onChange={e => setProfileForm(prev => ({ ...prev, phoneNumber: e.target.value }))}
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-cyan-600/20 transition-all outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Trường học</label>
+                      <input
+                        type="text"
+                        value={profileForm.school}
+                        onChange={e => setProfileForm(prev => ({ ...prev, school: e.target.value }))}
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-cyan-600/20 transition-all outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Môn phụ trách</label>
+                      <input
+                        type="text"
+                        value={profileForm.subject}
+                        onChange={e => setProfileForm(prev => ({ ...prev, subject: e.target.value }))}
                         className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-cyan-600/20 transition-all outline-none"
                       />
                     </div>
