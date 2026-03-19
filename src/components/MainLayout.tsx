@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import type { AxiosError } from 'axios';
 import { 
@@ -14,10 +14,16 @@ import {
   Zap,
   Star,
   Crown,
-  Flame
+  Flame,
+  Banknote,
+  ClipboardCheck,
+  Gem
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axiosClient, { 
+  fetchMySubscriptionRequests,
+  fetchSubscriptionReviewQueue,
+  SUBSCRIPTION_REVIEW_UPDATED_EVENT,
   clearAuthSession, 
   fetchCurrentUserProfile, 
   updateCurrentUserProfile,
@@ -29,6 +35,14 @@ interface MainLayoutProps {
   children: React.ReactNode;
 }
 
+type NotificationItem = {
+  id: string;
+  title: string;
+  description: string;
+  timeLabel: string;
+  onClick: () => void;
+};
+
 const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -39,6 +53,49 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isSavingPassword, setIsSavingPassword] = useState(false);
+  const [pendingReviewCount, setPendingReviewCount] = useState(0);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [notificationItems, setNotificationItems] = useState<NotificationItem[]>([]);
+  const notificationRef = useRef<HTMLDivElement | null>(null);
+
+  const getDismissedIdsStorageKey = () => {
+    const role = user?.role ?? 'GUEST';
+    const email = user?.email ?? 'anonymous';
+    return `main-dismissed-notification-ids:${role}:${email}`;
+  };
+
+  const readDismissedIds = () => {
+    try {
+      const raw = localStorage.getItem(getDismissedIdsStorageKey());
+      if (!raw) {
+        return new Set<string>();
+      }
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        return new Set<string>();
+      }
+      return new Set(parsed.filter((item): item is string => typeof item === 'string'));
+    } catch {
+      return new Set<string>();
+    }
+  };
+
+  const persistDismissedIds = (ids: Set<string>) => {
+    localStorage.setItem(getDismissedIdsStorageKey(), JSON.stringify(Array.from(ids)));
+  };
+
+  const dismissNotification = (id: string) => {
+    setNotificationItems((current) => {
+      const next = current.filter((item) => item.id !== id);
+      if (user?.role === 'CONTRIBUTOR') {
+        setPendingReviewCount(next.filter((item) => item.id.startsWith('review-item-')).length);
+      }
+      return next;
+    });
+    const dismissed = readDismissedIds();
+    dismissed.add(id);
+    persistDismissedIds(dismissed);
+  };
 
   const [displayNameInput, setDisplayNameInput] = useState('');
   const [profileForm, setProfileForm] = useState({
@@ -70,6 +127,115 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     void loadProfile();
   }, []);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadNotifications = async () => {
+      try {
+        if (user?.role === 'CONTRIBUTOR') {
+          const queue = await fetchSubscriptionReviewQueue(0, 5, 'PENDING_REVIEW');
+          const items: NotificationItem[] = queue.content.map((row) => ({
+            id: `review-item-${row.id}`,
+            title: `Request #${row.id} cần bạn duyệt`,
+            description: `${row.userFullName} • ${row.planName} • ${Number(row.purchasedPrice).toLocaleString('vi-VN')}đ`,
+            timeLabel: new Date(row.createdAt).toLocaleString('vi-VN'),
+            onClick: () => navigate('/contributor/subscription-reviews'),
+          }));
+
+          items.push({
+            id: 'meta-review-history-contributor',
+            title: 'Lịch sử duyệt thanh toán',
+            description: 'Mở trang duyệt để xem request đã duyệt hoặc từ chối.',
+            timeLabel: 'Hệ thống',
+            onClick: () => navigate('/contributor/subscription-reviews'),
+          });
+
+          const dismissedIds = readDismissedIds();
+          const visibleItems = items.filter((item) => !dismissedIds.has(item.id));
+
+          if (isMounted) {
+            setPendingReviewCount(visibleItems.filter((item) => item.id.startsWith('review-item-')).length);
+            setNotificationItems(visibleItems);
+          }
+          return;
+        }
+
+        const myRequests = await fetchMySubscriptionRequests();
+        const recent = myRequests.slice(0, 5);
+        const items: NotificationItem[] = recent.map((row) => ({
+          id: `my-request-${row.id}`,
+          title: `Yêu cầu ${row.planName} đã ${row.status === 'APPROVED' ? 'được duyệt' : row.status === 'REJECTED' ? 'bị từ chối' : 'đang chờ duyệt'}`,
+          description: `Mã GD: ${row.transactionRef || '-'} • Số tiền ${Number(row.purchasedPrice).toLocaleString('vi-VN')}đ`,
+          timeLabel: new Date(row.createdAt).toLocaleString('vi-VN'),
+          onClick: () => navigate('/dashboard/subscription-payments'),
+        }));
+
+        items.push({
+          id: 'premium-nudge',
+          title: 'Theo dõi thanh toán Premium',
+          description: 'Bạn có thể xem đầy đủ lịch sử giao dịch ở trang Nâng cấp Premium.',
+          timeLabel: 'Hệ thống',
+          onClick: () => navigate('/dashboard/subscription-payments'),
+        });
+
+        const dismissedIds = readDismissedIds();
+        const visibleItems = items.filter((item) => !dismissedIds.has(item.id));
+
+        if (isMounted) {
+          setPendingReviewCount(0);
+          setNotificationItems(visibleItems);
+        }
+      } catch {
+        if (isMounted) {
+          setPendingReviewCount(0);
+          setNotificationItems([
+            {
+              id: 'fallback-main',
+              title: 'Không tải được thông báo',
+              description: 'Vui lòng thử lại sau hoặc mở trang thanh toán để kiểm tra.',
+              timeLabel: 'Hệ thống',
+              onClick: () => navigate(user?.role === 'CONTRIBUTOR' ? '/contributor/subscription-reviews' : '/dashboard/subscription-payments'),
+            },
+          ]);
+        }
+      }
+    };
+
+    const handleRefresh = () => {
+      void loadNotifications();
+    };
+
+    void loadNotifications();
+    const intervalId = globalThis.setInterval(handleRefresh, 30000);
+    globalThis.addEventListener(SUBSCRIPTION_REVIEW_UPDATED_EVENT, handleRefresh);
+
+    return () => {
+      isMounted = false;
+      globalThis.clearInterval(intervalId);
+      globalThis.removeEventListener(SUBSCRIPTION_REVIEW_UPDATED_EVENT, handleRefresh);
+    };
+  }, [navigate, user?.role]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
+        setIsNotificationOpen(false);
+      }
+    };
+
+    globalThis.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      globalThis.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  const bellBadgeCount = useMemo(() => {
+    if (user?.role === 'CONTRIBUTOR') {
+      return pendingReviewCount;
+    }
+    return notificationItems.length;
+  }, [notificationItems.length, pendingReviewCount, user?.role]);
+
   const handleLogout = async () => {
     try {
       await axiosClient.post('/logout');
@@ -81,10 +247,13 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
   const navItems = user?.role === 'CONTRIBUTOR' ? [
     { label: 'Tổng quan', icon: LayoutDashboard, path: '/contributor' },
+    { label: 'Tạo gói Premium', icon: Gem, path: '/contributor/premium-plans' },
+    { label: 'Duyệt thanh toán', icon: ClipboardCheck, path: '/contributor/subscription-reviews' },
     { label: 'Đề thi của tôi', icon: BookOpen, path: '/contributor/exams' },
     { label: 'Thống kê', icon: Zap, path: '/contributor/analytics' },
   ] : [
     { label: 'Tổng quan', icon: LayoutDashboard, path: '/dashboard' },
+    { label: 'Nâng cấp Premium', icon: Banknote, path: '/dashboard/subscription-payments' },
     { label: 'Đề thi đã làm', icon: BookOpen, path: '/dashboard/history' },
     { label: 'Học tập (SM-2)', icon: Zap, path: '/dashboard/spaced-repetition' },
     { label: 'Cộng đồng', icon: Star, path: '/dashboard/community' },
@@ -279,10 +448,56 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                 <span className="text-xs font-bold text-amber-700">850 Pts</span>
               </div>
             </div>
-            <button className="relative p-2 text-slate-400 hover:text-slate-600">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-2 right-2.5 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-white"></span>
-            </button>
+            <div ref={notificationRef} className="relative">
+              <button
+                id="main-review-bell"
+                type="button"
+                onClick={() => setIsNotificationOpen((prev) => !prev)}
+                className="relative p-2 text-slate-400 hover:text-slate-600"
+                title="Mở danh sách thông báo"
+              >
+                <Bell className="w-5 h-5" />
+                {bellBadgeCount > 0 && (
+                  <span
+                    id="main-review-bell-badge"
+                    className="absolute -top-1 -right-1 min-w-5 rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white ring-2 ring-white"
+                  >
+                    {bellBadgeCount > 99 ? '99+' : bellBadgeCount}
+                  </span>
+                )}
+              </button>
+
+              {isNotificationOpen && (
+                <div className="absolute right-0 top-11 z-50 w-[22rem] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+                  <div className="border-b border-slate-100 px-4 py-3">
+                    <p className="text-sm font-bold text-slate-900">Thông báo</p>
+                    <p className="text-xs text-slate-500">Nhấn từng thông báo để mở trang liên quan.</p>
+                  </div>
+                  <div className="max-h-96 overflow-y-auto">
+                    {notificationItems.length === 0 ? (
+                      <p className="px-4 py-6 text-center text-sm text-slate-500">Hiện chưa có thông báo mới.</p>
+                    ) : (
+                      notificationItems.map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => {
+                            dismissNotification(item.id);
+                            setIsNotificationOpen(false);
+                            item.onClick();
+                          }}
+                          className="w-full border-b border-slate-100 px-4 py-3 text-left hover:bg-slate-50"
+                        >
+                          <p className="text-sm font-semibold text-slate-900">{item.title}</p>
+                          <p className="mt-1 text-xs text-slate-600">{item.description}</p>
+                          <p className="mt-1 text-[11px] text-slate-400">{item.timeLabel}</p>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
             <div className="h-8 w-px bg-slate-200 mx-2 hidden sm:block" />
             <button 
               id="profile-settings-trigger"

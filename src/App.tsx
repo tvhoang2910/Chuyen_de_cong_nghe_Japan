@@ -17,6 +17,9 @@ const Dashboard = lazy(() => import('./pages/Dashboard'));
 const OAuth2Success = lazy(() => import('./pages/OAuth2Success'));
 const AdminUsers = lazy(() => import('./pages/AdminUsers'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const SubscriptionPayments = lazy(() => import('./pages/SubscriptionPayments'));
+const SubscriptionReviewQueue = lazy(() => import('./pages/SubscriptionReviewQueue'));
+const PremiumPlanManagement = lazy(() => import('./pages/PremiumPlanManagement'));
 
 const RouteLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-600 font-semibold italic animate-pulse">
@@ -107,6 +110,19 @@ function App() {
                 </ProtectedRoute>
               } 
             />
+            <Route
+              path="/dashboard/subscription-payments"
+              element={
+                <ProtectedRoute
+                  isAuthenticated={effectiveIsAuthenticated}
+                  userRole={effectiveRole}
+                  defaultPath={defaultAuthenticatedPath}
+                  allowedRoles={['USER']}
+                >
+                  <SubscriptionPayments />
+                </ProtectedRoute>
+              }
+            />
             <Route 
               path="/contributor" 
               element={
@@ -119,6 +135,32 @@ function App() {
                   <Dashboard />
                 </ProtectedRoute>
               } 
+            />
+            <Route
+              path="/contributor/subscription-reviews"
+              element={
+                <ProtectedRoute
+                  isAuthenticated={effectiveIsAuthenticated}
+                  userRole={effectiveRole}
+                  defaultPath={defaultAuthenticatedPath}
+                  allowedRoles={['CONTRIBUTOR']}
+                >
+                  <SubscriptionReviewQueue mode="contributor" />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/contributor/premium-plans"
+              element={
+                <ProtectedRoute
+                  isAuthenticated={effectiveIsAuthenticated}
+                  userRole={effectiveRole}
+                  defaultPath={defaultAuthenticatedPath}
+                  allowedRoles={['CONTRIBUTOR']}
+                >
+                  <PremiumPlanManagement mode="contributor" />
+                </ProtectedRoute>
+              }
             />
 
             {/* Admin Routes */}
@@ -147,6 +189,32 @@ function App() {
                   <AdminDashboard />
                 </ProtectedRoute>
               } 
+            />
+            <Route
+              path="/admin/subscription-reviews"
+              element={
+                <ProtectedRoute
+                  isAuthenticated={effectiveIsAuthenticated}
+                  userRole={effectiveRole}
+                  defaultPath={defaultAuthenticatedPath}
+                  allowedRoles={['ADMIN']}
+                >
+                  <SubscriptionReviewQueue mode="admin" />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/premium-plans"
+              element={
+                <ProtectedRoute
+                  isAuthenticated={effectiveIsAuthenticated}
+                  userRole={effectiveRole}
+                  defaultPath={defaultAuthenticatedPath}
+                  allowedRoles={['ADMIN']}
+                >
+                  <PremiumPlanManagement mode="admin" />
+                </ProtectedRoute>
+              }
             />
             <Route path="/admin" element={<Navigate to="/admin/users" />} />
 

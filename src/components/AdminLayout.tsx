@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import type { AxiosError } from 'axios';
 import { 
@@ -12,10 +12,14 @@ import {
   X,
   UserRound,
   KeyRound,
-  ShieldCheck
+  ShieldCheck,
+  ClipboardCheck,
+  Gem
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axiosClient, { 
+  fetchSubscriptionReviewQueue,
+  SUBSCRIPTION_REVIEW_UPDATED_EVENT,
   clearAuthSession, 
   fetchCurrentUserProfile, 
   updateCurrentUserProfile,
@@ -27,6 +31,16 @@ interface AdminLayoutProps {
   children: React.ReactNode;
 }
 
+type NotificationItem = {
+  id: string;
+  title: string;
+  description: string;
+  timeLabel: string;
+  onClick: () => void;
+};
+
+const ADMIN_DISMISSED_NOTIFICATION_IDS_KEY = 'admin-dismissed-notification-ids';
+
 const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -37,6 +51,36 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isSavingPassword, setIsSavingPassword] = useState(false);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [notificationItems, setNotificationItems] = useState<NotificationItem[]>([]);
+  const notificationRef = useRef<HTMLDivElement | null>(null);
+
+  const readDismissedIds = () => {
+    try {
+      const raw = localStorage.getItem(ADMIN_DISMISSED_NOTIFICATION_IDS_KEY);
+      if (!raw) {
+        return new Set<string>();
+      }
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        return new Set<string>();
+      }
+      return new Set(parsed.filter((item): item is string => typeof item === 'string'));
+    } catch {
+      return new Set<string>();
+    }
+  };
+
+  const persistDismissedIds = (ids: Set<string>) => {
+    localStorage.setItem(ADMIN_DISMISSED_NOTIFICATION_IDS_KEY, JSON.stringify(Array.from(ids)));
+  };
+
+  const dismissNotification = (id: string) => {
+    setNotificationItems((current) => current.filter((item) => item.id !== id));
+    const dismissed = readDismissedIds();
+    dismissed.add(id);
+    persistDismissedIds(dismissed);
+  };
 
   const [displayNameInput, setDisplayNameInput] = useState('');
   const [profileForm, setProfileForm] = useState({
@@ -69,6 +113,81 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     void loadProfile();
   }, []);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadNotifications = async () => {
+      try {
+        const queue = await fetchSubscriptionReviewQueue(0, 5, 'PENDING_REVIEW');
+        const items: NotificationItem[] = queue.content.map((row) => ({
+          id: `review-item-${row.id}`,
+          title: `Request #${row.id} đang chờ duyệt`,
+          description: `${row.userFullName} • ${row.planName} • ${Number(row.purchasedPrice).toLocaleString('vi-VN')}đ`,
+          timeLabel: new Date(row.createdAt).toLocaleString('vi-VN'),
+          onClick: () => navigate('/admin/subscription-reviews'),
+        }));
+
+        items.push({
+          id: 'meta-review-history',
+          title: 'Lịch sử duyệt thanh toán',
+          description: 'Xem các yêu cầu đã duyệt hoặc từ chối trong trang duyệt thanh toán.',
+          timeLabel: 'Hệ thống',
+          onClick: () => navigate('/admin/subscription-reviews'),
+        });
+
+        const dismissedIds = readDismissedIds();
+        const visibleItems = items.filter((item) => !dismissedIds.has(item.id));
+
+        if (isMounted) {
+          setNotificationItems(visibleItems);
+        }
+      } catch {
+        if (isMounted) {
+          setNotificationItems([
+            {
+              id: 'meta-fallback-review',
+              title: 'Không tải được thông báo review',
+              description: 'Vui lòng thử lại sau ít phút hoặc nhấn làm mới trang.',
+              timeLabel: 'Hệ thống',
+              onClick: () => navigate('/admin/subscription-reviews'),
+            },
+          ]);
+        }
+      }
+    };
+
+    const handleRefresh = () => {
+      void loadNotifications();
+    };
+
+    void loadNotifications();
+    const intervalId = globalThis.setInterval(handleRefresh, 30000);
+    globalThis.addEventListener(SUBSCRIPTION_REVIEW_UPDATED_EVENT, handleRefresh);
+
+    return () => {
+      isMounted = false;
+      globalThis.clearInterval(intervalId);
+      globalThis.removeEventListener(SUBSCRIPTION_REVIEW_UPDATED_EVENT, handleRefresh);
+    };
+  }, [navigate]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
+        setIsNotificationOpen(false);
+      }
+    };
+
+    globalThis.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      globalThis.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  const bellBadgeCount = useMemo(() => {
+    return notificationItems.filter((item) => item.id.startsWith('review-item-')).length;
+  }, [notificationItems]);
+
   const handleLogout = async () => {
     try {
       await axiosClient.post('/logout');
@@ -83,6 +202,8 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const navItems = [
     { label: 'Dashboard', icon: LayoutDashboard, path: '/admin/dashboard' },
     { label: 'Quản lý Users', icon: Users, path: '/admin/users' },
+    { label: 'Quản lý gói Premium', icon: Gem, path: '/admin/premium-plans' },
+    { label: 'Duyệt thanh toán', icon: ClipboardCheck, path: '/admin/subscription-reviews' },
     { label: 'Cài đặt hệ thống', icon: Settings, path: '/admin/settings' },
   ];
 
@@ -236,10 +357,56 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           </div>
 
           <div className="flex items-center gap-4">
-            <button className="relative p-2 text-slate-400 hover:text-slate-600 transition-colors">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-white"></span>
-            </button>
+            <div ref={notificationRef} className="relative">
+              <button
+                id="admin-review-bell"
+                type="button"
+                onClick={() => setIsNotificationOpen((prev) => !prev)}
+                className="relative p-2 text-slate-400 hover:text-slate-600 transition-colors"
+                title="Mở danh sách thông báo"
+              >
+                <Bell className="w-5 h-5" />
+                {bellBadgeCount > 0 && (
+                  <span
+                    id="admin-review-bell-badge"
+                    className="absolute -top-1 -right-1 min-w-5 rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white ring-2 ring-white"
+                  >
+                    {bellBadgeCount > 99 ? '99+' : bellBadgeCount}
+                  </span>
+                )}
+              </button>
+
+              {isNotificationOpen && (
+                <div className="absolute right-0 top-11 z-50 w-[22rem] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+                  <div className="border-b border-slate-100 px-4 py-3">
+                    <p className="text-sm font-bold text-slate-900">Thông báo</p>
+                    <p className="text-xs text-slate-500">Nhấn vào từng thông báo để mở chi tiết.</p>
+                  </div>
+                  <div className="max-h-96 overflow-y-auto">
+                    {notificationItems.length === 0 ? (
+                      <p className="px-4 py-6 text-center text-sm text-slate-500">Hiện chưa có thông báo mới.</p>
+                    ) : (
+                      notificationItems.map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => {
+                            dismissNotification(item.id);
+                            setIsNotificationOpen(false);
+                            item.onClick();
+                          }}
+                          className="w-full border-b border-slate-100 px-4 py-3 text-left hover:bg-slate-50"
+                        >
+                          <p className="text-sm font-semibold text-slate-900">{item.title}</p>
+                          <p className="mt-1 text-xs text-slate-600">{item.description}</p>
+                          <p className="mt-1 text-[11px] text-slate-400">{item.timeLabel}</p>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
             <div className="h-8 w-px bg-slate-200 mx-2" />
             <button 
               onClick={() => setIsProfileModalOpen(true)}

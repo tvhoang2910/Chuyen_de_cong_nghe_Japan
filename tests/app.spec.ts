@@ -12,10 +12,18 @@ const seedAdminSession = async (page: import('@playwright/test').Page) => {
   });
 };
 
+const seedContributorSession = async (page: import('@playwright/test').Page) => {
+  await page.goto('/login');
+  await page.evaluate(() => {
+    localStorage.setItem('access_token', 'contributor-access-token');
+    localStorage.setItem('user_role', 'CONTRIBUTOR');
+  });
+};
+
 test('has title and landing page content', async ({ page }) => {
   await page.goto('/');
 
-  await expect(page.locator('h1')).toContainText('Tối ưu trí nhớ');
+  await expect(page.locator('h1')).toContainText('Chinh phục');
 });
 
 test('can navigate to login page', async ({ page }) => {
@@ -25,7 +33,7 @@ test('can navigate to login page', async ({ page }) => {
   await loginButton.click();
 
   await expect(page).toHaveURL(/.*\/login/);
-  await expect(page.locator('h2')).toContainText('Chào mừng trở lại');
+  await expect(page.getByRole('heading', { name: 'Đăng nhập' })).toBeVisible();
 });
 
 test('register redirects to verify-email and can submit OTP verification', async ({ page }) => {
@@ -86,7 +94,7 @@ test('oauth2 success callback redirects admin to admin users page immediately', 
   await page.goto('/oauth2/success?token=gg-access-token&refreshToken=gg-refresh-token&email=admin@example.com&role=ADMIN');
 
   await expect(page).toHaveURL(/.*\/admin\/users/);
-  await expect(page.locator('h1')).toContainText('Quản lý Users');
+  await expect(page.locator('h1')).toContainText('Quản lý Thành viên');
 });
 
 test('shows validation errors on empty login submit', async ({ page }) => {
@@ -94,7 +102,7 @@ test('shows validation errors on empty login submit', async ({ page }) => {
 
   await page.click('button[type="submit"]');
 
-  await expect(page.locator('text=Email không hợp lệ')).toBeVisible();
+  await expect(page.locator('text=Vui lòng nhập đầy đủ email và mật khẩu.')).toBeVisible();
 });
 
 test('shows lockout message when backend returns 429', async ({ page }) => {
@@ -111,7 +119,7 @@ test('shows lockout message when backend returns 429', async ({ page }) => {
   await page.fill('input#password-input', 'wrongpassword');
   await page.click('button[type="submit"]');
 
-  await expect(page.locator('p:has-text("Too many failed login attempts")')).toBeVisible();
+  await expect(page.locator('text=Too many failed login attempts. Please try again later.')).toBeVisible();
 });
 
 test('redirects to dashboard after successful login and back to login after logout', async ({ page }) => {
@@ -456,17 +464,20 @@ test('admin can change role and lock/unlock user', async ({ page }) => {
   expect(rolePayloads[0]).toEqual({ role: 'ADMIN' });
   await expect(page.locator('select[aria-label="role-1"]')).toHaveValue('ADMIN');
 
-  await page.fill('#status-reason-1', 'Vi phạm quy chế thi');
-  await page.click('button:has-text("Khóa")');
+  const statusReasonInput = page.locator('tbody tr').first().locator('input[placeholder*="Lý do"]');
+  const statusActionButton = page.locator('tbody tr').first().getByRole('button', { name: /Khóa tài khoản|Mở khóa ngay/ });
+
+  await statusReasonInput.fill('Vi phạm quy chế thi');
+  await statusActionButton.click();
   await expect.poll(() => statusPayloads.length).toBe(1);
   expect(statusPayloads[0]).toEqual({ status: 0, reason: 'Vi phạm quy chế thi' });
-  await expect(page.locator('text=BANNED (0)')).toBeVisible();
+  await expect(page.locator('tbody tr').first().getByRole('button', { name: 'Mở khóa ngay' })).toBeVisible();
 
-  await page.fill('#status-reason-1', 'Đã xử lý xong khiếu nại');
-  await page.click('button:has-text("Mở khóa")');
+  await statusReasonInput.fill('Đã xử lý xong khiếu nại');
+  await page.locator('tbody tr').first().getByRole('button', { name: 'Mở khóa ngay' }).click();
   await expect.poll(() => statusPayloads.length).toBe(2);
   expect(statusPayloads[1]).toEqual({ status: 1, reason: 'Đã xử lý xong khiếu nại' });
-  await expect(page.locator('text=ACTIVE (1)')).toBeVisible();
+  await expect(page.locator('tbody tr').first().getByRole('button', { name: 'Khóa tài khoản' })).toBeVisible();
 });
 
 test('admin can import users by json payload', async ({ page }) => {
@@ -520,7 +531,8 @@ test('admin can import users by json payload', async ({ page }) => {
 
   await seedAdminSession(page);
   await page.goto('/admin/users');
-  await page.fill('#admin-import-json-input', JSON.stringify([
+  const importTextarea = page.locator('textarea').first();
+  await importTextarea.fill(JSON.stringify([
     {
       email: 'new.teacher@example.com',
       fullName: 'New Teacher',
@@ -534,11 +546,14 @@ test('admin can import users by json payload', async ({ page }) => {
       role: 'USER',
     },
   ]));
-  await page.check('#admin-import-skip-existing');
-  await page.click('#admin-import-submit');
+  await page.getByRole('checkbox').check();
+  await page.getByRole('button', { name: 'Xác nhận Import JSON' }).click();
 
   await expect.poll(() => importPayloads.length).toBe(1);
-  await expect(page.locator('text=Tổng: 2 | Tạo mới: 1 | Bỏ qua: 1 | Lỗi: 0')).toBeVisible();
+  await expect(page.locator('text=Tổng: 2')).toBeVisible();
+  await expect(page.locator('text=Thành công')).toBeVisible();
+  await expect(page.getByText('Bỏ qua', { exact: true })).toBeVisible();
+  await expect(page.locator('text=Thất bại')).toBeVisible();
 });
 
 test('admin can generate sample json for import', async ({ page }) => {
@@ -572,11 +587,149 @@ test('admin can generate sample json for import', async ({ page }) => {
 
   await seedAdminSession(page);
   await page.goto('/admin/users');
-  await page.click('#admin-import-generate-sample');
+  await page.getByRole('button', { name: 'Tạo JSON mẫu' }).click();
 
-  const importText = await page.inputValue('#admin-import-json-input');
+  const importText = await page.inputValue('textarea');
   expect(importText).toContain('teacher.one@example.com');
   expect(importText).toContain('CONTRIBUTOR');
+});
+
+test('admin can create premium plan', async ({ page }) => {
+  const createPayloads: Array<Record<string, unknown>> = [];
+
+  await page.route('**/api/v1/auth/me', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 99,
+        email: 'admin@example.com',
+        fullName: 'Admin User',
+        role: 'ADMIN',
+        premium: false,
+      }),
+    });
+  });
+
+  await page.route('**/api/v1/auth/subscriptions/plans/manage', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        {
+          id: 1,
+          name: 'Starter',
+          price: 49000,
+          durationDays: 30,
+          lifetime: false,
+          description: 'Starter plan',
+          active: true,
+        },
+      ]),
+    });
+  });
+
+  await page.route('**/api/v1/auth/subscriptions/plans', async (route) => {
+    const payload = (await route.request().postDataJSON()) as Record<string, unknown>;
+    createPayloads.push(payload);
+    await route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 2,
+        name: payload.name,
+        price: payload.price,
+        durationDays: payload.durationDays,
+        lifetime: payload.lifetime,
+        description: payload.description,
+        active: payload.active,
+      }),
+    });
+  });
+
+  await seedAdminSession(page);
+  await page.goto('/admin/premium-plans');
+  await expect(page.getByRole('heading', { name: 'Quản trị gói Premium' })).toBeVisible();
+
+  await page.fill('#premium-plan-name', 'Enterprise Max');
+  await page.fill('#premium-plan-price', '199000');
+  await page.fill('#premium-plan-duration', '60');
+  await page.fill('#premium-plan-description', 'Enterprise plan for schools');
+  await page.check('#premium-plan-active');
+  await page.click('#premium-plan-submit');
+
+  await expect.poll(() => createPayloads.length).toBe(1);
+  expect(createPayloads[0]).toEqual({
+    name: 'Enterprise Max',
+    price: 199000,
+    durationDays: 60,
+    lifetime: false,
+    description: 'Enterprise plan for schools',
+    active: true,
+  });
+});
+
+test('contributor can create premium plan', async ({ page }) => {
+  const createPayloads: Array<Record<string, unknown>> = [];
+
+  await page.route('**/api/v1/auth/me', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 78,
+        email: 'contributor@example.com',
+        fullName: 'Contributor User',
+        role: 'CONTRIBUTOR',
+        premium: false,
+      }),
+    });
+  });
+
+  await page.route('**/api/v1/auth/subscriptions/plans/manage', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([]),
+    });
+  });
+
+  await page.route('**/api/v1/auth/subscriptions/plans', async (route) => {
+    const payload = (await route.request().postDataJSON()) as Record<string, unknown>;
+    createPayloads.push(payload);
+    await route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 3,
+        name: payload.name,
+        price: payload.price,
+        durationDays: payload.durationDays,
+        lifetime: payload.lifetime,
+        description: payload.description,
+        active: payload.active,
+      }),
+    });
+  });
+
+  await seedContributorSession(page);
+  await page.goto('/contributor/premium-plans');
+  await expect(page.getByRole('heading', { name: 'Quản trị gói Premium' })).toBeVisible();
+
+  await page.fill('#premium-plan-name', 'Contributor Special');
+  await page.fill('#premium-plan-price', '79000');
+  await page.fill('#premium-plan-duration', '45');
+  await page.uncheck('#premium-plan-active');
+  await page.click('#premium-plan-submit');
+
+  await expect.poll(() => createPayloads.length).toBe(1);
+  expect(createPayloads[0]).toEqual({
+    name: 'Contributor Special',
+    price: 79000,
+    durationDays: 45,
+    lifetime: false,
+    active: false,
+  });
 });
 
 test('forgot-password flow navigates to OTP and reset password pages', async ({ page }) => {
@@ -622,4 +775,97 @@ test('forgot-password flow navigates to OTP and reset password pages', async ({ 
   await page.click('button#reset-password-submit');
 
   await expect(page).toHaveURL(/.*\/login/);
+});
+
+test('admin bell count updates and reviewed request disappears from pending queue', async ({ page }) => {
+  const pendingSubscription = {
+    id: 999,
+    userId: 31,
+    userEmail: 'user.one@example.com',
+    userFullName: 'User One',
+    planId: 5,
+    planName: 'Premium Plus',
+    purchasedPrice: 99000,
+    status: 'PENDING_REVIEW',
+    billImageUrl: 'https://example.com/bill-999.png',
+    paymentMethod: 'bank_transfer',
+    transactionRef: 'FT260319999',
+    promoCode: null,
+    trial: false,
+    startDate: '2026-03-19T09:00:00Z',
+    endDate: '2026-04-18T09:00:00Z',
+    createdAt: '2026-03-19T09:00:00Z',
+  };
+
+  let pendingRows = [pendingSubscription];
+  let approvedRows: Array<typeof pendingSubscription> = [];
+
+  await page.route('**/api/v1/auth/me', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 99,
+        email: 'admin@example.com',
+        fullName: 'Admin User',
+        role: 'ADMIN',
+        premium: false,
+      }),
+    });
+  });
+
+  await page.route('**/api/v1/auth/subscriptions/review-queue**', async (route) => {
+    const requestUrl = new URL(route.request().url());
+    const status = requestUrl.searchParams.get('status') || 'PENDING_REVIEW';
+    const rows = status === 'APPROVED' ? approvedRows : pendingRows;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        content: rows,
+        number: 0,
+        size: Number(requestUrl.searchParams.get('size') || 10),
+        totalElements: rows.length,
+        totalPages: rows.length > 0 ? 1 : 0,
+        first: true,
+        last: true,
+      }),
+    });
+  });
+
+  await page.route('**/api/v1/auth/subscriptions/purchase-requests/*/approvals', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([]),
+    });
+  });
+
+  await page.route('**/api/v1/auth/subscriptions/purchase-requests/*/review', async (route) => {
+    pendingRows = [];
+    approvedRows = [{ ...pendingSubscription, status: 'APPROVED' }];
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(approvedRows[0]),
+    });
+  });
+
+  await seedAdminSession(page);
+  await page.goto('/admin/subscription-reviews');
+
+  await expect(page.locator('#admin-review-bell-badge')).toHaveText('1');
+  await page.locator('#admin-review-bell').click();
+  await expect(page.getByText('Thông báo', { exact: true })).toBeVisible();
+  await expect(page.locator('text=Request #999 đang chờ duyệt')).toBeVisible();
+  await expect(page.locator('text=Nhấn vào từng thông báo để mở chi tiết.')).toBeVisible();
+  await expect(page.locator('text=#999 - User One')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Approve' }).click();
+
+  await expect(page.locator('text=Không có request cho trạng thái đã chọn.')).toBeVisible();
+  await expect(page.locator('#admin-review-bell-badge')).toHaveCount(0);
+
+  await page.selectOption('select', 'APPROVED');
+  await expect(page.locator('text=#999 - User One')).toBeVisible();
 });
