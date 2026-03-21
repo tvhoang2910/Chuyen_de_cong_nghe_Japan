@@ -189,6 +189,7 @@ export type ReviewSubscriptionRequestPayload = {
 
 type RetryableRequestConfig = InternalAxiosRequestConfig & {
   _retry?: boolean;
+  _skipAuthRecovery?: boolean;
 };
 
 const authApiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1/auth';
@@ -370,7 +371,10 @@ export const fetchAdminUsers = async (params: FetchAdminUsersParams): Promise<Ad
 
   const cacheKey = `admin:users:${page}:${size}:${search}:${role}`;
   return withCachedGet<AdminUsersPage>(cacheKey, async () => {
-    const response = await axiosClient.get<AdminUsersPage>(`/admin/users?${query.toString()}`);
+    const response = await axiosClient.get<AdminUsersPage>(
+      `/admin/users?${query.toString()}`,
+      { _skipAuthRecovery: true } as RetryableRequestConfig,
+    );
     return response.data;
   }, 2000);
 };
@@ -456,7 +460,10 @@ export const createSubscriptionPurchaseRequest = async (
 
 export const fetchMySubscriptionRequests = async (): Promise<UserSubscriptionQueueItem[]> => {
   return withCachedGet<UserSubscriptionQueueItem[]>('subscription:my-requests', async () => {
-    const response = await axiosClient.get<UserSubscriptionQueueItem[]>('/subscriptions/my-requests');
+    const response = await axiosClient.get<UserSubscriptionQueueItem[]>(
+      '/subscriptions/my-requests',
+      { _skipAuthRecovery: true } as RetryableRequestConfig,
+    );
     return response.data;
   });
 };
@@ -473,7 +480,10 @@ export const fetchSubscriptionReviewQueue = async (
     query.set('size', String(size));
     query.set('status', status);
 
-    const response = await axiosClient.get<SubscriptionQueuePage>(`/subscriptions/review-queue?${query.toString()}`);
+    const response = await axiosClient.get<SubscriptionQueuePage>(
+      `/subscriptions/review-queue?${query.toString()}`,
+      { _skipAuthRecovery: true } as RetryableRequestConfig,
+    );
     return response.data;
   }, 2500);
 };
@@ -546,6 +556,10 @@ axiosClient.interceptors.response.use(
   async (error: AxiosError) => {
     const originalRequest = error.config as RetryableRequestConfig | undefined;
     const status = error.response?.status;
+
+    if (originalRequest?._skipAuthRecovery && status === 401) {
+      throw error;
+    }
 
     if (!originalRequest || status !== 401 || originalRequest._retry) {
       throw error;

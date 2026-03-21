@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Zap, ChartLine, Clock, Star, Flame } from 'lucide-react';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer } from 'recharts';
 import toast from 'react-hot-toast';
+import { useNavigate } from 'react-router-dom';
 import { fetchCurrentUserProfile, type UserProfile } from '../api/axiosClient';
 import MainLayout from '../components/MainLayout';
 
@@ -15,6 +16,7 @@ const radarData = [
 ];
 
 const Dashboard: React.FC = () => {
+  const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<UserProfile | null>(null);
   const hasRequestedProfileRef = useRef(false);
@@ -46,6 +48,13 @@ const Dashboard: React.FC = () => {
             <h1 className="text-3xl font-bold text-slate-900 tracking-tight mb-1">{welcomeMessage}</h1>
             <p className="text-slate-500">Sẵn sàng chinh phục kiến thức mới hôm nay chưa?</p>
           </div>
+          <button
+            type="button"
+            onClick={() => navigate('/dashboard/exams')}
+            className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+          >
+            Xem kho đề thi công khai
+          </button>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
