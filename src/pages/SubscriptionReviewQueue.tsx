@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { AxiosError } from 'axios';
 import { CheckCheck, Eye, MailCheck, RefreshCw, ShieldCheck, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -29,7 +29,7 @@ const SubscriptionReviewQueue: React.FC<SubscriptionReviewQueueProps> = ({ mode 
 
   const Layout = useMemo(() => (mode === 'admin' ? AdminLayout : MainLayout), [mode]);
 
-  const loadQueue = async () => {
+  const loadQueue = useCallback(async () => {
     try {
       setIsLoading(true);
       const response = await fetchSubscriptionReviewQueue(0, 20, statusFilter);
@@ -40,11 +40,11 @@ const SubscriptionReviewQueue: React.FC<SubscriptionReviewQueueProps> = ({ mode 
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [statusFilter]);
 
   useEffect(() => {
     void loadQueue();
-  }, [statusFilter]);
+  }, [loadQueue]);
 
   useEffect(() => {
     const loadAudits = async () => {
@@ -60,7 +60,7 @@ const SubscriptionReviewQueue: React.FC<SubscriptionReviewQueueProps> = ({ mode 
       }
     };
     void loadAudits();
-  }, [selected?.id]);
+  }, [selected]);
 
   const handleReview = async (approved: boolean) => {
     if (!selected) {

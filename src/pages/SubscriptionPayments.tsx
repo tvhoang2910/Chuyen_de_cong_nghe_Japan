@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { AxiosError } from 'axios';
 import { CheckCircle2, Clock3, FileImage, Landmark, ReceiptText, UploadCloud, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -44,7 +44,7 @@ const SubscriptionPayments: React.FC = () => {
     [plans, selectedPlanId],
   );
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setIsLoading(true);
       const [plansResponse, requestsResponse] = await Promise.all([
@@ -61,11 +61,11 @@ const SubscriptionPayments: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [selectedPlanId]);
 
   useEffect(() => {
     void loadData();
-  }, []);
+  }, [loadData]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();

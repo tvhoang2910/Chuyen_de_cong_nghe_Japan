@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import type { AxiosError } from 'axios';
 import { 
@@ -58,15 +58,15 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const [notificationItems, setNotificationItems] = useState<NotificationItem[]>([]);
   const notificationRef = useRef<HTMLDivElement | null>(null);
 
-  const getDismissedIdsStorageKey = () => {
+  const dismissedIdsStorageKey = useMemo(() => {
     const role = user?.role ?? 'GUEST';
     const email = user?.email ?? 'anonymous';
     return `main-dismissed-notification-ids:${role}:${email}`;
-  };
+  }, [user?.email, user?.role]);
 
-  const readDismissedIds = () => {
+  const readDismissedIds = useCallback(() => {
     try {
-      const raw = localStorage.getItem(getDismissedIdsStorageKey());
+      const raw = localStorage.getItem(dismissedIdsStorageKey);
       if (!raw) {
         return new Set<string>();
       }
@@ -78,11 +78,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     } catch {
       return new Set<string>();
     }
-  };
+  }, [dismissedIdsStorageKey]);
 
-  const persistDismissedIds = (ids: Set<string>) => {
-    localStorage.setItem(getDismissedIdsStorageKey(), JSON.stringify(Array.from(ids)));
-  };
+  const persistDismissedIds = useCallback((ids: Set<string>) => {
+    localStorage.setItem(dismissedIdsStorageKey, JSON.stringify(Array.from(ids)));
+  }, [dismissedIdsStorageKey]);
 
   const dismissNotification = (id: string) => {
     setNotificationItems((current) => {
@@ -214,7 +214,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       globalThis.clearInterval(intervalId);
       globalThis.removeEventListener(SUBSCRIPTION_REVIEW_UPDATED_EVENT, handleRefresh);
     };
-  }, [navigate, user?.role]);
+  }, [navigate, readDismissedIds, user?.role]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -254,7 +254,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   ] : [
     { label: 'Tổng quan', icon: LayoutDashboard, path: '/dashboard' },
     { label: 'Nâng cấp Premium', icon: Banknote, path: '/dashboard/subscription-payments' },
-    { label: 'Đề thi đã làm', icon: BookOpen, path: '/dashboard/history' },
+    { label: 'Kho đề công khai', icon: BookOpen, path: '/dashboard/exams' },
     { label: 'Học tập (SM-2)', icon: Zap, path: '/dashboard/spaced-repetition' },
     { label: 'Cộng đồng', icon: Star, path: '/dashboard/community' },
   ];
