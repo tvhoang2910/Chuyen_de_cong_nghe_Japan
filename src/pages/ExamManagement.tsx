@@ -6,15 +6,18 @@ import { AxiosError } from 'axios';
 import MainLayout from '../components/MainLayout';
 import AdminLayout from '../components/AdminLayout';
 import {
+  createGlobalTag,
   createExam,
   deleteExam,
   fetchManagedExamDetail,
   fetchManagedExams,
+  fetchGlobalTags,
   type CreateExamPayload,
   type ExamDetail,
   type ExamQuestion,
   type ExamSummary,
   type OnlineExamStatus,
+  type TagOption,
   updateExam,
   updateExamStatus,
 } from '../api/examClient';
@@ -45,14 +48,16 @@ const emptyPayload = (): CreateExamPayload => ({
   description: '',
   durationMinutes: 60,
   passingScore: 5,
+  tagIds: [],
   questions: [emptyQuestion()],
 });
 
-const importSampleExam: CreateExamPayload = {
+const importSampleExam = {
   title: 'Đề thi mẫu Toán cơ bản',
   description: 'Mẫu import JSON cho hệ thống exam bank',
   durationMinutes: 45,
   passingScore: 5,
+  tags: ['Toán', 'Cơ bản', 'Trắc nghiệm'],
   questions: [
     {
       content: '2 + 2 = ?',
@@ -91,6 +96,68 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
   const [panelMode, setPanelMode] = useState<PanelMode>('none');
   const [importJsonText, setImportJsonText] = useState('');
   const [isImporting, setIsImporting] = useState(false);
+  const [tagInput, setTagInput] = useState('');
+  const [selectedTags, setSelectedTags] = useState<TagOption[]>([]);
+  const [availableTags, setAvailableTags] = useState<TagOption[]>([]);
+  const [isTagLoading, setIsTagLoading] = useState(false);
+
+  const addTagToSelected = (tag: TagOption) => {
+    setSelectedTags((prev) => {
+      if (prev.some((row) => row.id === tag.id)) {
+        return prev;
+      }
+      return [...prev, tag];
+    });
+  };
+
+  const handleCreateOrSelectTag = async (rawValue: string) => {
+    const candidate = rawValue.trim();
+    if (!candidate) {
+      return;
+    }
+
+    if (selectedTags.some((tag) => tag.name.toLowerCase() === candidate.toLowerCase())) {
+      setTagInput('');
+      return;
+    }
+
+    const existing = availableTags.find((tag) => tag.name.toLowerCase() === candidate.toLowerCase());
+    if (existing) {
+      addTagToSelected(existing);
+      setTagInput('');
+      return;
+    }
+
+    try {
+      const createdTag = await createGlobalTag({ name: candidate });
+      addTagToSelected(createdTag);
+      setAvailableTags((prev) => {
+        if (prev.some((row) => row.id === createdTag.id)) {
+          return prev;
+        }
+        return [createdTag, ...prev];
+      });
+      toast.success(`Đã tạo tag mới: ${createdTag.name}`);
+      setTagInput('');
+    } catch (error) {
+      const axiosError = error as AxiosError<{ message?: string }>;
+      toast.error(axiosError.response?.data?.message || 'Không thể tạo tag mới.');
+    }
+  };
+
+  const handleAddTagByEnter = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== 'Enter') {
+      return;
+    }
+
+    e.preventDefault();
+    await handleCreateOrSelectTag(tagInput);
+  };
+
+  const handleRemoveTag = (tagId: number) => {
+    setSelectedTags((prev) => prev.filter((tag) => tag.id !== tagId));
+  };
+
   const formSectionRef = useRef<HTMLElement | null>(null);
   const detailSectionRef = useRef<HTMLElement | null>(null);
 
@@ -133,10 +200,42 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
     };
   }, [panelMode]);
 
+  React.useEffect(() => {
+    if (panelMode !== 'create' && panelMode !== 'edit') {
+      return;
+    }
+
+    let mounted = true;
+    const timer = globalThis.setTimeout(async () => {
+      try {
+        setIsTagLoading(true);
+        const rows = await fetchGlobalTags(tagInput.trim() || undefined);
+        if (mounted) {
+          setAvailableTags(rows);
+        }
+      } catch {
+        if (mounted) {
+          setAvailableTags([]);
+        }
+      } finally {
+        if (mounted) {
+          setIsTagLoading(false);
+        }
+      }
+    }, 250);
+
+    return () => {
+      mounted = false;
+      globalThis.clearTimeout(timer);
+    };
+  }, [panelMode, tagInput]);
+
   const openCreate = () => {
     setEditingId(null);
     setSelectedExam(null);
     setForm(emptyPayload());
+    setSelectedTags([]);
+    setTagInput('');
     setPanelMode('create');
   };
 
@@ -155,6 +254,8 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
         description: detail.description || '',
         durationMinutes: detail.durationMinutes,
         passingScore: detail.passingScore,
+        tagIds: detail.tags?.map((tag) => tag.id) || [],
+        newTags: [],
         questions: detail.questions.map((q) => ({
           id: q.id,
           content: q.content,
@@ -167,6 +268,8 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
           })),
         })),
       });
+      setSelectedTags(detail.tags || []);
+      setTagInput('');
 
       requestAnimationFrame(() => {
         formSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -307,6 +410,8 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
       description: String(source.description ?? ''),
       durationMinutes: Number(source.durationMinutes ?? 60),
       passingScore: Number(source.passingScore ?? 5),
+      tagIds: [],
+      newTags: Array.isArray(source.tags) ? source.tags.map(String) : [],
       questions,
     };
   };
@@ -429,6 +534,8 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
       ...form,
       title: form.title.trim(),
       description: form.description?.trim() || '',
+      tagIds: selectedTags.map((tag) => tag.id),
+      newTags: [],
       questions: form.questions.map((q) => ({
         ...q,
         content: q.content.trim(),
@@ -617,6 +724,15 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
                           <p className="text-sm text-slate-500 mt-2">
                             Trạng thái: {selectedExam.status} • {selectedExam.totalQuestions} câu hỏi
                           </p>
+                          {selectedExam.tags && selectedExam.tags.length > 0 && (
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {selectedExam.tags.map((tag, idx) => (
+                                <span key={idx} className="rounded-md border border-cyan-200 bg-cyan-50 px-2 py-1 text-xs font-semibold text-cyan-700">
+                                  #{tag.name}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </div>
                         <div className="space-y-3">
                           {selectedExam.questions.map((question, questionIndex) => (
@@ -753,6 +869,47 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
                         className="w-full rounded-xl border border-slate-300 px-3 py-2"
                         placeholder="VD: Đề thi Java Core"
                       />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-1">Từ khóa (Tags)</label>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        {selectedTags.map((tag) => (
+                          <span key={tag.id} className="inline-flex items-center gap-1 rounded-lg bg-cyan-100 px-3 py-1 text-xs font-semibold text-cyan-800">
+                            {tag.name}
+                            <button 
+                              type="button" 
+                              onClick={() => handleRemoveTag(tag.id)} 
+                              className="text-cyan-600 hover:text-rose-600 ml-1 text-base leading-none focus:outline-none"
+                            >
+                              &times;
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                      <input
+                        type="text"
+                        value={tagInput}
+                        onChange={(e) => setTagInput(e.target.value)}
+                        onKeyDown={(e) => void handleAddTagByEnter(e)}
+                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                        placeholder="Tìm tag có sẵn hoặc gõ tên mới rồi Enter"
+                      />
+                      <div className="mt-2 max-h-36 overflow-y-auto rounded-xl border border-slate-200 bg-white">
+                        {isTagLoading && <p className="px-3 py-2 text-xs text-slate-500">Đang tìm tag...</p>}
+                        {!isTagLoading && availableTags.length === 0 && (
+                          <p className="px-3 py-2 text-xs text-slate-500">Không có tag phù hợp.</p>
+                        )}
+                        {!isTagLoading && availableTags.filter((tag) => !selectedTags.some((selected) => selected.id === tag.id)).map((tag) => (
+                          <button
+                            key={tag.id}
+                            type="button"
+                            onClick={() => addTagToSelected(tag)}
+                            className="block w-full border-b border-slate-100 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                          >
+                            {tag.name}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                     <div>
                       <label className="block text-sm font-semibold text-slate-700 mb-1">Mô tả</label>
