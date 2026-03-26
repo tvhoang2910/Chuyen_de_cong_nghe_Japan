@@ -22,6 +22,7 @@ export type ExamSummary = {
   description?: string;
   durationMinutes: number;
   passingScore: number;
+  tags: string[];
   totalQuestions: number;
   status: OnlineExamStatus;
   createdAt: string;
@@ -37,6 +38,7 @@ export type CreateExamPayload = {
   description?: string;
   durationMinutes: number;
   passingScore: number;
+  tags: string[];
   questions: ExamQuestion[];
 };
 

@@ -45,6 +45,7 @@ const emptyPayload = (): CreateExamPayload => ({
   description: '',
   durationMinutes: 60,
   passingScore: 5,
+  tags: [],
   questions: [emptyQuestion()],
 });
 
@@ -53,6 +54,7 @@ const importSampleExam: CreateExamPayload = {
   description: 'Mẫu import JSON cho hệ thống exam bank',
   durationMinutes: 45,
   passingScore: 5,
+  tags: ['Toán', 'Cơ bản', 'Trắc nghiệm'],
   questions: [
     {
       content: '2 + 2 = ?',
@@ -91,6 +93,27 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
   const [panelMode, setPanelMode] = useState<PanelMode>('none');
   const [importJsonText, setImportJsonText] = useState('');
   const [isImporting, setIsImporting] = useState(false);
+  
+  const [tagInput, setTagInput] = useState("");
+
+  const handleAddTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault(); // Ngăn form tự động submit khi bấm Enter
+      const newTag = tagInput.trim();
+      if (newTag && !form.tags?.includes(newTag)) {
+        setForm((prev) => ({ ...prev, tags: [...(prev.tags || []), newTag] }));
+      }
+      setTagInput("");
+    }
+  };
+
+  const handleRemoveTag = (indexToRemove: number) => {
+    setForm((prev) => ({
+      ...prev,
+      tags: (prev.tags || []).filter((_, idx) => idx !== indexToRemove)
+    }));
+  };
+
   const formSectionRef = useRef<HTMLElement | null>(null);
   const detailSectionRef = useRef<HTMLElement | null>(null);
 
@@ -155,6 +178,7 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
         description: detail.description || '',
         durationMinutes: detail.durationMinutes,
         passingScore: detail.passingScore,
+        tags: detail.tags || [],
         questions: detail.questions.map((q) => ({
           id: q.id,
           content: q.content,
@@ -307,6 +331,7 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
       description: String(source.description ?? ''),
       durationMinutes: Number(source.durationMinutes ?? 60),
       passingScore: Number(source.passingScore ?? 5),
+      tags: Array.isArray(source.tags) ? source.tags.map(String) : [], 
       questions,
     };
   };
@@ -429,6 +454,7 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
       ...form,
       title: form.title.trim(),
       description: form.description?.trim() || '',
+      tags: form.tags || [],
       questions: form.questions.map((q) => ({
         ...q,
         content: q.content.trim(),
@@ -617,6 +643,15 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
                           <p className="text-sm text-slate-500 mt-2">
                             Trạng thái: {selectedExam.status} • {selectedExam.totalQuestions} câu hỏi
                           </p>
+                          {selectedExam.tags && selectedExam.tags.length > 0 && (
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {selectedExam.tags.map((tag, idx) => (
+                                <span key={idx} className="rounded-md border border-cyan-200 bg-cyan-50 px-2 py-1 text-xs font-semibold text-cyan-700">
+                                  #{tag}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </div>
                         <div className="space-y-3">
                           {selectedExam.questions.map((question, questionIndex) => (
@@ -752,6 +787,31 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
                         onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))}
                         className="w-full rounded-xl border border-slate-300 px-3 py-2"
                         placeholder="VD: Đề thi Java Core"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-1">Từ khóa (Tags)</label>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        {(form.tags || []).map((tag, idx) => (
+                          <span key={idx} className="inline-flex items-center gap-1 rounded-lg bg-cyan-100 px-3 py-1 text-xs font-semibold text-cyan-800">
+                            {tag}
+                            <button 
+                              type="button" 
+                              onClick={() => handleRemoveTag(idx)} 
+                              className="text-cyan-600 hover:text-rose-600 ml-1 text-base leading-none focus:outline-none"
+                            >
+                              &times;
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                      <input
+                        type="text"
+                        value={tagInput}
+                        onChange={(e) => setTagInput(e.target.value)}
+                        onKeyDown={handleAddTag}
+                        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                        placeholder="Gõ tag và nhấn Enter (VD: Toán, Khó...)"
                       />
                     </div>
                     <div>
