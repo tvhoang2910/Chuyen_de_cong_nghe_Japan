@@ -2,6 +2,11 @@ import axios from 'axios';
 
 export type OnlineExamStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
 
+export type TagOption = {
+  id: number;
+  name: string;
+};
+
 export type ExamOption = {
   id?: number;
   content: string;
@@ -22,7 +27,7 @@ export type ExamSummary = {
   description?: string;
   durationMinutes: number;
   passingScore: number;
-  tags: string[];
+  tags: TagOption[];
   totalQuestions: number;
   status: OnlineExamStatus;
   createdAt: string;
@@ -38,8 +43,13 @@ export type CreateExamPayload = {
   description?: string;
   durationMinutes: number;
   passingScore: number;
-  tags: string[];
+  tagIds: number[];
+  newTags?: string[];
   questions: ExamQuestion[];
+};
+
+export type CreateTagPayload = {
+  name: string;
 };
 
 const examApiBaseUrl = import.meta.env.VITE_EXAM_API_BASE_URL || 'http://localhost:8082/api/v1/exam';
@@ -95,5 +105,17 @@ export const fetchPublicExams = async (): Promise<ExamSummary[]> => {
 
 export const fetchPublicExamDetail = async (examId: number): Promise<ExamDetail> => {
   const response = await examClient.get<ExamDetail>(`/exams/public/${examId}`);
+  return response.data;
+};
+
+export const fetchGlobalTags = async (query?: string): Promise<TagOption[]> => {
+  const response = await examClient.get<TagOption[]>('/tags', {
+    params: query ? { query } : {},
+  });
+  return response.data;
+};
+
+export const createGlobalTag = async (payload: CreateTagPayload): Promise<TagOption> => {
+  const response = await examClient.post<TagOption>('/tags', payload);
   return response.data;
 };
