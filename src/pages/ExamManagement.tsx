@@ -48,6 +48,7 @@ const emptyPayload = (): CreateExamPayload => ({
   description: '',
   durationMinutes: 60,
   passingScore: 5,
+  maxAttempts: 100,
   tagIds: [],
   questions: [emptyQuestion()],
 });
@@ -254,6 +255,7 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
         description: detail.description || '',
         durationMinutes: detail.durationMinutes,
         passingScore: detail.passingScore,
+        maxAttempts: detail.maxAttempts || 100,
         tagIds: detail.tags?.map((tag) => tag.id) || [],
         newTags: [],
         questions: detail.questions.map((q) => ({
@@ -361,6 +363,7 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
 
   const validatePayload = (payload: CreateExamPayload): string | null => {
     if (!payload.title.trim()) return 'Tiêu đề đề thi không được để trống.';
+    if (!payload.maxAttempts || payload.maxAttempts < 1) return 'Số lần làm tối đa phải lớn hơn hoặc bằng 1.';
     if (payload.questions.length === 0) return 'Đề thi phải có ít nhất 1 câu hỏi.';
 
     for (let i = 0; i < payload.questions.length; i += 1) {
@@ -410,6 +413,7 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
       description: String(source.description ?? ''),
       durationMinutes: Number(source.durationMinutes ?? 60),
       passingScore: Number(source.passingScore ?? 5),
+      maxAttempts: Number(source.maxAttempts ?? 100),
       tagIds: [],
       newTags: Array.isArray(source.tags) ? source.tags.map(String) : [],
       questions,
@@ -588,8 +592,9 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
         setPanelMode('none');
       }
       await loadManagedExams();
-    } catch {
-      toast.error('Không thể xóa đề thi.');
+    } catch (error) {
+      const axiosError = error as AxiosError<{ message?: string }>;
+      toast.error(axiosError.response?.data?.message || 'Không thể xóa đề thi.');
     }
   };
 
@@ -602,8 +607,9 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
         const detail = normalizeExamDetail(await fetchManagedExamDetail(examId));
         setSelectedExam(detail);
       }
-    } catch {
-      toast.error('Không cập nhật được trạng thái đề thi.');
+    } catch (error) {
+      const axiosError = error as AxiosError<{ message?: string }>;
+      toast.error(axiosError.response?.data?.message || 'Không cập nhật được trạng thái đề thi.');
     }
   };
 
@@ -653,7 +659,7 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
                     <h3 className="font-bold text-slate-900">{exam.title}</h3>
                     <p className="text-sm text-slate-500 line-clamp-2">{exam.description || 'Không có mô tả'}</p>
                     <p className="text-xs text-slate-400 mt-2">
-                      {exam.totalQuestions} câu hỏi • {exam.durationMinutes} phút • Điểm đỗ {exam.passingScore}
+                      {exam.totalQuestions} câu hỏi • {exam.durationMinutes} phút • Điểm đỗ {exam.passingScore} • Tối đa {exam.maxAttempts} lượt
                     </p>
                   </div>
                   <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">{exam.status}</span>
@@ -722,7 +728,7 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
                           <h3 className="text-lg font-bold text-slate-900">{selectedExam.title}</h3>
                           <p className="text-slate-600 mt-1">{selectedExam.description || 'Không có mô tả'}</p>
                           <p className="text-sm text-slate-500 mt-2">
-                            Trạng thái: {selectedExam.status} • {selectedExam.totalQuestions} câu hỏi
+                            Trạng thái: {selectedExam.status} • {selectedExam.totalQuestions} câu hỏi • Tối đa {selectedExam.maxAttempts} lượt
                           </p>
                           {selectedExam.tags && selectedExam.tags.length > 0 && (
                             <div className="mt-3 flex flex-wrap gap-2">
@@ -920,7 +926,7 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
                         rows={2}
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-3 gap-2">
                       <div>
                         <label className="block text-sm font-semibold text-slate-700 mb-1">Thời gian (phút)</label>
                         <input
@@ -939,6 +945,16 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
                           onChange={(event) => setForm((prev) => ({ ...prev, passingScore: Number(event.target.value || 0) }))}
                           className="w-full rounded-xl border border-slate-300 px-3 py-2"
                           min={0}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-1">Số lần làm tối đa</label>
+                        <input
+                          type="number"
+                          value={form.maxAttempts}
+                          onChange={(event) => setForm((prev) => ({ ...prev, maxAttempts: Number(event.target.value || 1) }))}
+                          className="w-full rounded-xl border border-slate-300 px-3 py-2"
+                          min={1}
                         />
                       </div>
                     </div>
@@ -981,7 +997,7 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
                             <div key={`opt-${optionIndex}`} className="flex items-center gap-2">
                               <input
                                 type="radio"
-                                checked={option.isCorrect}
+                                checked={Boolean(option.isCorrect)}
                                 onChange={() => setQuestionCorrectIndex(questionIndex, optionIndex)}
                                 name={`question-correct-${questionIndex}`}
                               />

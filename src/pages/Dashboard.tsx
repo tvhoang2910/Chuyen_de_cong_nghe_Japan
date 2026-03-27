@@ -1,9 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Zap, ChartLine, Clock, Star, Flame } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Zap, ChartLine, Clock } from 'lucide-react';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer } from 'recharts';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import { fetchCurrentUserProfile, type UserProfile } from '../api/axiosClient';
+import { fetchMyAttemptHistory, type AttemptSummary } from '../api/examClient';
 import MainLayout from '../components/MainLayout';
 
 const radarData = [
@@ -19,7 +20,33 @@ const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<UserProfile | null>(null);
+  const [attemptHistory, setAttemptHistory] = useState<AttemptSummary[]>([]);
   const hasRequestedProfileRef = useRef(false);
+
+  const recentActivities = useMemo(() => {
+    return attemptHistory
+      .flatMap((attempt) => {
+        const startedActivity = {
+          id: `start-${attempt.attemptId}`,
+          label: `Bắt đầu đề ${attempt.examTitle}`,
+          timestamp: attempt.startedAt,
+          tone: 'text-slate-700',
+        };
+
+        const submittedActivity = attempt.submittedAt
+          ? {
+              id: `submit-${attempt.attemptId}`,
+              label: `Đã nộp đề ${attempt.examTitle}`,
+              timestamp: attempt.submittedAt,
+              tone: 'text-emerald-700',
+            }
+          : null;
+
+        return submittedActivity ? [submittedActivity, startedActivity] : [startedActivity];
+      })
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .slice(0, 6);
+  }, [attemptHistory]);
 
   useEffect(() => {
     if (hasRequestedProfileRef.current) return;
@@ -27,8 +54,12 @@ const Dashboard: React.FC = () => {
 
     const loadProfile = async () => {
       try {
-        const profile = await fetchCurrentUserProfile();
+        const [profile, history] = await Promise.all([
+          fetchCurrentUserProfile(),
+          fetchMyAttemptHistory(),
+        ]);
         setUser(profile);
+        setAttemptHistory(history);
       } catch {
         toast.error('Không thể tải thông tin người dùng.');
       } finally {
@@ -105,32 +136,59 @@ const Dashboard: React.FC = () => {
         <div>
           <div className="flex items-center justify-between mb-6">
              <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Hoạt động gần đây</h2>
-             <button className="text-sm font-bold text-blue-600 hover:text-blue-700">Xem tất cả</button>
+             <button type="button" className="text-sm font-bold text-blue-600 hover:text-blue-700">Xem tất cả</button>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 mb-6">
+            {isLoading ? (
+              <p className="text-slate-500">Đang tải hoạt động...</p>
+            ) : recentActivities.length === 0 ? (
+              <p className="text-slate-500">Chưa có hoạt động học tập gần đây.</p>
+            ) : (
+              <div className="space-y-3">
+                {recentActivities.map((activity) => (
+                  <div key={activity.id} className="flex items-center justify-between rounded-xl border border-slate-100 px-3 py-2">
+                    <p className={`text-sm font-semibold ${activity.tone}`}>{activity.label}</p>
+                    <span className="text-xs text-slate-500">{new Date(activity.timestamp).toLocaleString('vi-VN')}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between mb-6">
+             <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Lịch sử làm bài</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {isLoading ? (
               [1, 2, 3].map(i => (
                 <div key={i} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm animate-pulse h-48"></div>
               ))
+            ) : attemptHistory.length === 0 ? (
+              <div className="md:col-span-2 lg:col-span-3 rounded-2xl border border-slate-200 bg-white p-6 text-slate-500">
+                Bạn chưa có lịch sử làm bài. Hãy bắt đầu một đề thi để hệ thống lưu tiến trình.
+              </div>
             ) : (
-              [
-                { title: 'Kiến trúc máy tính - MT101', date: 'Hôm nay', score: '8.5/10', color: 'blue', icon: Zap },
-                { title: 'Nhập môn AI - AI102', date: 'Hôm qua', score: '9.0/10', color: 'emerald', icon: Star },
-                { title: 'Tiếng Anh B1 - Đề 03', date: '3 ngày trước', score: '6.5/10', color: 'amber', icon: Flame },
-              ].map((exam) => (
-                <div key={exam.title} className="bg-white p-6 rounded-[2rem] border border-slate-200 hover:border-blue-300 hover:shadow-xl hover:shadow-blue-500/5 transition-all group">
+              attemptHistory.slice(0, 6).map((attempt) => (
+                <div key={attempt.attemptId} className="bg-white p-6 rounded-[2rem] border border-slate-200 hover:border-blue-300 hover:shadow-xl hover:shadow-blue-500/5 transition-all group">
                   <div className="flex justify-between items-start mb-6">
-                    <div className={`p-3 rounded-2xl bg-${exam.color}-50 text-${exam.color}-600`}>
-                      <exam.icon className="w-6 h-6" />
+                    <div className="p-3 rounded-2xl bg-blue-50 text-blue-600">
+                      <Zap className="w-6 h-6" />
                     </div>
                     <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                       <Clock className="w-3 h-3" /> {exam.date}
+                       <Clock className="w-3 h-3" /> {new Date(attempt.startedAt).toLocaleDateString('vi-VN')}
                     </span>
                   </div>
-                  <h3 className="font-bold text-slate-900 mb-2 truncate group-hover:text-blue-600 transition-colors" title={exam.title}>{exam.title}</h3>
+                  <h3 className="font-bold text-slate-900 mb-2 truncate group-hover:text-blue-600 transition-colors" title={attempt.examTitle}>{attempt.examTitle}</h3>
+                  <p className="text-xs font-semibold text-slate-500">Trạng thái: {attempt.status}</p>
                   <div className="flex items-center justify-between mt-6">
-                     <span className="text-sm font-bold text-slate-400">Điểm: <span className="text-slate-900">{exam.score}</span></span>
-                     <button className="px-4 py-2 bg-slate-900 text-white text-xs font-bold rounded-xl hover:bg-blue-600 transition-all active:scale-95">
+                     <span className="text-sm font-bold text-slate-400">
+                      Điểm: <span className="text-slate-900">{typeof attempt.scoreRaw === 'number' && typeof attempt.scoreMax === 'number' ? `${attempt.scoreRaw}/${attempt.scoreMax}` : '--'}</span>
+                    </span>
+                     <button
+                       type="button"
+                       onClick={() => navigate(`/dashboard/attempts/${attempt.attemptId}/result`)}
+                       className="px-4 py-2 bg-slate-900 text-white text-xs font-bold rounded-xl hover:bg-blue-600 transition-all active:scale-95"
+                     >
                         Xem chi tiết
                      </button>
                   </div>

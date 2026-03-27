@@ -20,6 +20,14 @@ const seedContributorSession = async (page: import('@playwright/test').Page) => 
   });
 };
 
+const seedUserSession = async (page: import('@playwright/test').Page) => {
+  await page.goto('/login');
+  await page.evaluate(() => {
+    localStorage.setItem('access_token', 'user-access-token');
+    localStorage.setItem('user_role', 'USER');
+  });
+};
+
 test('has title and landing page content', async ({ page }) => {
   await page.goto('/');
 
@@ -122,8 +130,359 @@ test('shows lockout message when backend returns 429', async ({ page }) => {
   await expect(page.locator('text=Too many failed login attempts. Please try again later.')).toBeVisible();
 });
 
+test('shows backend message when start attempt is rejected', async ({ page }) => {
+  await seedAdminSession(page);
+  await page.evaluate(() => {
+    localStorage.setItem('user_role', 'USER');
+  });
+
+  await page.route('**/api/v1/auth/me', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 1,
+        email: 'user@example.com',
+        fullName: 'Exam User',
+        role: 'USER',
+        premium: false,
+      }),
+    });
+  });
+
+  await page.route('**/api/v1/exam/attempts', async (route) => {
+    await route.fulfill({
+      status: 400,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        message: 'Cannot update questions because attempts already exist. You can still update exam metadata (title, duration, passing score, max attempts, tags, status). Create a new exam version to change questions.',
+      }),
+    });
+  });
+
+  await page.route('**/api/v1/exam/exams/public', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([]),
+    });
+  });
+
+  await page.goto('/dashboard/exams/3/attempt');
+
+  await expect(page).toHaveURL(/.*\/dashboard\/exams/);
+  await expect(page.locator('text=Cannot update questions because attempts already exist. You can still update exam metadata (title, duration, passing score, max attempts, tags, status). Create a new exam version to change questions.')).toBeVisible();
+});
+
+test('attempt page is rendered in focus mode without dashboard navbar', async ({ page }) => {
+  await seedUserSession(page);
+
+  await page.route('**/api/v1/auth/me', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 22,
+        email: 'focus.user@example.com',
+        fullName: 'Focus User',
+        role: 'USER',
+        premium: false,
+      }),
+    });
+  });
+
+  await page.route('**/api/v1/exam/attempts', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        attemptId: 900,
+        examId: 3,
+        startedAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+        durationMinutes: 30,
+        maxAttempts: 3,
+      }),
+    });
+  });
+
+  await page.route('**/api/v1/exam/exams/public/3/attempt-view', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 3,
+        title: 'Đề tập trung',
+        description: 'Không có navbar',
+        durationMinutes: 30,
+        passingScore: 5,
+        maxAttempts: 3,
+        totalQuestions: 1,
+        status: 'PUBLISHED',
+        createdAt: new Date().toISOString(),
+        modifiedAt: new Date().toISOString(),
+        tags: [],
+        questions: [
+          {
+            id: 301,
+            content: '2 + 2 = ?',
+            explanation: '',
+            scoreWeight: 1,
+            options: [
+              { id: 1, content: '3' },
+              { id: 2, content: '4' },
+            ],
+          },
+        ],
+      }),
+    });
+  });
+
+  await page.goto('/dashboard/exams/3/attempt');
+
+  await expect(page.locator('h1')).toContainText('Đề tập trung');
+  await expect(page.locator('#sidebar-logout-button')).toHaveCount(0);
+  await expect(page.locator('text=Chế độ tập trung: không có thanh điều hướng để tránh thoát nhầm.')).toBeVisible();
+});
+
+test('public exam page shows metadata only before start', async ({ page }) => {
+  await seedUserSession(page);
+
+  await page.route('**/api/v1/auth/me', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 31,
+        email: 'public.user@example.com',
+        fullName: 'Public User',
+        role: 'USER',
+        premium: false,
+      }),
+    });
+  });
+
+  await page.route('**/api/v1/exam/exams/public', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        {
+          id: 3,
+          title: 'Đề thi mẫu Toán cơ bản',
+          description: 'Mẫu import JSON cho hệ thống exam bank',
+          durationMinutes: 45,
+          passingScore: 5,
+          maxAttempts: 3,
+          tags: [
+            { id: 1, name: 'toán' },
+            { id: 2, name: 'trắc nghiệm' },
+          ],
+          totalQuestions: 2,
+          status: 'PUBLISHED',
+          createdAt: new Date().toISOString(),
+          modifiedAt: new Date().toISOString(),
+        },
+      ]),
+    });
+  });
+
+  await page.route('**/api/v1/exam/exams/public/3', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 3,
+        title: 'Đề thi mẫu Toán cơ bản',
+        description: 'Mẫu import JSON cho hệ thống exam bank',
+        durationMinutes: 45,
+        passingScore: 5,
+        maxAttempts: 3,
+        tags: [
+          { id: 1, name: 'toán' },
+          { id: 2, name: 'trắc nghiệm' },
+        ],
+        totalQuestions: 2,
+        status: 'PUBLISHED',
+        createdAt: new Date().toISOString(),
+        modifiedAt: new Date().toISOString(),
+      }),
+    });
+  });
+
+  await page.route('**/api/v1/exam/users/me/attempts', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        {
+          attemptId: 1001,
+          examId: 3,
+          examTitle: 'Đề thi mẫu Toán cơ bản',
+          status: 'SUBMITTED',
+          startedAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+          submittedAt: new Date(Date.now() - 24 * 60 * 60 * 1000 + 20 * 60 * 1000).toISOString(),
+          scoreRaw: 1,
+          scoreMax: 2,
+          scorePercent: 50,
+          passed: false,
+        },
+      ]),
+    });
+  });
+
+  await page.goto('/dashboard/exams');
+
+  await page.getByRole('link', { name: 'Xem đề' }).click();
+
+  await expect(page).toHaveURL(/.*\/dashboard\/exams\/3/);
+  await expect(page.locator('h1')).toContainText('Đề thi mẫu Toán cơ bản');
+  await expect(page.locator('text=Số lần đã nộp đề này')).toBeVisible();
+  await expect(page.locator('text=Nội dung câu hỏi sẽ chỉ hiển thị sau khi bấm Bắt đầu làm bài.')).toBeVisible();
+  await expect(page.locator('text=Câu 1: 2 + 2 = ?')).toHaveCount(0);
+});
+
+test('attempt answer sync uses batch endpoint with latest selection', async ({ page }) => {
+  await seedUserSession(page);
+
+  const batchPayloads: Array<{ answers: Array<{ questionId: number; selectedOptionIds: number[] }> }> = [];
+
+  await page.route('**/api/v1/auth/me', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 23,
+        email: 'sync.user@example.com',
+        fullName: 'Sync User',
+        role: 'USER',
+        premium: false,
+      }),
+    });
+  });
+
+  await page.route('**/api/v1/exam/attempts', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        attemptId: 901,
+        examId: 3,
+        startedAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+        durationMinutes: 30,
+        maxAttempts: 3,
+      }),
+    });
+  });
+
+  await page.route('**/api/v1/exam/exams/public/3/attempt-view', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 3,
+        title: 'Đề kiểm tra đồng bộ',
+        description: 'Kiểm tra batch save',
+        durationMinutes: 30,
+        passingScore: 5,
+        maxAttempts: 3,
+        totalQuestions: 1,
+        status: 'PUBLISHED',
+        createdAt: new Date().toISOString(),
+        modifiedAt: new Date().toISOString(),
+        tags: [],
+        questions: [
+          {
+            id: 401,
+            content: '1 + 1 = ?',
+            explanation: '',
+            scoreWeight: 1,
+            options: [
+              { id: 1, content: '1' },
+              { id: 2, content: '2' },
+            ],
+          },
+        ],
+      }),
+    });
+  });
+
+  await page.route(/\/api\/v1\/exam\/attempts\/\d+\/answers\/batch$/, async (route) => {
+    const payload = (await route.request().postDataJSON()) as {
+      answers: Array<{ questionId: number; selectedOptionIds: number[] }>;
+    };
+    batchPayloads.push(payload);
+    await route.fulfill({ status: 204, body: '' });
+  });
+
+  await page.goto('/dashboard/exams/3/attempt');
+
+  await page.getByRole('button', { name: '1. 1' }).click();
+  await page.getByRole('button', { name: '2. 2' }).click();
+
+  await expect.poll(() => batchPayloads.length, { timeout: 4000 }).toBe(1);
+  expect(batchPayloads[0].answers).toHaveLength(1);
+  expect(batchPayloads[0].answers[0]).toMatchObject({
+    questionId: 401,
+    selectedOptionIds: [2],
+  });
+});
+
+test('dashboard shows persisted attempt history', async ({ page }) => {
+  await seedUserSession(page);
+
+  await page.route('**/api/v1/auth/me', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 7,
+        email: 'history.user@example.com',
+        fullName: 'History User',
+        role: 'USER',
+        premium: false,
+      }),
+    });
+  });
+
+  await page.route('**/api/v1/exam/users/me/attempts', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        {
+          attemptId: 555,
+          examId: 3,
+          examTitle: 'Đề thi mẫu Toán cơ bản',
+          status: 'SUBMITTED',
+          startedAt: new Date().toISOString(),
+          submittedAt: new Date().toISOString(),
+          scoreRaw: 2,
+          scoreMax: 2,
+          scorePercent: 100,
+          passed: true,
+        },
+      ]),
+    });
+  });
+
+  await page.goto('/dashboard');
+
+  await expect(page.getByRole('heading', { name: 'Đề thi mẫu Toán cơ bản' })).toBeVisible();
+  await expect(page.locator('text=Điểm: 2/2')).toBeVisible();
+});
+
 test('redirects to dashboard after successful login and back to login after logout', async ({ page }) => {
   let meCallCount = 0;
+
+  await page.route('**/api/v1/exam/users/me/attempts', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([]),
+    });
+  });
 
   await page.route('**/api/v1/auth/login', async (route) => {
     await route.fulfill({
@@ -175,6 +534,14 @@ test('redirects to dashboard after successful login and back to login after logo
 test('can update display name and password from dashboard', async ({ page }) => {
   const updatePayloads: Array<Record<string, string>> = [];
   let currentFullName = 'John Doe';
+
+  await page.route('**/api/v1/exam/users/me/attempts', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([]),
+    });
+  });
 
   await page.route('**/api/v1/auth/login', async (route) => {
     await route.fulfill({

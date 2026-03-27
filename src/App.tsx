@@ -19,6 +19,9 @@ const AdminUsers = lazy(() => import('./pages/AdminUsers'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 const ExamManagement = lazy(() => import('./pages/ExamManagement'));
 const PublicExams = lazy(() => import('./pages/PublicExams'));
+const ExamStart = lazy(() => import('./pages/ExamStart'));
+const ExamAttempt = lazy(() => import('./pages/ExamAttempt'));
+const ExamResult = lazy(() => import('./pages/ExamResult'));
 const SubscriptionPayments = lazy(() => import('./pages/SubscriptionPayments'));
 const SubscriptionReviewQueue = lazy(() => import('./pages/SubscriptionReviewQueue'));
 const PremiumPlanManagement = lazy(() => import('./pages/PremiumPlanManagement'));
@@ -143,6 +146,45 @@ function App() {
                   allowedRoles={['USER']}
                 >
                   <PublicExams />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/exams/:examId"
+              element={
+                <ProtectedRoute
+                  isAuthenticated={effectiveIsAuthenticated}
+                  userRole={effectiveRole}
+                  defaultPath={defaultAuthenticatedPath}
+                  allowedRoles={['USER']}
+                >
+                  <ExamStart />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/exams/:examId/attempt"
+              element={
+                <ProtectedRoute
+                  isAuthenticated={effectiveIsAuthenticated}
+                  userRole={effectiveRole}
+                  defaultPath={defaultAuthenticatedPath}
+                  allowedRoles={['USER']}
+                >
+                  <ExamAttempt />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/attempts/:attemptId/result"
+              element={
+                <ProtectedRoute
+                  isAuthenticated={effectiveIsAuthenticated}
+                  userRole={effectiveRole}
+                  defaultPath={defaultAuthenticatedPath}
+                  allowedRoles={['USER']}
+                >
+                  <ExamResult />
                 </ProtectedRoute>
               }
             />
