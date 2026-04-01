@@ -8,6 +8,16 @@ type AuthPayload = {
   role?: string;
 };
 
+type AuthTokenApiResponse = {
+  accessToken: string;
+  refreshToken?: string;
+  email?: string;
+  role?: string;
+  tokenType?: string;
+  expiresIn?: number;
+  refreshExpiresIn?: number;
+};
+
 export type AppRole = 'USER' | 'CONTRIBUTOR' | 'ADMIN';
 
 export type UserProfile = {
@@ -198,6 +208,7 @@ const publicAuthPaths = new Set([
   '/register',
   '/register/resend-verification',
   '/register/verify-email',
+  '/oauth2/exchange',
   '/forgot-password',
   '/forgot-password/resend',
   '/forgot-password/verify-otp',
@@ -282,17 +293,42 @@ const withCachedGet = async <T>(
     return inflight as Promise<T>;
   }
 
-  const request = loader()
+  let resolver: (data: T) => void;
+  let rejecter: (err: unknown) => void;
+  const request = new Promise<T>((resolve, reject) => {
+    resolver = resolve;
+    rejecter = reject;
+  });
+  inflightGetRequests.set(cacheKey, request as Promise<unknown>);
+
+  loader()
     .then((data) => {
       setCached(cacheKey, data, ttlMs);
-      return data;
+      resolver(data);
+    })
+    .catch((err) => {
+      rejecter(err);
     })
     .finally(() => {
       inflightGetRequests.delete(cacheKey);
     });
 
-  inflightGetRequests.set(cacheKey, request as Promise<unknown>);
   return request;
+};
+
+export const exchangeOAuth2Code = async (code: string): Promise<AuthPayload> => {
+  const response = await axiosClient.post<AuthTokenApiResponse>(
+    '/oauth2/exchange',
+    { code },
+    { _skipAuthRecovery: true } as RetryableRequestConfig,
+  );
+
+  return {
+    accessToken: response.data.accessToken,
+    refreshToken: response.data.refreshToken,
+    email: response.data.email,
+    role: response.data.role,
+  };
 };
 
 export const persistAuthSession = (payload: AuthPayload) => {

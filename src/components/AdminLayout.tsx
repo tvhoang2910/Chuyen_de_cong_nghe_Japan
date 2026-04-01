@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import type { AxiosError } from 'axios';
 import { 
@@ -40,7 +40,41 @@ type NotificationItem = {
   onClick: () => void;
 };
 
+type DismissedNotificationEntry = {
+  id: string;
+  dismissedAt: number;
+};
+
+const DISMISSED_NOTIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
 const ADMIN_DISMISSED_NOTIFICATION_IDS_KEY = 'admin-dismissed-notification-ids';
+
+const normalizeDismissedEntries = (parsed: unknown, now: number): DismissedNotificationEntry[] => {
+  if (!Array.isArray(parsed)) {
+    return [];
+  }
+
+  const deduplicated = new Map<string, DismissedNotificationEntry>();
+  for (const item of parsed) {
+    if (typeof item === 'string') {
+      deduplicated.set(item, { id: item, dismissedAt: now });
+      continue;
+    }
+
+    if (
+      item &&
+      typeof item === 'object' &&
+      typeof (item as { id?: unknown }).id === 'string' &&
+      typeof (item as { dismissedAt?: unknown }).dismissedAt === 'number'
+    ) {
+      const entry = item as DismissedNotificationEntry;
+      if (entry.dismissedAt > now - DISMISSED_NOTIFICATION_TTL_MS) {
+        deduplicated.set(entry.id, entry);
+      }
+    }
+  }
+
+  return Array.from(deduplicated.values());
+};
 
 const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const navigate = useNavigate();
@@ -56,31 +90,39 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const [notificationItems, setNotificationItems] = useState<NotificationItem[]>([]);
   const notificationRef = useRef<HTMLDivElement | null>(null);
 
-  const readDismissedIds = () => {
+  const persistDismissedEntries = (entries: DismissedNotificationEntry[]) => {
+    localStorage.setItem(ADMIN_DISMISSED_NOTIFICATION_IDS_KEY, JSON.stringify(entries));
+  };
+
+  const readDismissedEntries = useCallback(() => {
+    const now = Date.now();
     try {
       const raw = localStorage.getItem(ADMIN_DISMISSED_NOTIFICATION_IDS_KEY);
       if (!raw) {
-        return new Set<string>();
+        return [] as DismissedNotificationEntry[];
       }
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) {
-        return new Set<string>();
-      }
-      return new Set(parsed.filter((item): item is string => typeof item === 'string'));
-    } catch {
-      return new Set<string>();
-    }
-  };
 
-  const persistDismissedIds = (ids: Set<string>) => {
-    localStorage.setItem(ADMIN_DISMISSED_NOTIFICATION_IDS_KEY, JSON.stringify(Array.from(ids)));
-  };
+      const parsed = JSON.parse(raw);
+      const normalized = normalizeDismissedEntries(parsed, now);
+      if (JSON.stringify(parsed) !== JSON.stringify(normalized)) {
+        persistDismissedEntries(normalized);
+      }
+      return normalized;
+    } catch {
+      localStorage.removeItem(ADMIN_DISMISSED_NOTIFICATION_IDS_KEY);
+      return [] as DismissedNotificationEntry[];
+    }
+  }, []);
+
+  const readDismissedIds = useCallback(() => {
+    return new Set(readDismissedEntries().map((entry) => entry.id));
+  }, [readDismissedEntries]);
 
   const dismissNotification = (id: string) => {
     setNotificationItems((current) => current.filter((item) => item.id !== id));
-    const dismissed = readDismissedIds();
-    dismissed.add(id);
-    persistDismissedIds(dismissed);
+    const dismissedEntries = readDismissedEntries().filter((entry) => entry.id !== id);
+    dismissedEntries.push({ id, dismissedAt: Date.now() });
+    persistDismissedEntries(dismissedEntries);
   };
 
   const [displayNameInput, setDisplayNameInput] = useState('');
@@ -128,14 +170,6 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           onClick: () => navigate('/admin/subscription-reviews'),
         }));
 
-        items.push({
-          id: 'meta-review-history',
-          title: 'Lịch sử duyệt thanh toán',
-          description: 'Xem các yêu cầu đã duyệt hoặc từ chối trong trang duyệt thanh toán.',
-          timeLabel: 'Hệ thống',
-          onClick: () => navigate('/admin/subscription-reviews'),
-        });
-
         const dismissedIds = readDismissedIds();
         const visibleItems = items.filter((item) => !dismissedIds.has(item.id));
 
@@ -170,7 +204,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       globalThis.clearInterval(intervalId);
       globalThis.removeEventListener(SUBSCRIPTION_REVIEW_UPDATED_EVENT, handleRefresh);
     };
-  }, [navigate]);
+  }, [navigate, readDismissedEntries, readDismissedIds]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {

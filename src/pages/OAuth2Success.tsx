@@ -1,37 +1,52 @@
 import React, { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
-import { persistAuthSession } from '../api/axiosClient';
+import { exchangeOAuth2Code, persistAuthSession } from '../api/axiosClient';
 
 const OAuth2Success: React.FC = () => {
   const [searchParameters] = useSearchParams();
   const navigate = useNavigate();
 
   useEffect(() => {
-    const accessToken = searchParameters.get('accessToken') ?? searchParameters.get('token');
-    const refreshToken = searchParameters.get('refreshToken');
-    const email = searchParameters.get('email');
-    const role = searchParameters.get('role');
+    let active = true;
+    const code = searchParameters.get('code');
 
-    if (accessToken) {
-      persistAuthSession({
-        accessToken,
-        refreshToken: refreshToken || undefined,
-        email: email || undefined,
-        role: role || undefined,
-      });
-
-      let targetPath = '/dashboard';
-      if (role === 'ADMIN') {
-        targetPath = '/admin/users';
-      } else if (role === 'CONTRIBUTOR') {
-        targetPath = '/contributor';
-      }
-      
-      navigate(targetPath);
-    } else {
-      navigate('/login');
+    if (!code) {
+      navigate('/login', { replace: true });
+      return () => {
+        active = false;
+      };
     }
+
+    const completeOAuth2Login = async () => {
+      try {
+        const authSession = await exchangeOAuth2Code(code);
+        if (!active) {
+          return;
+        }
+
+        persistAuthSession(authSession);
+
+        let targetPath = '/dashboard';
+        if (authSession.role === 'ADMIN') {
+          targetPath = '/admin/users';
+        } else if (authSession.role === 'CONTRIBUTOR') {
+          targetPath = '/contributor';
+        }
+
+        navigate(targetPath, { replace: true });
+      } catch {
+        if (active) {
+          navigate('/login', { replace: true });
+        }
+      }
+    };
+
+    void completeOAuth2Login();
+
+    return () => {
+      active = false;
+    };
   }, [searchParameters, navigate]);
 
   return (

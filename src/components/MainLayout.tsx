@@ -43,6 +43,41 @@ type NotificationItem = {
   onClick: () => void;
 };
 
+type DismissedNotificationEntry = {
+  id: string;
+  dismissedAt: number;
+};
+
+const DISMISSED_NOTIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
+
+const normalizeDismissedEntries = (parsed: unknown, now: number): DismissedNotificationEntry[] => {
+  if (!Array.isArray(parsed)) {
+    return [];
+  }
+
+  const deduplicated = new Map<string, DismissedNotificationEntry>();
+  for (const item of parsed) {
+    if (typeof item === 'string') {
+      deduplicated.set(item, { id: item, dismissedAt: now });
+      continue;
+    }
+
+    if (
+      item &&
+      typeof item === 'object' &&
+      typeof (item as { id?: unknown }).id === 'string' &&
+      typeof (item as { dismissedAt?: unknown }).dismissedAt === 'number'
+    ) {
+      const entry = item as DismissedNotificationEntry;
+      if (entry.dismissedAt > now - DISMISSED_NOTIFICATION_TTL_MS) {
+        deduplicated.set(entry.id, entry);
+      }
+    }
+  }
+
+  return Array.from(deduplicated.values());
+};
+
 const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -64,25 +99,33 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     return `main-dismissed-notification-ids:${role}:${email}`;
   }, [user?.email, user?.role]);
 
-  const readDismissedIds = useCallback(() => {
+  const persistDismissedEntries = useCallback((entries: DismissedNotificationEntry[]) => {
+    localStorage.setItem(dismissedIdsStorageKey, JSON.stringify(entries));
+  }, [dismissedIdsStorageKey]);
+
+  const readDismissedEntries = useCallback(() => {
+    const now = Date.now();
     try {
       const raw = localStorage.getItem(dismissedIdsStorageKey);
       if (!raw) {
-        return new Set<string>();
+        return [] as DismissedNotificationEntry[];
       }
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) {
-        return new Set<string>();
-      }
-      return new Set(parsed.filter((item): item is string => typeof item === 'string'));
-    } catch {
-      return new Set<string>();
-    }
-  }, [dismissedIdsStorageKey]);
 
-  const persistDismissedIds = useCallback((ids: Set<string>) => {
-    localStorage.setItem(dismissedIdsStorageKey, JSON.stringify(Array.from(ids)));
-  }, [dismissedIdsStorageKey]);
+      const parsed = JSON.parse(raw);
+      const normalized = normalizeDismissedEntries(parsed, now);
+      if (JSON.stringify(parsed) !== JSON.stringify(normalized)) {
+        persistDismissedEntries(normalized);
+      }
+      return normalized;
+    } catch {
+      localStorage.removeItem(dismissedIdsStorageKey);
+      return [] as DismissedNotificationEntry[];
+    }
+  }, [dismissedIdsStorageKey, persistDismissedEntries]);
+
+  const readDismissedIds = useCallback(() => {
+    return new Set(readDismissedEntries().map((entry) => entry.id));
+  }, [readDismissedEntries]);
 
   const dismissNotification = (id: string) => {
     setNotificationItems((current) => {
@@ -92,9 +135,9 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       }
       return next;
     });
-    const dismissed = readDismissedIds();
-    dismissed.add(id);
-    persistDismissedIds(dismissed);
+    const dismissedEntries = readDismissedEntries().filter((entry) => entry.id !== id);
+    dismissedEntries.push({ id, dismissedAt: Date.now() });
+    persistDismissedEntries(dismissedEntries);
   };
 
   const [displayNameInput, setDisplayNameInput] = useState('');
@@ -142,14 +185,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             onClick: () => navigate('/contributor/subscription-reviews'),
           }));
 
-          items.push({
-            id: 'meta-review-history-contributor',
-            title: 'Lịch sử duyệt thanh toán',
-            description: 'Mở trang duyệt để xem request đã duyệt hoặc từ chối.',
-            timeLabel: 'Hệ thống',
-            onClick: () => navigate('/contributor/subscription-reviews'),
-          });
-
           const dismissedIds = readDismissedIds();
           const visibleItems = items.filter((item) => !dismissedIds.has(item.id));
 
@@ -169,14 +204,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           timeLabel: new Date(row.createdAt).toLocaleString('vi-VN'),
           onClick: () => navigate('/dashboard/subscription-payments'),
         }));
-
-        items.push({
-          id: 'premium-nudge',
-          title: 'Theo dõi thanh toán Premium',
-          description: 'Bạn có thể xem đầy đủ lịch sử giao dịch ở trang Nâng cấp Premium.',
-          timeLabel: 'Hệ thống',
-          onClick: () => navigate('/dashboard/subscription-payments'),
-        });
 
         const dismissedIds = readDismissedIds();
         const visibleItems = items.filter((item) => !dismissedIds.has(item.id));

@@ -84,7 +84,23 @@ test('register redirects to verify-email and can submit OTP verification', async
   await expect(page).toHaveURL(/.*\/login/);
 });
 
-test('oauth2 success callback redirects admin to admin users page immediately', async ({ page }) => {
+test('oauth2 success callback exchanges code and redirects admin to admin users page', async ({ page }) => {
+  await page.route('**/api/v1/auth/oauth2/exchange', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        accessToken: 'gg-access-token',
+        refreshToken: 'gg-refresh-token',
+        tokenType: 'Bearer',
+        expiresIn: 3600,
+        refreshExpiresIn: 604800,
+        email: 'admin@example.com',
+        role: 'ADMIN',
+      }),
+    });
+  });
+
   await page.route('**/api/v1/auth/me', async (route) => {
     await route.fulfill({
       status: 200,
@@ -99,7 +115,7 @@ test('oauth2 success callback redirects admin to admin users page immediately', 
     });
   });
 
-  await page.goto('/oauth2/success?token=gg-access-token&refreshToken=gg-refresh-token&email=admin@example.com&role=ADMIN');
+  await page.goto('/oauth2/success?code=oauth2-code-123');
 
   await expect(page).toHaveURL(/.*\/admin\/users/);
   await expect(page.locator('h1')).toContainText('Quản lý Thành viên');
@@ -1297,4 +1313,91 @@ test('admin bell count updates and reviewed request disappears from pending queu
 
   await page.selectOption('select', 'APPROVED');
   await expect(page.locator('text=#999 - User One')).toBeVisible();
+});
+
+test('admin notification panel stays empty when review queue is empty', async ({ page }) => {
+  await page.route('**/api/v1/auth/me', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 12,
+        email: 'admin.empty@example.com',
+        fullName: 'Admin Empty',
+        role: 'ADMIN',
+        premium: false,
+      }),
+    });
+  });
+
+  await page.route('**/api/v1/auth/subscriptions/review-queue**', async (route) => {
+    const requestUrl = new URL(route.request().url());
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        content: [],
+        number: 0,
+        size: Number(requestUrl.searchParams.get('size') || 10),
+        totalElements: 0,
+        totalPages: 0,
+        first: true,
+        last: true,
+      }),
+    });
+  });
+
+  await page.route('**/api/v1/auth/subscriptions/purchase-requests/*/approvals', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([]),
+    });
+  });
+
+  await seedAdminSession(page);
+  await page.goto('/admin/subscription-reviews');
+
+  await expect(page.locator('#admin-review-bell-badge')).toHaveCount(0);
+  await page.locator('#admin-review-bell').click();
+  await expect(page.locator('text=Hiện chưa có thông báo mới.')).toBeVisible();
+});
+
+test('user notification panel stays empty when no subscription requests', async ({ page }) => {
+  await page.route('**/api/v1/auth/me', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 44,
+        email: 'user.empty@example.com',
+        fullName: 'User Empty',
+        role: 'USER',
+        premium: false,
+      }),
+    });
+  });
+
+  await page.route('**/api/v1/auth/subscriptions/plans', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([]),
+    });
+  });
+
+  await page.route('**/api/v1/auth/subscriptions/my-requests', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([]),
+    });
+  });
+
+  await seedUserSession(page);
+  await page.goto('/dashboard/subscription-payments');
+
+  await expect(page.locator('#main-review-bell-badge')).toHaveCount(0);
+  await page.locator('#main-review-bell').click();
+  await expect(page.locator('text=Hiện chưa có thông báo mới.')).toBeVisible();
 });
