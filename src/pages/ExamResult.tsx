@@ -68,19 +68,29 @@ const ExamResult: React.FC = () => {
 
         <section className="space-y-3">
           {result.questionResults.map((question, idx) => (
-            <article key={question.questionId} className="rounded-xl border border-slate-200 bg-white p-4">
+            <article
+              key={question.questionId}
+              className={`rounded-xl border p-4 ${
+                question.correct
+                  ? 'border-emerald-200 bg-emerald-50/30'
+                  : 'border-rose-200 bg-rose-50/30'
+              }`}
+            >
               <h2 className="font-semibold text-slate-900">Câu {idx + 1}: {question.content}</h2>
-              <p className="text-sm mt-2 text-slate-600">
-                Điểm: {question.earnedScore}/{question.maxScore} • {question.correct ? 'Đúng' : 'Sai'}
+              <p className="text-sm mt-2 text-slate-700">
+                Điểm: {question.earnedScore}/{question.maxScore} •{' '}
+                <span className={`font-bold ${question.correct ? 'text-emerald-700' : 'text-rose-700'}`}>
+                  {question.correct ? 'Đúng' : 'Sai'}
+                </span>
               </p>
-              <p className="text-xs mt-1 text-slate-500">
+              <p className={`text-xs mt-1 ${question.correct ? 'text-emerald-700' : 'text-rose-700'}`}>
                 Đáp án chọn: {question.selectedOptionIds.length > 0
                   ? question.selectedOptionIds
                       .map((optionId) => question.options.find((option) => option.id === optionId)?.content || `#${optionId}`)
                       .join(', ')
                   : 'Bỏ trống'}
               </p>
-              <p className="text-xs mt-1 text-slate-500">
+              <p className="text-xs mt-1 text-emerald-700">
                 Đáp án đúng: {question.correctOptionIds
                   .map((optionId) => question.options.find((option) => option.id === optionId)?.content || `#${optionId}`)
                   .join(', ')}

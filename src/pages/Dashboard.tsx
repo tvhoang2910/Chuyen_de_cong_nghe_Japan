@@ -1,29 +1,40 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Zap, ChartLine, Clock } from 'lucide-react';
-import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer } from 'recharts';
+import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import { fetchCurrentUserProfile, type UserProfile } from '../api/axiosClient';
 import { fetchMyAttemptHistory, type AttemptSummary } from '../api/examClient';
+import { fetchWeaknessRadar, fetchScoreHistory, fetchStudyStats, type RadarPoint, type ScorePoint, type StudyStats } from '../api/studyClient';
+import { WeaknessRadarChart } from '../components/analytics/WeaknessRadarChart';
+import { ScoreHistoryChart } from '../components/analytics/ScoreHistoryChart';
+import { StudyStatsCards } from '../components/analytics/StudyStatsCards';
 import MainLayout from '../components/MainLayout';
-
-const radarData = [
-  { subject: 'Toán', A: 85 },
-  { subject: 'Vật lý', A: 70 },
-  { subject: 'IT', A: 90 },
-  { subject: 'Tiếng Anh', A: 65 },
-  { subject: 'Triết học', A: 50 },
-  { subject: 'Giải phẫu', A: 40 },
-];
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [attemptHistory, setAttemptHistory] = useState<AttemptSummary[]>([]);
+  const [radarPoints, setRadarPoints] = useState<RadarPoint[]>([]);
+  const [scorePoints, setScorePoints] = useState<ScorePoint[]>([]);
+  const [studyStats, setStudyStats] = useState<StudyStats | null>(null);
+  const [analyticsWarnings, setAnalyticsWarnings] = useState<string[]>([]);
   const hasRequestedProfileRef = useRef(false);
 
-  const recentActivities = useMemo(() => {
+  const buildAnalyticsWarning = (label: string, reason: unknown) => {
+    if (axios.isAxiosError(reason)) {
+      const detail =
+        typeof reason.response?.data === 'object' && reason.response?.data !== null
+          ? (reason.response.data as { message?: string }).message
+          : undefined;
+      return detail ? `${label}: ${detail}` : `${label}: Không thể tải dữ liệu phân tích.`;
+    }
+
+    return `${label}: Không thể tải dữ liệu phân tích.`;
+  };
+
+  const recentActivities = React.useMemo(() => {
     return attemptHistory
       .flatMap((attempt) => {
         const startedActivity = {
@@ -52,7 +63,7 @@ const Dashboard: React.FC = () => {
     if (hasRequestedProfileRef.current) return;
     hasRequestedProfileRef.current = true;
 
-    const loadProfile = async () => {
+    const loadData = async () => {
       try {
         const [profile, history] = await Promise.all([
           fetchCurrentUserProfile(),
@@ -60,13 +71,45 @@ const Dashboard: React.FC = () => {
         ]);
         setUser(profile);
         setAttemptHistory(history);
+
+        // Load analytics in parallel — gracefully handle errors
+        const [radarResult, scoreResult, statsResult] = await Promise.allSettled([
+          fetchWeaknessRadar(),
+          fetchScoreHistory(),
+          fetchStudyStats(),
+        ]);
+
+        const nextWarnings: string[] = [];
+
+        if (radarResult.status === 'fulfilled') {
+          setRadarPoints(radarResult.value.points ?? []);
+        } else {
+          setRadarPoints([]);
+          nextWarnings.push(buildAnalyticsWarning('Năng lực môn học', radarResult.reason));
+        }
+
+        if (scoreResult.status === 'fulfilled') {
+          setScorePoints(scoreResult.value.points ?? []);
+        } else {
+          setScorePoints([]);
+          nextWarnings.push(buildAnalyticsWarning('Lịch sử điểm số', scoreResult.reason));
+        }
+
+        if (statsResult.status === 'fulfilled') {
+          setStudyStats(statsResult.value);
+        } else {
+          setStudyStats(null);
+          nextWarnings.push(buildAnalyticsWarning('Thống kê học tập', statsResult.reason));
+        }
+
+        setAnalyticsWarnings(nextWarnings);
       } catch {
         toast.error('Không thể tải thông tin người dùng.');
       } finally {
         setIsLoading(false);
       }
     };
-    void loadProfile();
+    void loadData();
   }, []);
 
   const welcomeMessage = user ? `Chào buổi sáng, ${user.fullName}! 👋` : 'Chào buổi sáng! 👋';
@@ -88,6 +131,21 @@ const Dashboard: React.FC = () => {
           </button>
         </div>
 
+        {/* Stats Row */}
+        {studyStats && <StudyStatsCards stats={studyStats} />}
+
+        {analyticsWarnings.length > 0 && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4">
+            <p className="text-sm font-semibold text-amber-900">Một số dữ liệu phân tích chưa tải được</p>
+            <div className="mt-2 space-y-1">
+              {analyticsWarnings.map((warning) => (
+                <p key={warning} className="text-sm text-amber-700">{warning}</p>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Radar + Score History */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Hero Action Widget */}
           <div className="lg:col-span-2 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-xl shadow-blue-600/20 group">
@@ -97,8 +155,14 @@ const Dashboard: React.FC = () => {
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-white/20 rounded-lg text-xs font-bold text-white mb-6 backdrop-blur-md border border-white/20 uppercase tracking-widest">
                   <Zap className="w-3.5 h-3.5 fill-white" /> Thuật toán SM-2
                 </div>
-                <h2 className="text-4xl font-bold mb-4 leading-tight">Bạn có 24 câu hỏi <br />cần ôn tập ngay</h2>
-                <p className="text-blue-100 max-w-sm mb-8 leading-relaxed">Đừng để kiến thức trôi xa! Hoàn thành bài tập Spaced Repetition hôm nay để tối ưu trí nhớ dài hạn.</p>
+                <h2 className="text-4xl font-bold mb-4 leading-tight">
+                  {studyStats?.dueCardsCount
+                    ? `Bạn có ${studyStats.dueCardsCount} câu hỏi cần ôn tập ngay`
+                    : 'Sẵn sàng cho bài thi tiếp theo?'}
+                </h2>
+                <p className="text-blue-100 max-w-sm mb-8 leading-relaxed">
+                  Đừng để kiến thức trôi xa! Hoàn thành bài tập Spaced Repetition hôm nay để tối ưu trí nhớ dài hạn.
+                </p>
               </div>
               <button className="self-start bg-white text-blue-700 px-8 py-4 rounded-2xl font-bold hover:shadow-lg hover:-translate-y-1 transition-all flex items-center gap-2 active:scale-95">
                 Bắt đầu ngay <Zap className="w-4 h-4" />
@@ -111,32 +175,31 @@ const Dashboard: React.FC = () => {
             <div className="flex items-center justify-between mb-6">
               <h3 className="font-bold text-slate-900">Năng lực môn học</h3>
               <div className="p-2 bg-slate-50 rounded-xl">
-                 <ChartLine className="w-4 h-4 text-slate-400" />
+                <ChartLine className="w-4 h-4 text-slate-400" />
               </div>
             </div>
-            <div className="flex-1 min-h-[250px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
-                  <PolarGrid stroke="#e2e8f0" />
-                  <PolarAngleAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 11, fontWeight: 600 }} />
-                  <Radar
-                    name="Student"
-                    dataKey="A"
-                    stroke="#2563eb"
-                    fill="#3b82f6"
-                    fillOpacity={0.3}
-                  />
-                </RadarChart>
-              </ResponsiveContainer>
+            <div className="flex-1 min-h-[280px] w-full">
+              <WeaknessRadarChart points={radarPoints} />
             </div>
           </div>
+        </div>
+
+        {/* Score History */}
+        <div className="bg-white rounded-[2.5rem] p-8 border border-slate-200 shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="font-bold text-slate-900">Lịch sử điểm số</h3>
+            <div className="p-2 bg-slate-50 rounded-xl">
+              <ChartLine className="w-4 h-4 text-slate-400" />
+            </div>
+          </div>
+          <ScoreHistoryChart points={scorePoints} />
         </div>
 
         {/* Recent Activity */}
         <div>
           <div className="flex items-center justify-between mb-6">
-             <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Hoạt động gần đây</h2>
-             <button type="button" className="text-sm font-bold text-blue-600 hover:text-blue-700">Xem tất cả</button>
+            <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Hoạt động gần đây</h2>
+            <button type="button" className="text-sm font-bold text-blue-600 hover:text-blue-700">Xem tất cả</button>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white p-5 mb-6">
             {isLoading ? (
@@ -156,7 +219,7 @@ const Dashboard: React.FC = () => {
           </div>
 
           <div className="flex items-center justify-between mb-6">
-             <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Lịch sử làm bài</h2>
+            <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Lịch sử làm bài</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {isLoading ? (

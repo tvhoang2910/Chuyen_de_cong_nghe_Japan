@@ -277,7 +277,6 @@ const ExamAttempt: React.FC = () => {
           <div>
             <h1 className="text-2xl font-bold text-slate-900">{exam.title}</h1>
             <p className="text-slate-500 text-sm mt-1">{totalQuestions} câu hỏi • Điểm đỗ {exam.passingScore}</p>
-            <p className="text-amber-700 text-xs mt-2">Chế độ tập trung: không có thanh điều hướng để tránh thoát nhầm.</p>
           </div>
           <div className="rounded-xl bg-rose-50 border border-rose-200 px-4 py-2 text-rose-700 font-semibold">
             Thời gian còn lại: {formatTimer(remainingSeconds)}

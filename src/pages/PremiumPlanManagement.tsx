@@ -74,7 +74,7 @@ const PremiumPlanManagement: React.FC<PremiumPlanManagementProps> = ({ mode }) =
     const payload: CreatePremiumPlanPayload = {
       name: form.name.trim(),
       price,
-      durationDays: form.lifetime ? 0 : durationDays,
+      durationDays: form.lifetime ? undefined : durationDays,
       lifetime: form.lifetime,
       description: form.description.trim() || undefined,
       active: form.active,
@@ -177,11 +177,12 @@ const PremiumPlanManagement: React.FC<PremiumPlanManagementProps> = ({ mode }) =
                   <input
                     id="premium-plan-duration"
                     type="number"
-                    min={0}
+                    min={1}
                     value={form.durationDays}
                     onChange={(event) => setForm((prev) => ({ ...prev, durationDays: event.target.value }))}
                     disabled={form.lifetime}
                     className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none disabled:bg-slate-100"
+                    placeholder={form.lifetime ? 'Không áp dụng cho lifetime' : '30'}
                   />
                 </label>
               </div>
@@ -203,7 +204,14 @@ const PremiumPlanManagement: React.FC<PremiumPlanManagementProps> = ({ mode }) =
                     id="premium-plan-lifetime"
                     type="checkbox"
                     checked={form.lifetime}
-                    onChange={(event) => setForm((prev) => ({ ...prev, lifetime: event.target.checked }))}
+                    onChange={(event) => {
+                      const checked = event.target.checked;
+                      setForm((prev) => ({
+                        ...prev,
+                        lifetime: checked,
+                        durationDays: checked ? '' : '30',
+                      }));
+                    }}
                   />
                   <span>Lifetime</span>
                 </label>

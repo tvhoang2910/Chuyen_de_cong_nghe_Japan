@@ -242,7 +242,7 @@ test('attempt page is rendered in focus mode without dashboard navbar', async ({
 
   await expect(page.locator('h1')).toContainText('Đề tập trung');
   await expect(page.locator('#sidebar-logout-button')).toHaveCount(0);
-  await expect(page.locator('text=Chế độ tập trung: không có thanh điều hướng để tránh thoát nhầm.')).toBeVisible();
+  await expect(page.locator('text=Thời gian còn lại:')).toBeVisible();
 });
 
 test('public exam page shows metadata only before start', async ({ page }) => {
@@ -1032,6 +1032,68 @@ test('admin can create premium plan', async ({ page }) => {
     durationDays: 60,
     lifetime: false,
     description: 'Enterprise plan for schools',
+    active: true,
+  });
+});
+
+test('admin can create lifetime premium plan without durationDays', async ({ page }) => {
+  const createPayloads: Array<Record<string, unknown>> = [];
+
+  await page.route('**/api/v1/auth/me', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 99,
+        email: 'admin@example.com',
+        fullName: 'Admin User',
+        role: 'ADMIN',
+        premium: false,
+      }),
+    });
+  });
+
+  await page.route('**/api/v1/auth/subscriptions/plans/manage', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([]),
+    });
+  });
+
+  await page.route('**/api/v1/auth/subscriptions/plans', async (route) => {
+    const payload = (await route.request().postDataJSON()) as Record<string, unknown>;
+    createPayloads.push(payload);
+    await route.fulfill({
+      status: 201,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        id: 4,
+        name: payload.name,
+        price: payload.price,
+        durationDays: payload.durationDays,
+        lifetime: payload.lifetime,
+        description: payload.description,
+        active: payload.active,
+      }),
+    });
+  });
+
+  await seedAdminSession(page);
+  await page.goto('/admin/premium-plans');
+
+  await page.fill('#premium-plan-name', 'Lifetime Ultimate');
+  await page.fill('#premium-plan-price', '499000');
+  await page.check('#premium-plan-lifetime');
+  await expect(page.locator('#premium-plan-duration')).toBeDisabled();
+  await expect(page.locator('#premium-plan-duration')).toHaveValue('');
+  await page.click('#premium-plan-submit');
+
+  await expect.poll(() => createPayloads.length).toBe(1);
+  expect(createPayloads[0]).toEqual({
+    name: 'Lifetime Ultimate',
+    price: 499000,
+    lifetime: true,
     active: true,
   });
 });
