@@ -112,7 +112,8 @@ test('usePushNotification.subscribe() calls POST /push-subscription when permiss
 
   expect(pushSubscriptionCalled).toBeTruthy();
   expect(pushSubscriptionPayload).toHaveProperty('endpoint');
-  expect(pushSubscriptionPayload).toHaveProperty('keys');
+  expect(pushSubscriptionPayload).toHaveProperty('p256dh');
+  expect(pushSubscriptionPayload).toHaveProperty('auth');
 });
 
 test('usePushNotification.subscribe() skips subscription when permission denied', async ({ page }) => {

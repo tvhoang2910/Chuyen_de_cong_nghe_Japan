@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import { AxiosError } from 'axios';
 import MainLayout from '../components/MainLayout';
 import AdminLayout from '../components/AdminLayout';
+import { ExamDifficultyBadge, type DifficultyLevel } from '../components/ExamDifficultyBadge';
 import {
   createGlobalTag,
   createExam,
@@ -22,6 +23,10 @@ import {
   updateExamStatus,
 } from '../api/examClient';
 import { getCurrentSessionRole } from '../api/axiosClient';
+
+/** Question shape that may carry a difficulty field from the backend */
+export type QuestionWithDifficulty = ExamQuestion & { difficulty?: DifficultyLevel };
+type DifficultyFilter = Exclude<DifficultyLevel, null | undefined> | '';
 
 type RoleMode = 'ADMIN' | 'CONTRIBUTOR';
 
@@ -101,6 +106,9 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
   const [selectedTags, setSelectedTags] = useState<TagOption[]>([]);
   const [availableTags, setAvailableTags] = useState<TagOption[]>([]);
   const [isTagLoading, setIsTagLoading] = useState(false);
+
+  /** Filter for question difficulty in the question card list */
+  const [difficultyFilter, setDifficultyFilter] = useState<DifficultyFilter>('');
 
   const addTagToSelected = (tag: TagOption) => {
     setSelectedTags((prev) => {
@@ -743,7 +751,11 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
                         <div className="space-y-3">
                           {selectedExam.questions.map((question, questionIndex) => (
                             <div key={question.id || `q-${questionIndex}`} className="rounded-xl border border-slate-200 p-4">
-                              <h4 className="font-semibold text-slate-900">Câu {questionIndex + 1}: {question.content}</h4>
+                              <div className="flex items-start justify-between gap-2">
+                                <h4 className="font-semibold text-slate-900">Câu {questionIndex + 1}: {question.content}</h4>
+                                {/* @ts-expect-error difficulty may exist on questions loaded from the backend */}
+                                <ExamDifficultyBadge difficulty={question.difficulty} size="sm" />
+                              </div>
                               <ul className="mt-2 space-y-1 text-sm text-slate-700">
                                 {question.options.map((option, optionIndex) => (
                                   <li key={option.id || `opt-${optionIndex}`} className={option.isCorrect ? 'font-semibold text-emerald-700' : ''}>
@@ -959,10 +971,30 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
                       </div>
                     </div>
 
+                    {/* Difficulty filter */}
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm font-semibold text-slate-600 whitespace-nowrap">Lọc độ khó:</label>
+                      <select
+                        value={difficultyFilter}
+                        onChange={(e) => setDifficultyFilter(e.target.value as DifficultyFilter)}
+                        className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+                      >
+                        <option value="">Tất cả</option>
+                        <option value="EASY">Dễ</option>
+                        <option value="MEDIUM">Trung bình</option>
+                        <option value="HARD">Khó</option>
+                        <option value="VERY_HARD">Cực khó</option>
+                      </select>
+                    </div>
+
                     {form.questions.map((question, questionIndex) => (
                       <div key={`question-${questionIndex}`} className="rounded-xl border border-slate-200 p-3">
                         <div className="mb-2 flex items-center justify-between">
-                          <h4 className="font-semibold text-slate-800">Câu hỏi {questionIndex + 1}</h4>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-semibold text-slate-800">Câu hỏi {questionIndex + 1}</h4>
+                            {/* @ts-expect-error difficulty may exist on questions loaded from the backend */}
+                            <ExamDifficultyBadge difficulty={question.difficulty} size="sm" />
+                          </div>
                           {form.questions.length > 1 && (
                             <button type="button" className="text-xs font-semibold text-rose-600" onClick={() => removeQuestion(questionIndex)}>
                               Xóa câu

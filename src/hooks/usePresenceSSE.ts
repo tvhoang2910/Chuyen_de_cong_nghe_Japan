@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export interface PresenceEvent {
   eventType: 'JOIN' | 'LEAVE' | 'SNAPSHOT';
@@ -12,38 +12,54 @@ export function usePresenceSSE(accessToken: string | null) {
   const emitterRef = useRef<EventSource | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const connect = useCallback(() => {
-    if (!accessToken) return;
-
-    const authBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1/auth';
-    const url = `${authBaseUrl}/sse/presence?token=${encodeURIComponent(accessToken)}`;
-
-    const es = new EventSource(url, { withCredentials: false });
-    emitterRef.current = es;
-
-    es.onopen = () => {
-      console.log('[usePresenceSSE] connected');
-    };
-
-    es.addEventListener('presence', (e: MessageEvent) => {
-      try {
-        const data: PresenceEvent = JSON.parse(e.data);
-        if (data.eventType === 'SNAPSHOT' || data.eventType === 'JOIN' || data.eventType === 'LEAVE') {
-          setOnlineCount(data.onlineCount);
-        }
-      } catch {
-        // ignore parse errors
-      }
-    });
-
-    es.onerror = () => {
-      console.warn('[usePresenceSSE] SSE error, reconnecting in 5s...');
-      es.close();
-      reconnectTimeoutRef.current = setTimeout(connect, 5000);
-    };
-  }, [accessToken]);
-
   useEffect(() => {
+    if (!accessToken) {
+      return undefined;
+    }
+
+    let stopped = false;
+
+    const connect = () => {
+      if (stopped) {
+        return;
+      }
+
+      const authBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1/auth';
+      const url = `${authBaseUrl}/sse/presence?token=${encodeURIComponent(accessToken)}`;
+
+      const es = new EventSource(url, { withCredentials: false });
+      emitterRef.current = es;
+
+      es.onopen = () => {
+        console.log('[usePresenceSSE] connected');
+      };
+
+      es.addEventListener('presence', (e: MessageEvent) => {
+        try {
+          const data: PresenceEvent = JSON.parse(e.data);
+          if (data.eventType === 'SNAPSHOT' || data.eventType === 'JOIN' || data.eventType === 'LEAVE') {
+            setOnlineCount(data.onlineCount);
+          }
+        } catch {
+          // ignore parse errors
+        }
+      });
+
+      es.onerror = () => {
+        if (stopped) {
+          return;
+        }
+        console.warn('[usePresenceSSE] SSE error, reconnecting in 5s...');
+        es.close();
+        if (reconnectTimeoutRef.current) {
+          clearTimeout(reconnectTimeoutRef.current);
+        }
+        reconnectTimeoutRef.current = setTimeout(() => {
+          connect();
+        }, 5000);
+      };
+    };
+
     connect();
 
     // Heartbeat every 30s
@@ -58,11 +74,14 @@ export function usePresenceSSE(accessToken: string | null) {
     }, 30_000);
 
     return () => {
+      stopped = true;
       emitterRef.current?.close();
-      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
       clearInterval(heartbeatInterval);
     };
-  }, [connect, accessToken]);
+  }, [accessToken]);
 
   return { onlineCount };
 }

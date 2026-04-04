@@ -18,6 +18,7 @@ const Dashboard = lazy(() => import('./pages/Dashboard'));
 const OAuth2Success = lazy(() => import('./pages/OAuth2Success'));
 const AdminUsers = lazy(() => import('./pages/AdminUsers'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const AuditLogPage = lazy(() => import('./pages/AuditLogPage'));
 const ExamManagement = lazy(() => import('./pages/ExamManagement'));
 const PublicExams = lazy(() => import('./pages/PublicExams'));
 const ExamStart = lazy(() => import('./pages/ExamStart'));
@@ -271,18 +272,31 @@ function App() {
                 </ProtectedRoute>
               } 
             />
-            <Route 
-              path="/admin/dashboard" 
+            <Route
+              path="/admin/dashboard"
               element={
-                <ProtectedRoute 
-                  isAuthenticated={effectiveIsAuthenticated} 
-                  userRole={effectiveRole} 
-                  defaultPath={defaultAuthenticatedPath} 
+                <ProtectedRoute
+                  isAuthenticated={effectiveIsAuthenticated}
+                  userRole={effectiveRole}
+                  defaultPath={defaultAuthenticatedPath}
                   allowedRoles={['ADMIN']}
                 >
                   <AdminDashboard />
                 </ProtectedRoute>
-              } 
+              }
+            />
+            <Route
+              path="/admin/audit-logs"
+              element={
+                <ProtectedRoute
+                  isAuthenticated={effectiveIsAuthenticated}
+                  userRole={effectiveRole}
+                  defaultPath={defaultAuthenticatedPath}
+                  allowedRoles={['ADMIN']}
+                >
+                  <AuditLogPage />
+                </ProtectedRoute>
+              }
             />
             <Route
               path="/admin/exams"

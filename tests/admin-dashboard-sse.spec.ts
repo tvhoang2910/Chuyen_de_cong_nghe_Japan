@@ -32,7 +32,7 @@ const createSseStream = (
     start(controller) {
       const emit = () => {
         if (chunks.length === 0) return;
-        const { event, data, delay } = chunks.shift()!;
+        const { event, data } = chunks.shift()!;
         controller.enqueue(encoder.encode(`event: ${event}\ndata: ${data}\n\n`));
         if (chunks.length > 0) {
           const nextDelay = chunks[0].delay ?? 100;
@@ -52,7 +52,7 @@ const createSseStream = (
 test('admin dashboard shows SSE presence online count', async ({ page }) => {
   let presenceSseConnected = false;
 
-  await page.route('**/api/v1/auth/sse/presence', async (route) => {
+  await page.route('**/api/v1/auth/sse/presence**', async (route) => {
     if (route.request().method() === 'GET') {
       presenceSseConnected = true;
       const data = JSON.stringify({
@@ -72,10 +72,7 @@ test('admin dashboard shows SSE presence online count', async ({ page }) => {
   await seedAdminSession(page);
   await page.goto('/admin/dashboard');
 
-  // Allow SSE handshake to complete
-  await page.waitForTimeout(500);
-
-  expect(presenceSseConnected).toBeTruthy();
+  await expect.poll(() => presenceSseConnected, { timeout: 5000 }).toBeTruthy();
 });
 
 test('admin dashboard shows SSE exam events with active attempt count', async ({
@@ -83,7 +80,7 @@ test('admin dashboard shows SSE exam events with active attempt count', async ({
 }) => {
   let examSseConnected = false;
 
-  await page.route('**/api/v1/exam/sse/events', async (route) => {
+  await page.route('**/api/v1/exam/sse/events**', async (route) => {
     if (route.request().method() === 'GET') {
       examSseConnected = true;
       const data = JSON.stringify({
@@ -103,18 +100,15 @@ test('admin dashboard shows SSE exam events with active attempt count', async ({
   await seedAdminSession(page);
   await page.goto('/admin/dashboard');
 
-  await page.waitForTimeout(500);
-
-  expect(examSseConnected).toBeTruthy();
+  await expect.poll(() => examSseConnected, { timeout: 5000 }).toBeTruthy();
 });
 
 test('admin dashboard receives EXAM_SUBMITTED SSE event and updates counter', async ({
   page,
 }) => {
-  let eventCount = 0;
   let examSseConnected = false;
 
-  await page.route('**/api/v1/exam/sse/events', async (route) => {
+  await page.route('**/api/v1/exam/sse/events**', async (route) => {
     if (route.request().method() === 'GET') {
       examSseConnected = true;
       const snapshot = JSON.stringify({
@@ -143,26 +137,16 @@ test('admin dashboard receives EXAM_SUBMITTED SSE event and updates counter', as
     }
   });
 
-  // Intercept POST to count how many EXAM_SUBMITTED events were received
-  // (in a real implementation the hook would POST back; here we track via stream)
-  await page.route('**/api/v1/exam/sse/events', async (route) => {
-    // Already handled above
-  });
-
-  void eventCount; // tracked via stream emit count
-
   await seedAdminSession(page);
   await page.goto('/admin/dashboard');
 
-  await page.waitForTimeout(1000);
-
-  expect(examSseConnected).toBeTruthy();
+  await expect.poll(() => examSseConnected, { timeout: 5000 }).toBeTruthy();
 });
 
 test('presence SSE JOIN event increments online count', async ({ page }) => {
   let presenceSseConnected = false;
 
-  await page.route('**/api/v1/auth/sse/presence', async (route) => {
+  await page.route('**/api/v1/auth/sse/presence**', async (route) => {
     if (route.request().method() === 'GET') {
       presenceSseConnected = true;
       const snapshot = JSON.stringify({
@@ -192,8 +176,7 @@ test('presence SSE JOIN event increments online count', async ({ page }) => {
   await seedAdminSession(page);
   await page.goto('/admin/dashboard');
 
-  await page.waitForTimeout(500);
-  expect(presenceSseConnected).toBeTruthy();
+  await expect.poll(() => presenceSseConnected, { timeout: 5000 }).toBeTruthy();
 });
 
 test('SSE does not connect when not authenticated', async ({ page }) => {
@@ -203,10 +186,12 @@ test('SSE does not connect when not authenticated', async ({ page }) => {
 });
 
 test('presence SSE sends heartbeat every 30 seconds', async ({ page }) => {
+  test.setTimeout(45_000);
+
   let heartbeatCount = 0;
 
   // Mock the presence SSE endpoint (returns a hanging stream)
-  await page.route('**/api/v1/auth/sse/presence', async (route) => {
+  await page.route('**/api/v1/auth/sse/presence**', async (route) => {
     if (route.request().method() === 'GET') {
       const data = JSON.stringify({
         eventType: 'SNAPSHOT',

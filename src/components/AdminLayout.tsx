@@ -240,6 +240,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     { label: 'Quản lý đề thi', icon: BookOpen, path: '/admin/exams' },
     { label: 'Quản lý gói Premium', icon: Gem, path: '/admin/premium-plans' },
     { label: 'Duyệt thanh toán', icon: ClipboardCheck, path: '/admin/subscription-reviews' },
+    { label: 'Nhật ký bảo mật', icon: ShieldCheck, path: '/admin/audit-logs' },
     { label: 'Cài đặt hệ thống', icon: Settings, path: '/admin/settings' },
   ];
 
