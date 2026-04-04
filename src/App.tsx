@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { Suspense, lazy, useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useState, useRef } from 'react';
+import { usePushNotification } from '@/hooks/usePushNotification';
 import { Toaster } from 'react-hot-toast';
 import { AUTH_SESSION_CHANGED_EVENT, getCurrentSessionRole } from './api/axiosClient';
 
@@ -75,6 +76,21 @@ function App() {
       globalThis.removeEventListener(AUTH_SESSION_CHANGED_EVENT, syncAuthState);
     };
   }, []);
+
+  const { subscribe, unsubscribe } = usePushNotification();
+  const prevAuth = useRef(false);
+
+  useEffect(() => {
+    if (effectiveIsAuthenticated && !prevAuth.current) {
+      // User just logged in — subscribe to push notifications
+      void subscribe();
+    }
+    if (!effectiveIsAuthenticated && prevAuth.current) {
+      // User just logged out — remove stale browser subscription binding
+      void unsubscribe();
+    }
+    prevAuth.current = effectiveIsAuthenticated;
+  }, [effectiveIsAuthenticated, subscribe, unsubscribe]);
 
   return (
     <BrowserRouter>

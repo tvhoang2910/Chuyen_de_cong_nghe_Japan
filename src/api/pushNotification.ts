@@ -1,0 +1,55 @@
+const buildAuthHeaders = (): HeadersInit => {
+  const token = localStorage.getItem('access_token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
+interface PushSubscriptionRequestPayload {
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+}
+
+const toPushSubscriptionRequestPayload = (
+  subscription: PushSubscriptionJSON,
+): PushSubscriptionRequestPayload => {
+  const endpoint = subscription.endpoint ?? '';
+  const p256dh = subscription.keys?.p256dh ?? '';
+  const auth = subscription.keys?.auth ?? '';
+
+  if (!endpoint || !p256dh || !auth) {
+    throw new Error('Invalid push subscription payload');
+  }
+
+  return { endpoint, p256dh, auth };
+};
+
+export const fetchVapidPublicKey = async (): Promise<string> => {
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1/auth';
+  const res = await fetch(`${baseUrl}/push-subscription/vapid-public-key`, {
+    headers: buildAuthHeaders(),
+  });
+  if (!res.ok) throw new Error('Failed to fetch VAPID public key');
+  const data = (await res.json()) as { publicKey: string };
+  return data.publicKey;
+};
+
+export const subscribePush = async (subscription: PushSubscriptionJSON): Promise<void> => {
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1/auth';
+  const payload = toPushSubscriptionRequestPayload(subscription);
+  const res = await fetch(`${baseUrl}/push-subscription`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...buildAuthHeaders() },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error('Failed to subscribe push notification');
+};
+
+export const unsubscribePush = async (endpoint: string): Promise<void> => {
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1/auth';
+  const res = await fetch(`${baseUrl}/push-subscription`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...buildAuthHeaders() },
+    body: JSON.stringify({ endpoint }),
+  });
+  if (!res.ok) throw new Error('Failed to unsubscribe push notification');
+};

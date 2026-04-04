@@ -288,26 +288,29 @@ const withCachedGet = async <T>(
     return cached;
   }
 
-  const inflight = inflightGetRequests.get(cacheKey);
-  if (inflight) {
-    return inflight as Promise<T>;
+  // Race-condition guard: check-then-set must be atomic relative to the event
+  // loop, so we do them back-to-back. If two calls race past the cache check
+  // simultaneously, the second one sees the in-flight entry and waits on it
+  // instead of firing a duplicate loader.
+  if (inflightGetRequests.has(cacheKey)) {
+    return inflightGetRequests.get(cacheKey) as Promise<T>;
   }
 
-  let resolver: (data: T) => void;
-  let rejecter: (err: unknown) => void;
+  let resolvePromise: (data: T) => void;
+  let rejectPromise: (err: unknown) => void;
   const request = new Promise<T>((resolve, reject) => {
-    resolver = resolve;
-    rejecter = reject;
+    resolvePromise = resolve;
+    rejectPromise = reject;
   });
   inflightGetRequests.set(cacheKey, request as Promise<unknown>);
 
   loader()
     .then((data) => {
       setCached(cacheKey, data, ttlMs);
-      resolver(data);
+      resolvePromise(data);
     })
     .catch((err) => {
-      rejecter(err);
+      rejectPromise(err);
     })
     .finally(() => {
       inflightGetRequests.delete(cacheKey);

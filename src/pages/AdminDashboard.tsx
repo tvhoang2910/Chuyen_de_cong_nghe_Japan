@@ -8,6 +8,8 @@ import {
   Globe,
   Zap,
 } from 'lucide-react';
+import { usePresenceSSE } from '@/hooks/usePresenceSSE';
+import { useExamEventsSSE } from '@/hooks/useExamEventsSSE';
 import {
   AreaChart,
   Area,
@@ -76,6 +78,9 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, icon: Icon, trend, tr
 
 const AdminDashboard: React.FC = () => {
   const navigate = useNavigate();
+  const accessToken = localStorage.getItem('access_token');
+  const { onlineCount } = usePresenceSSE(accessToken);
+  const { activeAttempts, submissionsToday } = useExamEventsSSE(accessToken);
 
   return (
     <AdminLayout>
@@ -88,17 +93,17 @@ const AdminDashboard: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <StatCard title="Tổng người dùng" value="1,284" icon={Users} trend="up" trendValue="+12%" color="bg-cyan-500" />
+          <StatCard title="Tổng người dùng" value={onlineCount > 0 ? onlineCount.toLocaleString() : '...'} icon={Users} trend="up" trendValue="Live" color="bg-cyan-500" />
           <StatCard
             title="Đề thi đã tạo"
-            value="452"
+            value={submissionsToday > 0 ? submissionsToday.toLocaleString() : '...'}
             icon={BookOpen}
             trend="up"
-            trendValue="+5%"
+            trendValue="Live"
             color="bg-blue-500"
             onClick={() => navigate('/admin/exams')}
           />
-          <StatCard title="Lượt làm bài" value="12,402" icon={Zap} trend="down" trendValue="-2%" color="bg-amber-500" />
+          <StatCard title="Lượt làm bài" value={activeAttempts > 0 ? activeAttempts.toLocaleString() : '...'} icon={Zap} trend="down" trendValue="Live" color="bg-amber-500" />
           <StatCard title="Báo cáo lỗi" value="08" icon={ShieldCheck} trend="down" trendValue="-40%" color="bg-rose-500" />
         </div>
 
