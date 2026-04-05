@@ -27,6 +27,7 @@ const ExamResult = lazy(() => import('./pages/ExamResult'));
 const SubscriptionPayments = lazy(() => import('./pages/SubscriptionPayments'));
 const SubscriptionReviewQueue = lazy(() => import('./pages/SubscriptionReviewQueue'));
 const PremiumPlanManagement = lazy(() => import('./pages/PremiumPlanManagement'));
+const AdminReports = lazy(() => import('./pages/AdminReports'));
 
 const RouteLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-600 font-semibold italic animate-pulse">
@@ -257,6 +258,19 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/contributor/reports"
+              element={
+                <ProtectedRoute
+                  isAuthenticated={effectiveIsAuthenticated}
+                  userRole={effectiveRole}
+                  defaultPath={defaultAuthenticatedPath}
+                  allowedRoles={['CONTRIBUTOR']}
+                >
+                  <AdminReports mode="contributor" />
+                </ProtectedRoute>
+              }
+            />
 
             {/* Admin Routes */}
             <Route 
@@ -334,6 +348,32 @@ function App() {
                   allowedRoles={['ADMIN']}
                 >
                   <PremiumPlanManagement mode="admin" />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/reports"
+              element={
+                <ProtectedRoute
+                  isAuthenticated={effectiveIsAuthenticated}
+                  userRole={effectiveRole}
+                  defaultPath={defaultAuthenticatedPath}
+                  allowedRoles={['ADMIN']}
+                >
+                  <AdminReports mode="admin" />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/reports"
+              element={
+                <ProtectedRoute
+                  isAuthenticated={effectiveIsAuthenticated}
+                  userRole={effectiveRole}
+                  defaultPath={defaultAuthenticatedPath}
+                  allowedRoles={['ADMIN', 'CONTRIBUTOR']}
+                >
+                  {effectiveRole === 'ADMIN' ? <AdminReports mode="admin" /> : <AdminReports mode="contributor" />}
                 </ProtectedRoute>
               }
             />

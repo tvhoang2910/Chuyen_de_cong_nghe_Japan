@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { Flag } from 'lucide-react';
 import toast from 'react-hot-toast';
 import MainLayout from '../components/MainLayout';
+import ReportModal from '../components/ReportModal';
+import { ExamDifficultyBadge } from '../components/ExamDifficultyBadge';
 import { fetchAttemptResult, type AttemptResult } from '../api/examClient';
 
 const ExamResult: React.FC = () => {
@@ -10,6 +13,8 @@ const ExamResult: React.FC = () => {
 
   const [result, setResult] = useState<AttemptResult | null>(null);
   const [loading, setLoading] = useState(true);
+  const [reportModalQuestion, setReportModalQuestion] = useState<AttemptResult['questionResults'][number] | null>(null);
+  const [reportedQuestionIds, setReportedQuestionIds] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     if (!attemptId || Number.isNaN(attemptId)) {
@@ -76,7 +81,10 @@ const ExamResult: React.FC = () => {
                   : 'border-rose-200 bg-rose-50/30'
               }`}
             >
-              <h2 className="font-semibold text-slate-900">Câu {idx + 1}: {question.content}</h2>
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <h2 className="font-semibold text-slate-900">Câu {idx + 1}: {question.content}</h2>
+                <ExamDifficultyBadge difficulty={question.difficulty} size="sm" />
+              </div>
               <p className="text-sm mt-2 text-slate-700">
                 Điểm: {question.earnedScore}/{question.maxScore} •{' '}
                 <span className={`font-bold ${question.correct ? 'text-emerald-700' : 'text-rose-700'}`}>
@@ -95,10 +103,42 @@ const ExamResult: React.FC = () => {
                   .map((optionId) => question.options.find((option) => option.id === optionId)?.content || `#${optionId}`)
                   .join(', ')}
               </p>
+
+              {reportedQuestionIds.has(question.questionId) ? (
+                <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700">
+                  <Flag className="h-3.5 w-3.5" />
+                  Đã báo lỗi
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setReportModalQuestion(question)}
+                  className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 transition-colors hover:text-rose-600"
+                >
+                  <Flag className="h-3.5 w-3.5" />
+                  Báo lỗi câu hỏi này
+                </button>
+              )}
             </article>
           ))}
         </section>
       </div>
+
+      {reportModalQuestion && (
+        <ReportModal
+          questionId={reportModalQuestion.questionId}
+          attemptId={result.attemptId}
+          questionContent={reportModalQuestion.content}
+          onClose={() => setReportModalQuestion(null)}
+          onSuccess={() => {
+            setReportedQuestionIds((previous) => {
+              const next = new Set(previous);
+              next.add(reportModalQuestion.questionId);
+              return next;
+            });
+          }}
+        />
+      )}
     </MainLayout>
   );
 };

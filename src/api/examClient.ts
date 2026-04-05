@@ -87,6 +87,7 @@ export type AttemptQuestionResult = {
   maxScore: number;
   earnedScore: number;
   correct: boolean;
+  difficulty?: 'EASY' | 'MEDIUM' | 'HARD' | 'VERY_HARD';
   options: { id: number; content: string }[];
   selectedOptionIds: number[];
   correctOptionIds: number[];
@@ -221,5 +222,45 @@ export const fetchAttemptResult = async (attemptId: number): Promise<AttemptResu
 
 export const fetchMyAttemptHistory = async (): Promise<AttemptSummary[]> => {
   const response = await examClient.get<AttemptSummary[]>('/users/me/attempts');
+  return response.data;
+};
+
+export type ReportType =
+  | 'WRONG_ANSWER'
+  | 'TYPO'
+  | 'MISSING_INFORMATION'
+  | 'INVALID_QUESTION'
+  | 'OTHER';
+
+export type QuestionReportResponse = {
+  id: number;
+  questionId: number;
+  questionPreview: string;
+  attemptId: number;
+  examId: number;
+  examTitle: string;
+  reporterId: number;
+  reporterUsername: string;
+  reportType: ReportType;
+  reportTypeLabel: string;
+  description: string | null;
+  status: 'REPORTED' | 'REVIEWING' | 'RESOLVED' | 'REJECTED';
+  statusLabel: string;
+  resolutionNote: string | null;
+  resolvedBy: number | null;
+  resolvedByUsername: string | null;
+  resolvedAt: string | null;
+  createdAt: string;
+};
+
+export const submitQuestionReport = async (
+  questionId: number,
+  attemptId: number,
+  payload: { reportType: ReportType; description?: string }
+): Promise<QuestionReportResponse> => {
+  const response = await examClient.post<QuestionReportResponse>(
+    `/attempts/${attemptId}/questions/${questionId}/reports`,
+    payload
+  );
   return response.data;
 };

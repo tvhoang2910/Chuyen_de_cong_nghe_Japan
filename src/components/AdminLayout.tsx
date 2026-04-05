@@ -15,7 +15,8 @@ import {
   ShieldCheck,
   ClipboardCheck,
   Gem,
-  BookOpen
+  BookOpen,
+  Flag
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axiosClient, { 
@@ -238,6 +239,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     { label: 'Dashboard', icon: LayoutDashboard, path: '/admin/dashboard' },
     { label: 'Quản lý Users', icon: Users, path: '/admin/users' },
     { label: 'Quản lý đề thi', icon: BookOpen, path: '/admin/exams' },
+    { label: 'Báo cáo câu hỏi', icon: Flag, path: '/admin/reports' },
     { label: 'Quản lý gói Premium', icon: Gem, path: '/admin/premium-plans' },
     { label: 'Duyệt thanh toán', icon: ClipboardCheck, path: '/admin/subscription-reviews' },
     { label: 'Nhật ký bảo mật', icon: ShieldCheck, path: '/admin/audit-logs' },

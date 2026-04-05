@@ -17,7 +17,8 @@ import {
   Flame,
   Banknote,
   ClipboardCheck,
-  Gem
+  Gem,
+  Flag
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axiosClient, { 
@@ -276,6 +277,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     { label: 'Tổng quan', icon: LayoutDashboard, path: '/contributor' },
     { label: 'Tạo gói Premium', icon: Gem, path: '/contributor/premium-plans' },
     { label: 'Duyệt thanh toán', icon: ClipboardCheck, path: '/contributor/subscription-reviews' },
+    { label: 'Báo cáo câu hỏi', icon: Flag, path: '/contributor/reports' },
     { label: 'Đề thi của tôi', icon: BookOpen, path: '/contributor/exams' },
     { label: 'Thống kê', icon: Zap, path: '/contributor/analytics' },
   ] : [

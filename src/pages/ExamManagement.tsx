@@ -670,25 +670,42 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
                       {exam.totalQuestions} câu hỏi • {exam.durationMinutes} phút • Điểm đỗ {exam.passingScore} • Tối đa {exam.maxAttempts} lượt
                     </p>
                   </div>
-                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">{exam.status}</span>
+                  <span className={`rounded-full px-3 py-1 text-xs font-bold ${
+                    exam.status === 'PUBLISHED' ? 'bg-emerald-100 text-emerald-700' :
+                    exam.status === 'ARCHIVED' ? 'bg-amber-100 text-amber-700' :
+                    'bg-slate-100 text-slate-700'
+                  }`}>{exam.status}</span>
                 </div>
 
                 <div className="mt-4 flex flex-wrap gap-2">
                   <button type="button" onClick={() => void openView(exam.id)} className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200">
                     <Eye className="w-3.5 h-3.5 inline mr-1" />Xem
                   </button>
-                  <button type="button" onClick={() => void openEdit(exam.id)} className="rounded-lg bg-blue-100 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-200">
-                    <Pencil className="w-3.5 h-3.5 inline mr-1" />Sửa
-                  </button>
-                  <button type="button" onClick={() => void handleDelete(exam.id)} className="rounded-lg bg-rose-100 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-200">
-                    <Trash2 className="w-3.5 h-3.5 inline mr-1" />Xóa
-                  </button>
-                  <button type="button" onClick={() => void handleStatus(exam.id, 'PUBLISHED')} className="rounded-lg bg-emerald-100 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-200">
-                    <Megaphone className="w-3.5 h-3.5 inline mr-1" />Public
-                  </button>
-                  <button type="button" onClick={() => void handleStatus(exam.id, 'ARCHIVED')} className="rounded-lg bg-amber-100 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-200">
-                    <Archive className="w-3.5 h-3.5 inline mr-1" />Archive
-                  </button>
+                  {exam.status !== 'ARCHIVED' && (
+                    <button type="button" onClick={() => void openEdit(exam.id)} className="rounded-lg bg-blue-100 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-200">
+                      <Pencil className="w-3.5 h-3.5 inline mr-1" />Sửa
+                    </button>
+                  )}
+                  {exam.status !== 'ARCHIVED' && (
+                    <button type="button" onClick={() => void handleDelete(exam.id)} className="rounded-lg bg-rose-100 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-200">
+                      <Trash2 className="w-3.5 h-3.5 inline mr-1" />Xóa
+                    </button>
+                  )}
+                  {exam.status === 'DRAFT' && (
+                    <button type="button" onClick={() => void handleStatus(exam.id, 'PUBLISHED')} className="rounded-lg bg-emerald-100 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-200">
+                      <Megaphone className="w-3.5 h-3.5 inline mr-1" />Public
+                    </button>
+                  )}
+                  {exam.status === 'PUBLISHED' && (
+                    <button type="button" onClick={() => void handleStatus(exam.id, 'ARCHIVED')} className="rounded-lg bg-amber-100 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-200">
+                      <Archive className="w-3.5 h-3.5 inline mr-1" />Archive
+                    </button>
+                  )}
+                  {exam.status === 'ARCHIVED' && (
+                    <button type="button" onClick={() => void handleStatus(exam.id, 'PUBLISHED')} className="rounded-lg bg-indigo-100 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-200">
+                      <Megaphone className="w-3.5 h-3.5 inline mr-1" />Khôi phục
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
