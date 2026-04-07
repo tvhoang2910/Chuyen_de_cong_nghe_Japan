@@ -24,6 +24,8 @@ const PublicExams = lazy(() => import('./pages/PublicExams'));
 const ExamStart = lazy(() => import('./pages/ExamStart'));
 const ExamAttempt = lazy(() => import('./pages/ExamAttempt'));
 const ExamResult = lazy(() => import('./pages/ExamResult'));
+const SpacedRepetition = lazy(() => import('./pages/SpacedRepetition.tsx'));
+const SpacedRepetitionPractice = lazy(() => import('./pages/SpacedRepetitionPractice.tsx'));
 const SubscriptionPayments = lazy(() => import('./pages/SubscriptionPayments'));
 const SubscriptionReviewQueue = lazy(() => import('./pages/SubscriptionReviewQueue'));
 const PremiumPlanManagement = lazy(() => import('./pages/PremiumPlanManagement'));
@@ -189,6 +191,32 @@ function App() {
                   allowedRoles={['USER']}
                 >
                   <ExamAttempt />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/spaced-repetition"
+              element={
+                <ProtectedRoute
+                  isAuthenticated={effectiveIsAuthenticated}
+                  userRole={effectiveRole}
+                  defaultPath={defaultAuthenticatedPath}
+                  allowedRoles={['USER']}
+                >
+                  <SpacedRepetition />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/spaced-repetition/:examId/practice"
+              element={
+                <ProtectedRoute
+                  isAuthenticated={effectiveIsAuthenticated}
+                  userRole={effectiveRole}
+                  defaultPath={defaultAuthenticatedPath}
+                  allowedRoles={['USER']}
+                >
+                  <SpacedRepetitionPractice />
                 </ProtectedRoute>
               }
             />
