@@ -33,7 +33,13 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
+<<<<<<< HEAD
   "include": [
     "src"
   ]
 }
+=======
+  "include": ["src"],
+  "exclude": ["../community_service/frontend/**/*"]
+}
+>>>>>>> origin/feature/frontend-comment-community

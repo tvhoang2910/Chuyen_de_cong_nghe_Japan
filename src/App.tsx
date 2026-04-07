@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Suspense, lazy, useEffect, useState, useRef } from 'react';
 import { usePushNotification } from '@/hooks/usePushNotification';
@@ -28,7 +29,45 @@ const SubscriptionPayments = lazy(() => import('./pages/SubscriptionPayments'));
 const SubscriptionReviewQueue = lazy(() => import('./pages/SubscriptionReviewQueue'));
 const PremiumPlanManagement = lazy(() => import('./pages/PremiumPlanManagement'));
 const AdminReports = lazy(() => import('./pages/AdminReports'));
-const CommentsPage = lazy(() => import('./pages/CommentsPage'));
+=======
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Suspense, lazy, useEffect, useState } from "react";
+import { Toaster } from "react-hot-toast";
+import {
+  AUTH_SESSION_CHANGED_EVENT,
+  getCurrentSessionRole,
+} from "./api/axiosClient";
+
+const Home = lazy(() => import("./pages/Home"));
+const About = lazy(() => import("./pages/About"));
+const Features = lazy(() => import("./pages/Features"));
+const Pricing = lazy(() => import("./pages/Pricing"));
+const Login = lazy(() => import("./pages/Login"));
+const Register = lazy(() => import("./pages/Register"));
+const VerifyRegisterEmail = lazy(() => import("./pages/VerifyRegisterEmail"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ForgotPasswordVerifyOtp = lazy(
+  () => import("./pages/ForgotPasswordVerifyOtp"),
+);
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const OAuth2Success = lazy(() => import("./pages/OAuth2Success"));
+const AdminUsers = lazy(() => import("./pages/AdminUsers"));
+const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
+const ExamManagement = lazy(() => import("./pages/ExamManagement"));
+const PublicExams = lazy(() => import("./pages/PublicExams"));
+const ExamStart = lazy(() => import("./pages/ExamStart"));
+const ExamAttempt = lazy(() => import("./pages/ExamAttempt"));
+const ExamResult = lazy(() => import("./pages/ExamResult"));
+const SubscriptionPayments = lazy(() => import("./pages/SubscriptionPayments"));
+const SubscriptionReviewQueue = lazy(
+  () => import("./pages/SubscriptionReviewQueue"),
+);
+const PremiumPlanManagement = lazy(
+  () => import("./pages/PremiumPlanManagement"),
+);
+const CommentsPage = lazy(() => import("./pages/CommentsPage"));
+>>>>>>> origin/feature/frontend-comment-community
 
 const RouteLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-600 font-semibold italic animate-pulse">
@@ -334,11 +373,16 @@ function App() {
                   isAuthenticated={effectiveIsAuthenticated}
                   userRole={effectiveRole}
                   defaultPath={defaultAuthenticatedPath}
+<<<<<<< HEAD
                   allowedRoles={['ADMIN']}
+=======
+                  allowedRoles={["ADMIN"]}
+>>>>>>> origin/feature/frontend-comment-community
                 >
                   <AdminDashboard />
                 </ProtectedRoute>
               }
+<<<<<<< HEAD
             />
             <Route
               path="/admin/audit-logs"
@@ -352,6 +396,8 @@ function App() {
                   <AuditLogPage />
                 </ProtectedRoute>
               }
+=======
+>>>>>>> origin/feature/frontend-comment-community
             />
             <Route
               path="/admin/exams"
