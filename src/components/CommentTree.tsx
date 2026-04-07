@@ -5,6 +5,7 @@ interface CommentTreeProps {
   comment: CommentNode;
   depth: number;
   activeReplyTargetId: number | null;
+  canReply: boolean;
   onReply: (commentId: number) => void;
   onCancelReply: () => void;
   onSubmitReply: (content: string, parentId: number) => void;
@@ -14,11 +15,12 @@ const CommentTree = ({
   comment,
   depth,
   activeReplyTargetId,
+  canReply,
   onReply,
   onCancelReply,
   onSubmitReply,
 }: CommentTreeProps) => {
-  const canReply = depth < 3;
+  const canReplyOnThisLevel = canReply && depth < 3;
 
   return (
     <div
@@ -37,7 +39,7 @@ const CommentTree = ({
         <span className="rounded-full bg-slate-100 px-3 py-1">
           Tầng {depth + 1}
         </span>
-        {canReply ? (
+        {canReplyOnThisLevel ? (
           <button
             type="button"
             onClick={() => onReply(comment.id)}
@@ -45,14 +47,14 @@ const CommentTree = ({
           >
             Reply
           </button>
-        ) : (
+        ) : depth < 3 ? null : (
           <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-400">
             Đã đạt tối đa tầng
           </span>
         )}
       </div>
 
-      {activeReplyTargetId === comment.id && canReply && (
+      {activeReplyTargetId === comment.id && canReplyOnThisLevel && (
         <div className="mt-5 rounded-[1.75rem] bg-slate-50 p-4 border border-slate-200">
           <CommentForm
             submitLabel="Gửi reply"
@@ -71,6 +73,7 @@ const CommentTree = ({
               comment={reply}
               depth={depth + 1}
               activeReplyTargetId={activeReplyTargetId}
+              canReply={canReply}
               onReply={onReply}
               onCancelReply={onCancelReply}
               onSubmitReply={onSubmitReply}
