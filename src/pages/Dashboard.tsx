@@ -164,7 +164,11 @@ const Dashboard: React.FC = () => {
                   Đừng để kiến thức trôi xa! Hoàn thành bài tập Spaced Repetition hôm nay để tối ưu trí nhớ dài hạn.
                 </p>
               </div>
-              <button className="self-start bg-white text-blue-700 px-8 py-4 rounded-2xl font-bold hover:shadow-lg hover:-translate-y-1 transition-all flex items-center gap-2 active:scale-95">
+              <button
+                type="button"
+                onClick={() => navigate('/dashboard/spaced-repetition')}
+                className="self-start bg-white text-blue-700 px-8 py-4 rounded-2xl font-bold hover:shadow-lg hover:-translate-y-1 transition-all flex items-center gap-2 active:scale-95"
+              >
                 Bắt đầu ngay <Zap className="w-4 h-4" />
               </button>
             </div>

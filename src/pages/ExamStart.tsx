@@ -24,7 +24,7 @@ const ExamStart: React.FC = () => {
   const [comments, setComments] = useState<CommentNode[]>([]);
   const [isLoadingComments, setIsLoadingComments] = useState(false);
   const [replyTargetId, setReplyTargetId] = useState<number | null>(null);
-  const [userId, setUserId] = useState("1");
+  const userId = 1;
 
   const loadComments = useCallback(async (examIdNumber: number) => {
     setIsLoadingComments(true);
@@ -44,7 +44,7 @@ const ExamStart: React.FC = () => {
     parentId: number | null = null,
   ) => {
     const payload = {
-      userId: Number(userId),
+      userId,
       targetId: examId,
       parentId,
       content,

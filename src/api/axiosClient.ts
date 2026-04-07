@@ -8,7 +8,6 @@ type AuthPayload = {
   role?: string;
 };
 
-<<<<<<< HEAD
 type AuthTokenApiResponse = {
   accessToken: string;
   refreshToken?: string;
@@ -19,10 +18,7 @@ type AuthTokenApiResponse = {
   refreshExpiresIn?: number;
 };
 
-export type AppRole = 'USER' | 'CONTRIBUTOR' | 'ADMIN';
-=======
 export type AppRole = "USER" | "CONTRIBUTOR" | "ADMIN";
->>>>>>> origin/feature/frontend-comment-community
 
 export type UserProfile = {
   id: number;
@@ -214,26 +210,15 @@ type RetryableRequestConfig = InternalAxiosRequestConfig & {
 const authApiBaseUrl =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:8081/api/v1/auth";
 const publicAuthPaths = new Set([
-<<<<<<< HEAD
-  '/login',
-  '/register',
-  '/register/resend-verification',
-  '/register/verify-email',
-  '/oauth2/exchange',
-  '/forgot-password',
-  '/forgot-password/resend',
-  '/forgot-password/verify-otp',
-  '/reset-password',
-=======
   "/login",
   "/register",
   "/register/resend-verification",
   "/register/verify-email",
+  "/oauth2/exchange",
   "/forgot-password",
   "/forgot-password/resend",
   "/forgot-password/verify-otp",
   "/reset-password",
->>>>>>> origin/feature/frontend-comment-community
 ]);
 export const AUTH_SESSION_CHANGED_EVENT = "auth-session-changed";
 export const SUBSCRIPTION_REVIEW_UPDATED_EVENT = "subscription-review-updated";

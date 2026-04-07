@@ -139,6 +139,7 @@ const CommentsPage = () => {
                 comment={comment}
                 depth={0}
                 activeReplyTargetId={replyTargetId}
+                canReply={true}
                 onReply={(commentId) => setReplyTargetId(commentId)}
                 onCancelReply={() => setReplyTargetId(null)}
                 onSubmitReply={(content, parentId) =>

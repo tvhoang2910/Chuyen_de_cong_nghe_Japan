@@ -1,4 +1,5 @@
 import axios from "axios";
+import type { InternalAxiosRequestConfig } from "axios";
 
 const apiBaseUrl =
   import.meta.env.VITE_COMMUNITY_API_BASE_URL ||
@@ -31,7 +32,7 @@ export const fetchCommentsByExam = async (
   return response.data;
 };
 
-client.interceptors.request.use((config: any) => {
+client.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = localStorage.getItem("access_token");
 
   if (token) {
