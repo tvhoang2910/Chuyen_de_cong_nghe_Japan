@@ -23,10 +23,10 @@ const SpacedRepetition: React.FC = () => {
       setDeckData(data);
     } catch (error) {
       if (axios.isAxiosError(error)) {
-        const detail = (error.response?.data as { message?: string } | undefined)?.message;
-        toast.error(detail || 'Khong the tai danh sach on tap SM-2.');
+        const detail = error.response?.data as { message?: string; detail?: string } | undefined;
+        toast.error(detail?.message || detail?.detail || 'Không thể tải danh sách ôn tập SM-2.');
       } else {
-        toast.error('Khong the tai danh sach on tap SM-2.');
+        toast.error('Không thể tải danh sách ôn tập SM-2.');
       }
       setDeckData(null);
     } finally {
@@ -39,7 +39,7 @@ const SpacedRepetition: React.FC = () => {
     void loadDecks(false);
   }, [loadDecks]);
 
-  const decks = deckData?.decks ?? [];
+  const decks = useMemo(() => deckData?.decks ?? [], [deckData]);
   const dueCount = deckData?.totalWrongQuestions ?? 0;
 
   const completionRate = useMemo(() => {
@@ -57,10 +57,10 @@ const SpacedRepetition: React.FC = () => {
             <div>
               <div className="inline-flex items-center gap-2 rounded-lg bg-white/20 px-3 py-1 text-xs font-semibold uppercase tracking-wider">
                 <Brain className="h-4 w-4" />
-                Hoc tap SM-2
+                Học tập SM-2
               </div>
-              <h1 className="mt-3 text-2xl font-bold">On tap thong minh tu study_service</h1>
-              <p className="mt-1 text-blue-100">Deck theo de thi, bam nut Luyen tap de mo trang cau hoi rieng cho moi de.</p>
+              <h1 className="mt-3 text-2xl font-bold">Ôn tập thông minh từ study_service</h1>
+              <p className="mt-1 text-blue-100">Deck theo đề thi, bấm nút Luyện tập để mở trang câu hỏi riêng cho mỗi đề.</p>
             </div>
             <button
               type="button"
@@ -69,21 +69,21 @@ const SpacedRepetition: React.FC = () => {
               className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-70"
             >
               <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-              Lam moi
+              Làm mới
             </button>
           </div>
 
           <div className="mt-5 grid gap-3 sm:grid-cols-3">
             <div className="rounded-xl bg-white/15 p-3 backdrop-blur-sm">
-              <p className="text-xs uppercase tracking-wider text-blue-100">Cau den han</p>
+              <p className="text-xs uppercase tracking-wider text-blue-100">Câu đến hạn</p>
               <p className="mt-1 text-2xl font-bold">{dueCount}</p>
             </div>
             <div className="rounded-xl bg-white/15 p-3 backdrop-blur-sm">
-              <p className="text-xs uppercase tracking-wider text-blue-100">So de can on</p>
+              <p className="text-xs uppercase tracking-wider text-blue-100">Số đề cần ôn</p>
               <p className="mt-1 text-2xl font-bold">{deckData?.deckCount ?? 0}</p>
             </div>
             <div className="rounded-xl bg-white/15 p-3 backdrop-blur-sm">
-              <p className="text-xs uppercase tracking-wider text-blue-100">Ti le co lich su on</p>
+              <p className="text-xs uppercase tracking-wider text-blue-100">Tỉ lệ có lịch sử ôn</p>
               <p className="mt-1 text-2xl font-bold">{completionRate}%</p>
             </div>
           </div>
@@ -91,12 +91,12 @@ const SpacedRepetition: React.FC = () => {
 
         <section className="space-y-4">
           {isLoading ? (
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 text-slate-500">Dang tai danh sach on tap...</div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 text-slate-500">Đang tải danh sách ôn tập...</div>
           ) : decks.length === 0 ? (
             <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center">
               <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-500" />
-              <h2 className="mt-3 text-lg font-bold text-slate-900">Khong co cau nao can on tap</h2>
-              <p className="mt-1 text-slate-500">Ban co the lam them de moi de he thong tiep tuc tao deck on tap.</p>
+              <h2 className="mt-3 text-lg font-bold text-slate-900">Không có câu nào cần ôn tập</h2>
+              <p className="mt-1 text-slate-500">Bạn có thể làm thêm đề mới để hệ thống tiếp tục tạo deck ôn tập.</p>
             </div>
           ) : (
             decks.map((deck) => {
@@ -106,9 +106,9 @@ const SpacedRepetition: React.FC = () => {
                 <article key={key} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <h3 className="text-lg font-bold text-slate-900">{deck.examTitle} - cac cau sai</h3>
+                      <h3 className="text-lg font-bold text-slate-900">{deck.examTitle} - các câu sai</h3>
                       <p className="text-sm text-slate-500">
-                        Lan lam gan nhat: {new Date(deck.latestSubmittedAt).toLocaleString('vi-VN')} • {deck.wrongQuestionCount} cau sai
+                        Lần làm gần nhất: {new Date(deck.latestSubmittedAt).toLocaleString('vi-VN')} • {deck.wrongQuestionCount} câu sai
                       </p>
                     </div>
                     <button
@@ -118,7 +118,7 @@ const SpacedRepetition: React.FC = () => {
                       }}
                       className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
                     >
-                      Luyen tap
+                      Luyện tập
                     </button>
                   </div>
                 </article>
