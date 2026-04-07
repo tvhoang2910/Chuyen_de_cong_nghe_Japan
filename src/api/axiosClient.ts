@@ -1,5 +1,5 @@
-import axios, { AxiosError } from 'axios';
-import type { InternalAxiosRequestConfig } from 'axios';
+import axios, { AxiosError } from "axios";
+import type { InternalAxiosRequestConfig } from "axios";
 
 type AuthPayload = {
   accessToken: string;
@@ -8,7 +8,7 @@ type AuthPayload = {
   role?: string;
 };
 
-export type AppRole = 'USER' | 'CONTRIBUTOR' | 'ADMIN';
+export type AppRole = "USER" | "CONTRIBUTOR" | "ADMIN";
 
 export type UserProfile = {
   id: number;
@@ -60,7 +60,7 @@ export type FetchAdminUsersParams = {
   page?: number;
   size?: number;
   search?: string;
-  role?: AppRole | '';
+  role?: AppRole | "";
 };
 
 export type CreateAdminUserPayload = {
@@ -127,7 +127,12 @@ export type CreatePremiumPlanPayload = {
   active?: boolean;
 };
 
-export type SubscriptionStatus = 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED' | 'EXPIRED' | 'CANCELLED';
+export type SubscriptionStatus =
+  | "PENDING_REVIEW"
+  | "APPROVED"
+  | "REJECTED"
+  | "EXPIRED"
+  | "CANCELLED";
 
 export type UserSubscriptionQueueItem = {
   id: number;
@@ -164,7 +169,7 @@ export type SubscriptionApprovalAudit = {
   reviewerId: number;
   reviewerEmail: string;
   reviewerRole: AppRole;
-  decision: 'APPROVED' | 'REJECTED';
+  decision: "APPROVED" | "REJECTED";
   previousStatus: SubscriptionStatus;
   newStatus: SubscriptionStatus;
   reviewNote?: string | null;
@@ -192,19 +197,20 @@ type RetryableRequestConfig = InternalAxiosRequestConfig & {
   _skipAuthRecovery?: boolean;
 };
 
-const authApiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1/auth';
+const authApiBaseUrl =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:8081/api/v1/auth";
 const publicAuthPaths = new Set([
-  '/login',
-  '/register',
-  '/register/resend-verification',
-  '/register/verify-email',
-  '/forgot-password',
-  '/forgot-password/resend',
-  '/forgot-password/verify-otp',
-  '/reset-password',
+  "/login",
+  "/register",
+  "/register/resend-verification",
+  "/register/verify-email",
+  "/forgot-password",
+  "/forgot-password/resend",
+  "/forgot-password/verify-otp",
+  "/reset-password",
 ]);
-export const AUTH_SESSION_CHANGED_EVENT = 'auth-session-changed';
-export const SUBSCRIPTION_REVIEW_UPDATED_EVENT = 'subscription-review-updated';
+export const AUTH_SESSION_CHANGED_EVENT = "auth-session-changed";
+export const SUBSCRIPTION_REVIEW_UPDATED_EVENT = "subscription-review-updated";
 
 const notifyAuthSessionChanged = () => {
   globalThis.dispatchEvent(new Event(AUTH_SESSION_CHANGED_EVENT));
@@ -213,14 +219,14 @@ const notifyAuthSessionChanged = () => {
 const axiosClient = axios.create({
   baseURL: authApiBaseUrl,
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   },
 });
 
 const refreshClient = axios.create({
   baseURL: authApiBaseUrl,
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   },
 });
 
@@ -231,7 +237,9 @@ type CacheEntry<T> = {
   data: T;
 };
 
-const DEFAULT_GET_CACHE_TTL_MS = Number(import.meta.env.VITE_GET_CACHE_TTL_MS ?? 5000);
+const DEFAULT_GET_CACHE_TTL_MS = Number(
+  import.meta.env.VITE_GET_CACHE_TTL_MS ?? 5000,
+);
 const responseCache = new Map<string, CacheEntry<unknown>>();
 const inflightGetRequests = new Map<string, Promise<unknown>>();
 
@@ -247,7 +255,11 @@ const getCached = <T>(cacheKey: string): T | null => {
   return entry.data as T;
 };
 
-const setCached = <T>(cacheKey: string, data: T, ttlMs = DEFAULT_GET_CACHE_TTL_MS) => {
+const setCached = <T>(
+  cacheKey: string,
+  data: T,
+  ttlMs = DEFAULT_GET_CACHE_TTL_MS,
+) => {
   responseCache.set(cacheKey, {
     data,
     expiresAt: Date.now() + ttlMs,
@@ -296,24 +308,24 @@ const withCachedGet = async <T>(
 };
 
 export const persistAuthSession = (payload: AuthPayload) => {
-  localStorage.setItem('access_token', payload.accessToken);
+  localStorage.setItem("access_token", payload.accessToken);
   if (payload.refreshToken) {
-    localStorage.setItem('refresh_token', payload.refreshToken);
+    localStorage.setItem("refresh_token", payload.refreshToken);
   }
   if (payload.email) {
-    localStorage.setItem('user_email', payload.email);
+    localStorage.setItem("user_email", payload.email);
   }
   if (payload.role) {
-    localStorage.setItem('user_role', payload.role);
+    localStorage.setItem("user_role", payload.role);
   }
   notifyAuthSessionChanged();
 };
 
 export const clearAuthSession = () => {
-  localStorage.removeItem('access_token');
-  localStorage.removeItem('refresh_token');
-  localStorage.removeItem('user_email');
-  localStorage.removeItem('user_role');
+  localStorage.removeItem("access_token");
+  localStorage.removeItem("refresh_token");
+  localStorage.removeItem("user_email");
+  localStorage.removeItem("user_role");
   clearAllApiCache();
   notifyAuthSessionChanged();
 };
@@ -323,65 +335,86 @@ export const notifySubscriptionReviewUpdated = () => {
 };
 
 export const getCurrentSessionRole = (): AppRole | null => {
-  const role = localStorage.getItem('user_role');
-  return role === 'USER' || role === 'CONTRIBUTOR' || role === 'ADMIN' ? role : null;
+  const role = localStorage.getItem("user_role");
+  return role === "USER" || role === "CONTRIBUTOR" || role === "ADMIN"
+    ? role
+    : null;
 };
 
 export const fetchCurrentUserProfile = async (): Promise<UserProfile> => {
-  return withCachedGet<UserProfile>('profile:me', async () => {
-    const response = await axiosClient.get<UserProfile>('/me');
-    return response.data;
-  }, 3000);
+  return withCachedGet<UserProfile>(
+    "profile:me",
+    async () => {
+      const response = await axiosClient.get<UserProfile>("/me");
+      return response.data;
+    },
+    3000,
+  );
 };
 
-export const updateCurrentUserProfile = async (payload: UpdateMyProfilePayload): Promise<UserProfile> => {
-  const response = await axiosClient.patch<UserProfile>('/me', payload);
-  setCached('profile:me', response.data, 3000);
+export const updateCurrentUserProfile = async (
+  payload: UpdateMyProfilePayload,
+): Promise<UserProfile> => {
+  const response = await axiosClient.patch<UserProfile>("/me", payload);
+  setCached("profile:me", response.data, 3000);
   return response.data;
 };
 
-export const uploadCurrentUserAvatar = async (file: File): Promise<UserProfile> => {
+export const uploadCurrentUserAvatar = async (
+  file: File,
+): Promise<UserProfile> => {
   const formData = new FormData();
-  formData.append('file', file);
+  formData.append("file", file);
 
-  const response = await axiosClient.post<UserProfile>('/me/avatar', formData, {
+  const response = await axiosClient.post<UserProfile>("/me/avatar", formData, {
     headers: {
-      'Content-Type': 'multipart/form-data',
+      "Content-Type": "multipart/form-data",
     },
   });
-  setCached('profile:me', response.data, 3000);
+  setCached("profile:me", response.data, 3000);
   return response.data;
 };
 
-export const fetchAdminUsers = async (params: FetchAdminUsersParams): Promise<AdminUsersPage> => {
+export const fetchAdminUsers = async (
+  params: FetchAdminUsersParams,
+): Promise<AdminUsersPage> => {
   const query = new URLSearchParams();
   const page = params.page ?? 0;
   const size = params.size ?? 10;
-  const search = params.search?.trim() ?? '';
-  const role = params.role ?? '';
+  const search = params.search?.trim() ?? "";
+  const role = params.role ?? "";
 
-  query.set('page', String(page));
-  query.set('size', String(size));
+  query.set("page", String(page));
+  query.set("size", String(size));
   if (search) {
-    query.set('search', search);
+    query.set("search", search);
   }
   if (role) {
-    query.set('role', role);
+    query.set("role", role);
   }
 
   const cacheKey = `admin:users:${page}:${size}:${search}:${role}`;
-  return withCachedGet<AdminUsersPage>(cacheKey, async () => {
-    const response = await axiosClient.get<AdminUsersPage>(
-      `/admin/users?${query.toString()}`,
-      { _skipAuthRecovery: true } as RetryableRequestConfig,
-    );
-    return response.data;
-  }, 2000);
+  return withCachedGet<AdminUsersPage>(
+    cacheKey,
+    async () => {
+      const response = await axiosClient.get<AdminUsersPage>(
+        `/admin/users?${query.toString()}`,
+        { _skipAuthRecovery: true } as RetryableRequestConfig,
+      );
+      return response.data;
+    },
+    2000,
+  );
 };
 
-export const createAdminUser = async (payload: CreateAdminUserPayload): Promise<AdminUserItem> => {
-  const response = await axiosClient.post<AdminUserItem>('/admin/users', payload);
-  invalidateCacheByPrefix('admin:users:');
+export const createAdminUser = async (
+  payload: CreateAdminUserPayload,
+): Promise<AdminUserItem> => {
+  const response = await axiosClient.post<AdminUserItem>(
+    "/admin/users",
+    payload,
+  );
+  invalidateCacheByPrefix("admin:users:");
   return response.data;
 };
 
@@ -389,8 +422,11 @@ export const updateAdminUserStatus = async (
   userId: number,
   payload: UpdateAdminUserStatusPayload,
 ): Promise<AdminUserItem> => {
-  const response = await axiosClient.put<AdminUserItem>(`/admin/users/${userId}/status`, payload);
-  invalidateCacheByPrefix('admin:users:');
+  const response = await axiosClient.put<AdminUserItem>(
+    `/admin/users/${userId}/status`,
+    payload,
+  );
+  invalidateCacheByPrefix("admin:users:");
   return response.data;
 };
 
@@ -398,34 +434,59 @@ export const updateAdminUserRole = async (
   userId: number,
   payload: UpdateAdminUserRolePayload,
 ): Promise<AdminUserItem> => {
-  const response = await axiosClient.put<AdminUserItem>(`/admin/users/${userId}/role`, payload);
-  invalidateCacheByPrefix('admin:users:');
+  const response = await axiosClient.put<AdminUserItem>(
+    `/admin/users/${userId}/role`,
+    payload,
+  );
+  invalidateCacheByPrefix("admin:users:");
   return response.data;
 };
 
-export const importAdminUsers = async (payload: ImportAdminUsersPayload): Promise<ImportAdminUsersResponse> => {
-  const response = await axiosClient.post<ImportAdminUsersResponse>('/admin/users/import-json', payload);
-  invalidateCacheByPrefix('admin:users:');
+export const importAdminUsers = async (
+  payload: ImportAdminUsersPayload,
+): Promise<ImportAdminUsersResponse> => {
+  const response = await axiosClient.post<ImportAdminUsersResponse>(
+    "/admin/users/import-json",
+    payload,
+  );
+  invalidateCacheByPrefix("admin:users:");
   return response.data;
 };
 
 export const fetchPremiumPlans = async (): Promise<PremiumPlanSummary[]> => {
-  return withCachedGet<PremiumPlanSummary[]>('subscription:plans:active', async () => {
-    const response = await axiosClient.get<PremiumPlanSummary[]>('/subscriptions/plans');
-    return response.data;
-  });
+  return withCachedGet<PremiumPlanSummary[]>(
+    "subscription:plans:active",
+    async () => {
+      const response = await axiosClient.get<PremiumPlanSummary[]>(
+        "/subscriptions/plans",
+      );
+      return response.data;
+    },
+  );
 };
 
-export const fetchManagedPremiumPlans = async (): Promise<PremiumPlanSummary[]> => {
-  return withCachedGet<PremiumPlanSummary[]>('subscription:plans:manage', async () => {
-    const response = await axiosClient.get<PremiumPlanSummary[]>('/subscriptions/plans/manage');
-    return response.data;
-  });
+export const fetchManagedPremiumPlans = async (): Promise<
+  PremiumPlanSummary[]
+> => {
+  return withCachedGet<PremiumPlanSummary[]>(
+    "subscription:plans:manage",
+    async () => {
+      const response = await axiosClient.get<PremiumPlanSummary[]>(
+        "/subscriptions/plans/manage",
+      );
+      return response.data;
+    },
+  );
 };
 
-export const createPremiumPlan = async (payload: CreatePremiumPlanPayload): Promise<PremiumPlanSummary> => {
-  const response = await axiosClient.post<PremiumPlanSummary>('/subscriptions/plans', payload);
-  invalidateCacheByPrefix('subscription:plans:');
+export const createPremiumPlan = async (
+  payload: CreatePremiumPlanPayload,
+): Promise<PremiumPlanSummary> => {
+  const response = await axiosClient.post<PremiumPlanSummary>(
+    "/subscriptions/plans",
+    payload,
+  );
+  invalidateCacheByPrefix("subscription:plans:");
   return response.data;
 };
 
@@ -433,65 +494,79 @@ export const createSubscriptionPurchaseRequest = async (
   payload: CreateSubscriptionPurchaseRequestPayload,
 ): Promise<UserSubscriptionQueueItem> => {
   const formData = new FormData();
-  formData.append('planId', String(payload.planId));
-  formData.append('bill', payload.bill);
+  formData.append("planId", String(payload.planId));
+  formData.append("bill", payload.bill);
   if (payload.paymentMethod?.trim()) {
-    formData.append('paymentMethod', payload.paymentMethod.trim());
+    formData.append("paymentMethod", payload.paymentMethod.trim());
   }
   if (payload.transactionRef?.trim()) {
-    formData.append('transactionRef', payload.transactionRef.trim());
+    formData.append("transactionRef", payload.transactionRef.trim());
   }
   if (payload.promoCode?.trim()) {
-    formData.append('promoCode', payload.promoCode.trim());
+    formData.append("promoCode", payload.promoCode.trim());
   }
-  if (typeof payload.trial === 'boolean') {
-    formData.append('trial', String(payload.trial));
+  if (typeof payload.trial === "boolean") {
+    formData.append("trial", String(payload.trial));
   }
 
-  const response = await axiosClient.post<UserSubscriptionQueueItem>('/subscriptions/purchase-requests', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
+  const response = await axiosClient.post<UserSubscriptionQueueItem>(
+    "/subscriptions/purchase-requests",
+    formData,
+    {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
     },
-  });
-  invalidateCacheByPrefix('subscription:my-requests');
-  invalidateCacheByPrefix('subscription:review-queue:');
+  );
+  invalidateCacheByPrefix("subscription:my-requests");
+  invalidateCacheByPrefix("subscription:review-queue:");
   return response.data;
 };
 
-export const fetchMySubscriptionRequests = async (): Promise<UserSubscriptionQueueItem[]> => {
-  return withCachedGet<UserSubscriptionQueueItem[]>('subscription:my-requests', async () => {
-    const response = await axiosClient.get<UserSubscriptionQueueItem[]>(
-      '/subscriptions/my-requests',
-      { _skipAuthRecovery: true } as RetryableRequestConfig,
-    );
-    return response.data;
-  });
+export const fetchMySubscriptionRequests = async (): Promise<
+  UserSubscriptionQueueItem[]
+> => {
+  return withCachedGet<UserSubscriptionQueueItem[]>(
+    "subscription:my-requests",
+    async () => {
+      const response = await axiosClient.get<UserSubscriptionQueueItem[]>(
+        "/subscriptions/my-requests",
+        { _skipAuthRecovery: true } as RetryableRequestConfig,
+      );
+      return response.data;
+    },
+  );
 };
 
 export const fetchSubscriptionReviewQueue = async (
   page = 0,
   size = 10,
-  status: SubscriptionStatus = 'PENDING_REVIEW',
+  status: SubscriptionStatus = "PENDING_REVIEW",
 ): Promise<SubscriptionQueuePage> => {
   const cacheKey = `subscription:review-queue:${status}:${page}:${size}`;
-  return withCachedGet<SubscriptionQueuePage>(cacheKey, async () => {
-    const query = new URLSearchParams();
-    query.set('page', String(page));
-    query.set('size', String(size));
-    query.set('status', status);
+  return withCachedGet<SubscriptionQueuePage>(
+    cacheKey,
+    async () => {
+      const query = new URLSearchParams();
+      query.set("page", String(page));
+      query.set("size", String(size));
+      query.set("status", status);
 
-    const response = await axiosClient.get<SubscriptionQueuePage>(
-      `/subscriptions/review-queue?${query.toString()}`,
-      { _skipAuthRecovery: true } as RetryableRequestConfig,
-    );
-    return response.data;
-  }, 2500);
+      const response = await axiosClient.get<SubscriptionQueuePage>(
+        `/subscriptions/review-queue?${query.toString()}`,
+        { _skipAuthRecovery: true } as RetryableRequestConfig,
+      );
+      return response.data;
+    },
+    2500,
+  );
 };
 
-export const fetchPendingSubscriptionReviewCount = async (): Promise<number> => {
-  const page = await fetchSubscriptionReviewQueue(0, 1, 'PENDING_REVIEW');
-  return page.totalElements;
-};
+export const fetchPendingSubscriptionReviewCount =
+  async (): Promise<number> => {
+    const page = await fetchSubscriptionReviewQueue(0, 1, "PENDING_REVIEW");
+    return page.totalElements;
+  };
 
 export const reviewSubscriptionPurchaseRequest = async (
   subscriptionId: number,
@@ -501,8 +576,8 @@ export const reviewSubscriptionPurchaseRequest = async (
     `/subscriptions/purchase-requests/${subscriptionId}/review`,
     payload,
   );
-  invalidateCacheByPrefix('subscription:review-queue:');
-  invalidateCacheByPrefix('subscription:my-requests');
+  invalidateCacheByPrefix("subscription:review-queue:");
+  invalidateCacheByPrefix("subscription:my-requests");
   return response.data;
 };
 
@@ -516,12 +591,12 @@ export const fetchSubscriptionApprovalAudits = async (
 };
 
 axiosClient.interceptors.request.use((config) => {
-  const requestPath = config.url ?? '';
+  const requestPath = config.url ?? "";
   if (publicAuthPaths.has(requestPath)) {
     return config;
   }
 
-  const token = localStorage.getItem('access_token');
+  const token = localStorage.getItem("access_token");
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -529,12 +604,12 @@ axiosClient.interceptors.request.use((config) => {
 });
 
 const requestNewAccessToken = async (): Promise<string | null> => {
-  const refreshToken = localStorage.getItem('refresh_token');
+  const refreshToken = localStorage.getItem("refresh_token");
   if (!refreshToken) {
     return null;
   }
 
-  const response = await refreshClient.post('/refresh', { refreshToken });
+  const response = await refreshClient.post("/refresh", { refreshToken });
   const accessToken = response.data?.accessToken as string | undefined;
 
   if (!accessToken) {
