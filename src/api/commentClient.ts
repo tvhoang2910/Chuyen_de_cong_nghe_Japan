@@ -5,10 +5,17 @@ const apiBaseUrl =
   import.meta.env.VITE_COMMUNITY_API_BASE_URL ||
   "http://localhost:8080/api/v1/community";
 
+export type VoteType = "UP" | "DOWN" | "NONE";
+
 export type CommentNode = {
   id: number;
   content: string;
   replies: CommentNode[];
+  upvotes: number;
+  downvotes: number;
+  pinned: boolean;
+  replyCount: number;
+  userVote: VoteType;
 };
 
 export type CreateCommentPayload = {
@@ -44,6 +51,25 @@ client.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 
 export const createComment = async (payload: CreateCommentPayload) => {
   const response = await client.post("/comments", payload);
+  return response.data;
+};
+
+export type VotePayload = { voteType: VoteType };
+export type PinPayload = { pinned: boolean };
+
+export const voteComment = async (commentId: number, payload: VotePayload) => {
+  const response = await client.post<CommentNode>(
+    `/comments/${commentId}/vote`,
+    payload,
+  );
+  return response.data;
+};
+
+export const pinComment = async (commentId: number, payload: PinPayload) => {
+  const response = await client.post<CommentNode>(
+    `/comments/${commentId}/pin`,
+    payload,
+  );
   return response.data;
 };
 
