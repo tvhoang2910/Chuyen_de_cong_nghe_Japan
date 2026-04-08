@@ -147,6 +147,8 @@ const CommentTree = ({
             type="button"
             onClick={() => handleVote(upvoteActive ? "NONE" : "UP")}
             disabled={voting}
+            aria-label="upvote"
+            data-testid="upvote-btn"
             title="Upvote"
             className={`flex items-center gap-1 rounded-full px-2 py-1 transition ${
               upvoteActive
@@ -162,6 +164,8 @@ const CommentTree = ({
             type="button"
             onClick={() => handleVote(downvoteActive ? "NONE" : "DOWN")}
             disabled={voting}
+            aria-label="downvote"
+            data-testid="downvote-btn"
             title="Downvote"
             className={`flex items-center gap-1 rounded-full px-2 py-1 transition ${
               downvoteActive
@@ -185,6 +189,8 @@ const CommentTree = ({
             type="button"
             onClick={handlePin}
             disabled={pinning}
+            aria-label={localPinned ? "bo ghim" : "ghim"}
+            data-testid="pin-btn"
             title="Ghim / Bỏ ghim bình luận"
             className={`flex items-center gap-1 rounded-full px-3 py-1 font-semibold transition ${
               localPinned

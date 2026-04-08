@@ -242,7 +242,7 @@ function App() {
                   isAuthenticated={effectiveIsAuthenticated}
                   userRole={effectiveRole}
                   defaultPath={defaultAuthenticatedPath}
-                  allowedRoles={['USER']}
+                  allowedRoles={['USER', 'ADMIN', 'CONTRIBUTOR', 'TEACHER']}
                 >
                   <CommentsPage />
                 </ProtectedRoute>

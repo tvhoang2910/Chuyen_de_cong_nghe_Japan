@@ -6,7 +6,7 @@ import CommentForm from "../components/CommentForm";
 describe("CommentForm component", () => {
   const defaultProps = {
     submitLabel: "Gửi bình luận",
-    onSubmit: vi.fn<(content: string) => void>(),
+    onSubmit: vi.fn(),
   };
 
   beforeEach(() => {

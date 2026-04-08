@@ -36,7 +36,7 @@ const ExamAttempt: React.FC = () => {
   const questionMetaRef = useRef<Record<number, QuestionState>>({});
   const initializedExamIdRef = useRef<number | null>(null);
   const pendingAnswersRef = useRef<Record<number, SaveAttemptAnswerPayload>>({});
-  const flushTimerRef = useRef<number | null>(null);
+  const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isFlushingRef = useRef(false);
 
   const flushPendingAnswers = useCallback(async () => {

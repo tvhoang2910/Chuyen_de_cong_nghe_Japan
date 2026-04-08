@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import axios from "axios";
 import {
   fetchCommentsByExam,
   createComment,
@@ -21,32 +20,23 @@ Object.defineProperty(globalThis, "localStorage", {
 });
 
 // --- Mock axios ---
-vi.mock("axios", () => {
-  const mockAxiosInstance = {
+const { mockClient } = vi.hoisted(() => ({
+  mockClient: {
     get: vi.fn(),
     post: vi.fn(),
     interceptors: {
       request: { use: vi.fn() },
     },
-  };
+  },
+}));
+
+vi.mock("axios", () => {
   return {
-    default: vi.fn(() => mockAxiosInstance),
-    create: vi.fn(() => mockAxiosInstance),
+    default: {
+      create: vi.fn(() => mockClient),
+    },
   };
 });
-
-const mockAxios = axios as ReturnType<typeof vi.fn> & {
-  get: ReturnType<typeof vi.fn>;
-  post: ReturnType<typeof vi.fn>;
-};
-
-const mockClient = axios as unknown as ReturnType<typeof vi.fn> & {
-  get: ReturnType<typeof vi.fn>;
-  post: ReturnType<typeof vi.fn>;
-  interceptors: {
-    request: { use: ReturnType<typeof vi.fn> };
-  };
-};
 
 // --- Fixtures ---
 const commentNode: CommentNode = {

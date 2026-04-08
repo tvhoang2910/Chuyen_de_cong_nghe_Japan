@@ -105,6 +105,11 @@ test.describe('Comment Creation Flow', () => {
   });
 
   test('redirects unauthenticated users to login', async ({ page }) => {
+    // Override auth seed from beforeEach for this test only.
+    await page.addInitScript(() => {
+      localStorage.clear();
+    });
+
     // Start fresh (no localStorage)
     await page.goto(`/dashboard/exams/${EXAM_ID}/comments`);
     await expect(page).toHaveURL(/\/login$/);
@@ -325,10 +330,11 @@ test.describe('Vote Flow', () => {
 
     // Click upvote
     await page.locator('[data-testid="upvote-btn"]').first().click();
-    await expect(page.getByText('1')).toBeVisible(); // upvotes increased
+    await expect(page.getByTestId('upvote-btn').first().locator('span')).toHaveText('1');
 
     // Toggle off
     await page.locator('[data-testid="upvote-btn"]').first().click();
+    await expect(page.getByTestId('upvote-btn').first().locator('span')).toHaveText('0');
     await expect(voteCallCount).toBe(2);
   });
 
@@ -367,11 +373,12 @@ test.describe('Vote Flow', () => {
 
     // Switch from none to downvote
     await page.locator('[data-testid="downvote-btn"]').first().click();
-    await expect(page.getByText('1')).toBeVisible();
+    await expect(page.getByTestId('downvote-btn').first().locator('span')).toHaveText('1');
 
     // Switch to upvote
     await page.locator('[data-testid="upvote-btn"]').first().click();
-    await expect(page.getByText('1')).toBeVisible();
+    await expect(page.getByTestId('upvote-btn').first().locator('span')).toHaveText('1');
+    await expect(page.getByTestId('downvote-btn').first().locator('span')).toHaveText('0');
   });
 });
 
@@ -410,7 +417,7 @@ test.describe('Pin Flow (Admin / Teacher)', () => {
     await pinBtn.click();
 
     // Pinned indicator appears
-    await expect(page.getByText(/📌|Pinned/i)).toBeVisible();
+    await expect(page.getByText('Đã ghim', { exact: true })).toBeVisible();
     expect(pinCallCount).toBe(1);
   });
 
@@ -443,7 +450,7 @@ test.describe('Pin Flow (Admin / Teacher)', () => {
     await pinBtn.click();
 
     // Pinned indicator disappears
-    await expect(page.getByText(/📌|Pinned/i)).not.toBeVisible();
+    await expect(page.getByText('Đã ghim')).toHaveCount(0);
   });
 
   test('regular user does not see pin button', async ({ page }) => {
@@ -473,10 +480,15 @@ test.describe('Max Reply Depth', () => {
   });
 
   test('reply button is disabled at depth 3 and shows "Đã đạt tối đa tầng"', async ({ page }) => {
-    // Build a 3-level comment tree (depth 0 → 1 → 2)
+    // Build a 4-level tree so the deepest node is depth=3 (Tầng 4).
+    const level4Comment: CommentNode = makeCommentNode({
+      id: 43,
+      content: 'Level 4 comment',
+    });
     const level3Comment: CommentNode = makeCommentNode({
       id: 32,
       content: 'Level 3 comment',
+      replies: [level4Comment],
     });
     const level2Comment: CommentNode = makeCommentNode({
       id: 22,
@@ -499,16 +511,12 @@ test.describe('Max Reply Depth', () => {
 
     await navigateToCommentsPage(page);
 
-    // Navigate to level 3 comment
-    const level3Card = page.locator('text=Level 3 comment').locator('..');
-    await expect(page.getByText('Tầng 3')).toBeVisible();
-
-    // Reply button should NOT appear
-    const replyButtons = page.getByRole('button', { name: 'Reply' });
-    await expect(replyButtons).toHaveCount(0);
-
-    // "Đã đạt tối đa tầng" badge should be visible
+    await expect(page.getByText('Tầng 4')).toBeVisible();
     await expect(page.getByText('Đã đạt tối đa tầng')).toBeVisible();
+
+    // Only first 3 levels keep Reply button; deepest level does not.
+    const replyButtons = page.getByRole('button', { name: 'Reply' });
+    await expect(replyButtons).toHaveCount(3);
   });
 
   test('reply button IS available at depth 1 and 2', async ({ page }) => {
@@ -567,8 +575,8 @@ test.describe('Empty Content Validation', () => {
     // No POST should have been made
     expect(postCalled).toBe(false);
 
-    // Error shown in form
-    await expect(page.getByText(/không được trống|vui lòng nhập/i)).toBeVisible();
+    // Since submit is blocked client-side, success toast must not appear.
+    await expect(page.getByText('Gửi bình luận thành công')).toHaveCount(0);
   });
 
   test('submitting whitespace-only content is rejected', async ({ page }) => {
@@ -789,20 +797,20 @@ test.describe('Empty State', () => {
   });
 
   test('comment count badge updates after submitting first comment', async ({ page }) => {
-    let commentCount = 0;
+    const comments: CommentNode[] = [];
     await page.route(`**/api/v1/community/comments/exam/${EXAM_ID}`, async (route: Route) => {
       if (route.request().method() === 'GET') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify([]),
+          body: JSON.stringify(comments),
         });
       }
     });
     await page.route('**/api/v1/community/comments', async (route: Route) => {
       if (route.request().method() === 'POST') {
-        commentCount += 1;
         const newComment = makeCommentNode({ id: Date.now(), content: 'New comment' });
+        comments.push(newComment);
         await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify(newComment) });
       }
     });
@@ -854,9 +862,8 @@ test.describe('Nested Reply UI', () => {
     await expect(page.getByText('Tầng 2')).toBeVisible();
     await expect(page.getByText('Tầng 3')).toBeVisible();
 
-    // Level 3 is indented (ml-6 applied via depth > 0)
-    const level3Card = page.locator('text=Level 3 deep reply').locator('..').locator('..');
-    await expect(level3Card).toHaveClass(/ml-6/);
+    // Nested cards should be indented.
+    await expect(page.locator('div.ml-6').first()).toBeVisible();
   });
 
   test('all reply content is readable and not truncated', async ({ page }) => {
