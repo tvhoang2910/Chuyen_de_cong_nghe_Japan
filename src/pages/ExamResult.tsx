@@ -8,7 +8,9 @@ import { fetchAttemptResult, type AttemptResult } from "../api/examClient";
 import {
   createComment,
   fetchCommentsByExam,
+  pinComment,
   type CommentNode,
+  voteComment,
 } from "../api/commentClient";
 
 const ExamResult: React.FC = () => {
@@ -18,7 +20,7 @@ const ExamResult: React.FC = () => {
   const [result, setResult] = useState<AttemptResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [comments, setComments] = useState<CommentNode[]>([]);
-  const [userId, setUserId] = useState(1); // Default user ID, adjust as needed
+  const [userId] = useState(1); // Default user ID, adjust as needed
   const [replyTargetId, setReplyTargetId] = useState<number | null>(null);
 
   const loadComments = useCallback(async () => {
@@ -51,6 +53,26 @@ const ExamResult: React.FC = () => {
     } catch (error) {
       console.error(error);
       toast.error("Gửi bình luận thất bại.");
+    }
+  };
+
+  const handleVote = async (commentId: number, voteType: "UP" | "DOWN") => {
+    try {
+      await voteComment(commentId, voteType);
+      await loadComments();
+    } catch (error) {
+      console.error(error);
+      toast.error("Không thể cập nhật lượt thích.");
+    }
+  };
+
+  const handleTogglePin = async (commentId: number, pinned: boolean) => {
+    try {
+      await pinComment(commentId, pinned);
+      await loadComments();
+    } catch (error) {
+      console.error(error);
+      toast.error("Không thể cập nhật trạng thái ghim.");
     }
   };
 
@@ -186,11 +208,14 @@ const ExamResult: React.FC = () => {
                   comment={comment}
                   depth={0}
                   activeReplyTargetId={replyTargetId}
+                  canReply
                   onReply={(commentId) => setReplyTargetId(commentId)}
                   onCancelReply={() => setReplyTargetId(null)}
                   onSubmitReply={(content, parentId) =>
                     handleCommentSubmit(content, parentId)
                   }
+                  onVote={handleVote}
+                  onTogglePin={handleTogglePin}
                 />
               ))
             )}

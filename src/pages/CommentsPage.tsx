@@ -4,7 +4,12 @@ import toast from "react-hot-toast";
 import CommentForm from "../components/CommentForm";
 import CommentTree from "../components/CommentTree";
 import type { CommentNode } from "../api/commentClient";
-import { createComment, fetchCommentsByExam } from "../api/commentClient";
+import {
+  createComment,
+  fetchCommentsByExam,
+  pinComment,
+  voteComment,
+} from "../api/commentClient";
 
 const CommentsPage = () => {
   const { examId } = useParams<{ examId: string }>();
@@ -51,7 +56,34 @@ const CommentsPage = () => {
     }
   };
 
+  const handleVote = async (commentId: number, voteType: "UP" | "DOWN") => {
+    try {
+      await voteComment(commentId, voteType);
+      await loadComments();
+    } catch (error) {
+      console.error(error);
+      toast.error("Không thể cập nhật lượt thích.");
+    }
+  };
+
+  const handleTogglePin = async (commentId: number, pinned: boolean) => {
+    try {
+      await pinComment(commentId, pinned);
+      await loadComments();
+    } catch (error) {
+      console.error(error);
+      toast.error("Không thể cập nhật trạng thái ghim.");
+    }
+  };
+
+  const countTotalComments = (nodes: CommentNode[]): number =>
+    nodes.reduce(
+      (total, node) => total + 1 + countTotalComments(node.replies ?? []),
+      0,
+    );
+
   const topLevelCount = useMemo(() => comments.length, [comments]);
+  const totalCount = useMemo(() => countTotalComments(comments), [comments]);
 
   return (
     <div className="space-y-8">
@@ -66,7 +98,7 @@ const CommentsPage = () => {
             </h2>
           </div>
           <div className="rounded-3xl bg-slate-100 px-4 py-3 text-sm font-medium text-slate-700">
-            {topLevelCount} bình luận gốc
+            {topLevelCount} bình luận gốc · {totalCount} tổng comment/reply
           </div>
         </div>
 
@@ -139,11 +171,14 @@ const CommentsPage = () => {
                 comment={comment}
                 depth={0}
                 activeReplyTargetId={replyTargetId}
+                canReply
                 onReply={(commentId) => setReplyTargetId(commentId)}
                 onCancelReply={() => setReplyTargetId(null)}
                 onSubmitReply={(content, parentId) =>
                   handleSubmit(content, parentId)
                 }
+                onVote={handleVote}
+                onTogglePin={handleTogglePin}
               />
             ))}
           </div>

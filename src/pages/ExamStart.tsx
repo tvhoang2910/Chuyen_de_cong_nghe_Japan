@@ -5,7 +5,12 @@ import MainLayout from "../components/MainLayout";
 import CommentForm from "../components/CommentForm";
 import CommentTree from "../components/CommentTree";
 import type { CommentNode } from "../api/commentClient";
-import { createComment, fetchCommentsByExam } from "../api/commentClient";
+import {
+  createComment,
+  fetchCommentsByExam,
+  pinComment,
+  voteComment,
+} from "../api/commentClient";
 import {
   fetchMyAttemptHistory,
   fetchPublicExamDetail,
@@ -24,7 +29,7 @@ const ExamStart: React.FC = () => {
   const [comments, setComments] = useState<CommentNode[]>([]);
   const [isLoadingComments, setIsLoadingComments] = useState(false);
   const [replyTargetId, setReplyTargetId] = useState<number | null>(null);
-  const [userId, setUserId] = useState("1");
+  const [userId] = useState("1");
 
   const loadComments = useCallback(async (examIdNumber: number) => {
     setIsLoadingComments(true);
@@ -58,6 +63,26 @@ const ExamStart: React.FC = () => {
     } catch (error) {
       console.error(error);
       toast.error("Gửi bình luận thất bại.");
+    }
+  };
+
+  const handleVote = async (commentId: number, voteType: "UP" | "DOWN") => {
+    try {
+      await voteComment(commentId, voteType);
+      await loadComments(examId);
+    } catch (error) {
+      console.error(error);
+      toast.error("Không thể cập nhật lượt thích.");
+    }
+  };
+
+  const handleTogglePin = async (commentId: number, pinned: boolean) => {
+    try {
+      await pinComment(commentId, pinned);
+      await loadComments(examId);
+    } catch (error) {
+      console.error(error);
+      toast.error("Không thể cập nhật trạng thái ghim.");
     }
   };
 
@@ -278,6 +303,8 @@ const ExamStart: React.FC = () => {
                   onSubmitReply={(content, parentId) =>
                     handleCommentSubmit(content, parentId)
                   }
+                  onVote={handleVote}
+                  onTogglePin={handleTogglePin}
                 />
               ))
             )}
