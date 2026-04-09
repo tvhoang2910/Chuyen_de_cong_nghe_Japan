@@ -13,6 +13,7 @@ import {
   fetchCommentsByExam,
   type CommentNode,
 } from "../api/commentClient";
+import { resolveCommentSubmitErrorMessage } from "../api/commentHelpers";
 
 const ExamResult: React.FC = () => {
   const params = useParams();
@@ -62,7 +63,8 @@ const ExamResult: React.FC = () => {
       await loadComments();
     } catch (error) {
       console.error(error);
-      toast.error("Gửi bình luận thất bại.");
+      const errorMessage = resolveCommentSubmitErrorMessage(error);
+      toast.error(errorMessage);
     }
   };
 

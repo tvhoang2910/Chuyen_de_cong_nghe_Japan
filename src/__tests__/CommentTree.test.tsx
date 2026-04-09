@@ -21,7 +21,12 @@ vi.mock("../api/commentClient", () => ({
 // ── Fixture helpers ───────────────────────────────────────────────────────────
 const baseComment: CommentNode = {
   id: 1,
+  userId: 10,
+  authorName: "Teacher One",
+  parentId: null,
+  replyToUserId: null,
   content: "This is the root comment content",
+  createdAt: "2026-04-09T10:00:00.000Z",
   replies: [],
   upvotes: 5,
   downvotes: 2,
@@ -32,7 +37,13 @@ const baseComment: CommentNode = {
 
 const replyComment: CommentNode = {
   id: 2,
+  userId: 22,
+  authorName: "Student Two",
+  parentId: 1,
+  replyToUserId: 10,
+  replyToAuthorName: "Teacher One",
   content: "This is a reply comment",
+  createdAt: "2026-04-09T10:01:00.000Z",
   replies: [],
   upvotes: 1,
   downvotes: 0,
@@ -56,15 +67,27 @@ const deeplyNestedComment: CommentNode = {
   replies: [
     {
       id: 11,
+      userId: 11,
+      parentId: 10,
+      replyToUserId: 10,
       content: "Level 1 reply",
+      createdAt: "2026-04-09T10:02:00.000Z",
       replies: [
         {
           id: 12,
+          userId: 12,
+          parentId: 11,
+          replyToUserId: 11,
           content: "Level 2 reply",
+          createdAt: "2026-04-09T10:03:00.000Z",
           replies: [
             {
               id: 13,
+              userId: 13,
+              parentId: 12,
+              replyToUserId: 12,
               content: "Level 3 reply",
+              createdAt: "2026-04-09T10:04:00.000Z",
               replies: [],
               upvotes: 0,
               downvotes: 0,
@@ -134,8 +157,15 @@ describe("CommentTree component", () => {
       expect(screen.getByText("Level 1 reply")).toBeInTheDocument();
       expect(screen.getByText("Level 2 reply")).toBeInTheDocument();
       expect(screen.getByText("Level 3 reply")).toBeInTheDocument();
-      // Reply button exists for depth 0,1,2; deepest level (depth 3) has no Reply button.
-      expect(screen.getAllByRole("button", { name: "Reply" })).toHaveLength(3);
+      // Reply is always available; backend handles max-depth clamping.
+      expect(screen.getAllByRole("button", { name: "Trả lời" })).toHaveLength(4);
+    });
+
+    it("renders author and reply mention metadata", () => {
+      render(<CommentTree comment={replyComment} depth={1} {...defaultProps} />);
+
+      expect(screen.getByText("Student Two")).toBeInTheDocument();
+      expect(screen.getByText("@Teacher One")).toBeInTheDocument();
     });
 
     it("shows replyCount badge when replyCount > 0", () => {
@@ -252,13 +282,12 @@ describe("CommentTree component", () => {
     });
 
     it("optimistically updates local state immediately on upvote", async () => {
-      // Simulate a slow network response so we can catch the optimistic update
+      let resolveVote: ((value: CommentNode) => void) | undefined;
       vi.mocked(voteComment).mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve({
-          ...baseComment,
-          upvotes: 6,
-          userVote: "UP",
-        }), 100)),
+        () =>
+          new Promise((resolve) => {
+            resolveVote = resolve;
+          }),
       );
 
       render(<CommentTree comment={baseComment} depth={0} {...defaultProps} />);
@@ -269,6 +298,16 @@ describe("CommentTree component", () => {
       await waitFor(() => {
         const upvoteBtn = screen.getByRole("button", { name: /upvote/i });
         expect(upvoteBtn.querySelector("span")).toHaveTextContent("6");
+      });
+
+      resolveVote?.({
+        ...baseComment,
+        upvotes: 6,
+        userVote: "UP",
+      });
+
+      await waitFor(() => {
+        expect(voteComment).toHaveBeenCalledTimes(1);
       });
     });
 
@@ -341,11 +380,12 @@ describe("CommentTree component", () => {
 
     it("optimistically updates pin state immediately", async () => {
       getItemMock.mockReturnValue("ADMIN");
+      let resolvePin: ((value: CommentNode) => void) | undefined;
       vi.mocked(pinComment).mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve({
-          ...baseComment,
-          pinned: true,
-        }), 100)),
+        () =>
+          new Promise((resolve) => {
+            resolvePin = resolve;
+          }),
       );
 
       render(<CommentTree comment={baseComment} depth={0} {...defaultProps} />);
@@ -354,6 +394,12 @@ describe("CommentTree component", () => {
 
       await waitFor(() => {
         expect(screen.getByText("Bỏ ghim")).toBeInTheDocument();
+      });
+
+      resolvePin?.({ ...baseComment, pinned: true });
+
+      await waitFor(() => {
+        expect(pinComment).toHaveBeenCalledTimes(1);
       });
     });
 
@@ -386,10 +432,10 @@ describe("CommentTree component", () => {
   // ── Reply actions ──────────────────────────────────────────────────────────
 
   describe("Reply actions", () => {
-    it("calls onReply when Reply button is clicked", () => {
+    it("calls onReply when Trả lời button is clicked", () => {
       render(<CommentTree comment={baseComment} depth={0} {...defaultProps} />);
 
-      fireEvent.click(screen.getByRole("button", { name: /^Reply$/ }));
+      fireEvent.click(screen.getByRole("button", { name: /^Trả lời$/ }));
 
       expect(defaultProps.onReply).toHaveBeenCalledWith(1);
     });
@@ -404,7 +450,8 @@ describe("CommentTree component", () => {
         />,
       );
 
-      expect(screen.getByPlaceholderText("Nhập nội dung comment...")).toBeInTheDocument();
+      expect(screen.getByText("Đang trả lời @Teacher One")).toBeInTheDocument();
+      expect(screen.getByPlaceholderText("Viết phản hồi cho Teacher One...")).toBeInTheDocument();
     });
 
     it("calls onSubmitReply with content and parent id", () => {
@@ -417,7 +464,7 @@ describe("CommentTree component", () => {
         />,
       );
 
-      const textarea = screen.getByPlaceholderText("Nhập nội dung comment...");
+      const textarea = screen.getByRole("textbox");
       fireEvent.change(textarea, { target: { value: "My reply content" } });
       fireEvent.click(screen.getByRole("button", { name: "Gửi reply" }));
 
@@ -442,11 +489,10 @@ describe("CommentTree component", () => {
       expect(defaultProps.onCancelReply).toHaveBeenCalled();
     });
 
-    it("does NOT show Reply button when depth >= 3", () => {
-      render(<CommentTree comment={deeplyNestedComment} depth={3} {...defaultProps} />);
+    it("still shows Reply button for deep comments", () => {
+      render(<CommentTree comment={deeplyNestedComment} depth={2} {...defaultProps} />);
 
-      expect(screen.queryByRole("button", { name: /^Reply$/ })).not.toBeInTheDocument();
-      expect(screen.getAllByText("Đã đạt tối đa tầng").length).toBeGreaterThan(0);
+      expect(screen.getAllByRole("button", { name: /^Trả lời$/ }).length).toBeGreaterThan(0);
     });
   });
 });

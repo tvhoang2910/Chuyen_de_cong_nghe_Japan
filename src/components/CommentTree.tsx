@@ -3,6 +3,7 @@ import { ThumbsUp, ThumbsDown, Pin } from "lucide-react";
 import toast from "react-hot-toast";
 import type { CommentNode, VoteType } from "../api/commentClient";
 import { voteComment, pinComment } from "../api/commentClient";
+import { formatCommentAuthor, formatCommentTime } from "../api/commentHelpers";
 import CommentForm from "./CommentForm";
 
 interface CommentTreeProps {
@@ -33,8 +34,19 @@ const CommentTree = ({
   onVoteComplete,
   onPinComplete,
 }: CommentTreeProps) => {
-  const canReplyOnThisLevel = canReply && depth < 3;
   const isPrivileged = isAdminOrTeacher();
+  const authorLabel = formatCommentAuthor(
+    comment.authorName ?? comment.userFullName,
+    comment.userId,
+  );
+  const replyToLabel = comment.replyToUserId
+    ? formatCommentAuthor(
+        comment.replyToAuthorName ?? comment.replyToUserFullName,
+        comment.replyToUserId,
+      )
+    : null;
+  const timeLabel = formatCommentTime(comment.createdAt);
+  const indentationClass = depth <= 0 ? "" : depth === 1 ? "ml-6" : "ml-12";
 
   const [localUpvotes, setLocalUpvotes] = useState(comment.upvotes);
   const [localDownvotes, setLocalDownvotes] = useState(comment.downvotes);
@@ -116,114 +128,117 @@ const CommentTree = ({
 
   const upvoteActive = localUserVote === "UP";
   const downvoteActive = localUserVote === "DOWN";
+  const avatarChar = authorLabel.slice(0, 1).toUpperCase();
 
   return (
     <div
-      className={`rounded-[2rem] border bg-white p-5 shadow-sm ${depth > 0 ? "ml-6" : ""} ${localPinned ? "border-amber-300" : "border-slate-200"}`}
+      className={`rounded-[1.75rem] border bg-white p-4 shadow-sm ${indentationClass} ${localPinned ? "border-amber-300" : "border-slate-200"}`}
     >
-      <div className="flex items-start gap-4">
-        <div className="shrink-0 rounded-3xl bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700">
-          {depth + 1}
+      <div className="flex items-start gap-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-800 text-sm font-bold text-white">
+          {avatarChar}
         </div>
-        <div className="min-w-0 flex-1">
-          {localPinned && (
-            <div className="mb-2 inline-flex items-center gap-1 rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
-              <Pin className="h-3 w-3" />
-              Đã ghim
+        <div className="min-w-0 flex-1 space-y-2">
+          <div className="rounded-2xl bg-slate-50 px-4 py-3">
+            <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+              <span className="font-semibold text-slate-800">{authorLabel}</span>
+              <time>{timeLabel}</time>
+              {localPinned && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 font-semibold text-amber-700">
+                  <Pin className="h-3 w-3" />
+                  Đã ghim
+                </span>
+              )}
             </div>
-          )}
-          <p className="text-slate-900">{comment.content}</p>
+            <p className="text-slate-900">
+              {replyToLabel && (
+                <span className="mr-1 font-semibold text-blue-700">@{replyToLabel}</span>
+              )}
+              {comment.content}
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
+            <button
+              type="button"
+              onClick={() => handleVote(upvoteActive ? "NONE" : "UP")}
+              disabled={voting}
+              aria-label="upvote"
+              data-testid="upvote-btn"
+              title="Upvote"
+              className={`flex items-center gap-1 rounded-full px-2 py-1 transition ${
+                upvoteActive
+                  ? "bg-blue-100 text-blue-700 font-semibold"
+                  : "bg-slate-100 text-slate-500 hover:bg-blue-50 hover:text-blue-600"
+              }`}
+            >
+              <ThumbsUp className="h-4 w-4" />
+              <span>{localUpvotes}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleVote(downvoteActive ? "NONE" : "DOWN")}
+              disabled={voting}
+              aria-label="downvote"
+              data-testid="downvote-btn"
+              title="Downvote"
+              className={`flex items-center gap-1 rounded-full px-2 py-1 transition ${
+                downvoteActive
+                  ? "bg-red-100 text-red-700 font-semibold"
+                  : "bg-slate-100 text-slate-500 hover:bg-red-50 hover:text-red-600"
+              }`}
+            >
+              <ThumbsDown className="h-4 w-4" />
+              <span>{localDownvotes}</span>
+            </button>
+
+            {comment.replyCount > 0 && (
+              <span className="rounded-full bg-slate-100 px-3 py-1">
+                {comment.replyCount} {comment.replyCount === 1 ? "reply" : "replies"}
+              </span>
+            )}
+
+            {isPrivileged && (
+              <button
+                type="button"
+                onClick={handlePin}
+                disabled={pinning}
+                aria-label={localPinned ? "bo ghim" : "ghim"}
+                data-testid="pin-btn"
+                title="Ghim / Bỏ ghim bình luận"
+                className={`flex items-center gap-1 rounded-full px-3 py-1 font-semibold transition ${
+                  localPinned
+                    ? "bg-amber-100 text-amber-700"
+                    : "bg-slate-100 text-slate-500 hover:bg-amber-50 hover:text-amber-600"
+                }`}
+              >
+                <Pin className="h-4 w-4" />
+                {localPinned ? "Bỏ ghim" : "Ghim"}
+              </button>
+            )}
+
+            {canReply && (
+              <button
+                type="button"
+                onClick={() => onReply(comment.id)}
+                className="rounded-full bg-blue-50 px-3 py-1 font-semibold text-blue-700 transition hover:bg-blue-100"
+              >
+                Trả lời
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-slate-500">
-        <span className="rounded-full bg-slate-100 px-3 py-1">
-          Tầng {depth + 1}
-        </span>
-
-        {/* Vote buttons */}
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => handleVote(upvoteActive ? "NONE" : "UP")}
-            disabled={voting}
-            aria-label="upvote"
-            data-testid="upvote-btn"
-            title="Upvote"
-            className={`flex items-center gap-1 rounded-full px-2 py-1 transition ${
-              upvoteActive
-                ? "bg-blue-100 text-blue-700 font-semibold"
-                : "bg-slate-100 text-slate-500 hover:bg-blue-50 hover:text-blue-600"
-            }`}
-          >
-            <ThumbsUp className="h-4 w-4" />
-            <span>{localUpvotes}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleVote(downvoteActive ? "NONE" : "DOWN")}
-            disabled={voting}
-            aria-label="downvote"
-            data-testid="downvote-btn"
-            title="Downvote"
-            className={`flex items-center gap-1 rounded-full px-2 py-1 transition ${
-              downvoteActive
-                ? "bg-red-100 text-red-700 font-semibold"
-                : "bg-slate-100 text-slate-500 hover:bg-red-50 hover:text-red-600"
-            }`}
-          >
-            <ThumbsDown className="h-4 w-4" />
-            <span>{localDownvotes}</span>
-          </button>
-        </div>
-
-        {/* Reply count badge */}
-        {comment.replyCount > 0 && (
-          <span className="rounded-full bg-slate-100 px-3 py-1">
-            {comment.replyCount} {comment.replyCount === 1 ? "reply" : "replies"}
-          </span>
-        )}
-        {isPrivileged && (
-          <button
-            type="button"
-            onClick={handlePin}
-            disabled={pinning}
-            aria-label={localPinned ? "bo ghim" : "ghim"}
-            data-testid="pin-btn"
-            title="Ghim / Bỏ ghim bình luận"
-            className={`flex items-center gap-1 rounded-full px-3 py-1 font-semibold transition ${
-              localPinned
-                ? "bg-amber-100 text-amber-700"
-                : "bg-slate-100 text-slate-500 hover:bg-amber-50 hover:text-amber-600"
-            }`}
-          >
-            <Pin className="h-4 w-4" />
-            {localPinned ? "Bỏ ghim" : "Ghim"}
-          </button>
-        )}
-
-        {canReplyOnThisLevel ? (
-          <button
-            type="button"
-            onClick={() => onReply(comment.id)}
-            className="rounded-full bg-blue-50 px-3 py-1 font-semibold text-blue-700 transition hover:bg-blue-100"
-          >
-            Reply
-          </button>
-        ) : depth < 3 ? null : (
-          <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-400">
-            Đã đạt tối đa tầng
-          </span>
-        )}
-      </div>
-
-      {activeReplyTargetId === comment.id && canReplyOnThisLevel && (
+      {activeReplyTargetId === comment.id && canReply && (
         <div className="mt-5 rounded-[1.75rem] bg-slate-50 p-4 border border-slate-200">
           <CommentForm
             submitLabel="Gửi reply"
             onSubmit={(content) => onSubmitReply(content, comment.id)}
             onCancel={onCancelReply}
+            contextText={`Đang trả lời @${authorLabel}`}
+            placeholder={`Viết phản hồi cho ${authorLabel}...`}
             autoFocus
           />
         </div>

@@ -74,6 +74,10 @@ async function mockUserShellApis(page: Page, role = 'USER'): Promise<void> {
 // Build a CommentNode with sensible defaults
 function makeCommentNode(overrides: Partial<CommentNode> & { id: number; content: string }): CommentNode {
   return {
+    userId: 1,
+    parentId: null,
+    replyToUserId: null,
+    createdAt: ISO_NOW,
     upvotes: 0,
     downvotes: 0,
     pinned: false,
@@ -171,8 +175,8 @@ test.describe('Comment Creation Flow', () => {
     // Comment appears in list
     await expect(page.getByText('This is my first comment on this exam.')).toBeVisible();
 
-    // Counts initialise at zero
-    await expect(page.getByText('Tầng 1')).toBeVisible();
+    // Author metadata appears on comment bubble
+    await expect(page.getByText('User 1')).toBeVisible();
   });
 
   test('displays existing comments on page load', async ({ page }) => {
@@ -206,6 +210,7 @@ test.describe('Comment Reply Flow', () => {
   test('creates a reply nested under a parent comment', async ({ page }) => {
     const parentComment: CommentNode = makeCommentNode({
       id: 50,
+      userId: 50,
       content: 'Parent comment for reply test',
       replyCount: 1,
     });
@@ -225,6 +230,8 @@ test.describe('Comment Reply Flow', () => {
             id: 51,
             content: payload.content,
             parentId: payload.parentId,
+            userId: payload.userId,
+            replyToUserId: parentComment.userId,
           });
           parentComment.replies = [replyNode];
           await route.fulfill({
@@ -247,7 +254,7 @@ test.describe('Comment Reply Flow', () => {
     await expect(page.getByText('Parent comment for reply test')).toBeVisible();
 
     // Click Reply button
-    const replyButton = page.getByRole('button', { name: 'Reply' });
+    const replyButton = page.getByRole('button', { name: 'Trả lời' });
     await expect(replyButton).toBeVisible();
     await replyButton.click();
 
@@ -256,15 +263,15 @@ test.describe('Comment Reply Flow', () => {
     await expect(page.getByRole('button', { name: 'Hủy' })).toBeVisible();
 
     // Fill and submit
-    const replyTextarea = page.locator('textarea[placeholder="Nhập nội dung comment..."]').last();
+    const replyTextarea = page.locator('textarea[placeholder="Viết phản hồi cho User 50..."]');
     await replyTextarea.fill('This is a reply to the parent comment.');
     await page.getByRole('button', { name: 'Gửi reply' }).click();
 
     await expect(page.getByText('Gửi bình luận thành công')).toBeVisible();
 
-    // Reply appears nested — depth badge shows Tầng 2
+    // Reply appears nested and shows mention tag for target user.
     await expect(page.getByText('This is a reply to the parent comment.')).toBeVisible();
-    await expect(page.getByText('Tầng 2')).toBeVisible();
+    await expect(page.getByText('@User 50')).toBeVisible();
   });
 
   test('Cancel button hides the inline reply form without submitting', async ({ page }) => {
@@ -275,7 +282,7 @@ test.describe('Comment Reply Flow', () => {
 
     await navigateToCommentsPage(page);
 
-    await page.getByRole('button', { name: 'Reply' }).click();
+    await page.getByRole('button', { name: 'Trả lời' }).click();
     await expect(page.getByRole('button', { name: 'Gửi reply' })).toBeVisible();
 
     await page.getByRole('button', { name: 'Hủy' }).click();
@@ -479,24 +486,96 @@ test.describe('Max Reply Depth', () => {
     await mockUserShellApis(page);
   });
 
-  test('reply button is disabled at depth 3 and shows "Đã đạt tối đa tầng"', async ({ page }) => {
-    // Build a 4-level tree so the deepest node is depth=3 (Tầng 4).
-    const level4Comment: CommentNode = makeCommentNode({
-      id: 43,
-      content: 'Level 4 comment',
-    });
+  test('replying to level 3 comment still works and stays in level 3 thread', async ({ page }) => {
+    let capturedParentId: number | null = null;
+
     const level3Comment: CommentNode = makeCommentNode({
       id: 32,
+      userId: 32,
       content: 'Level 3 comment',
-      replies: [level4Comment],
+    });
+
+    const level2Comment: CommentNode = makeCommentNode({
+      id: 22,
+      userId: 22,
+      content: 'Level 2 comment',
+      replies: [level3Comment],
+    });
+
+    const level1Comment: CommentNode = makeCommentNode({
+      id: 11,
+      userId: 11,
+      content: 'Level 1 comment',
+      replies: [level2Comment],
+    });
+
+    const level3ThreadReply: CommentNode = makeCommentNode({
+      id: 99,
+      userId: 3,
+      parentId: 22,
+      replyToUserId: 32,
+      content: 'Reply beyond level 3 still in level 3 thread',
+    });
+
+    await page.route(`**/api/v1/community/comments/exam/${EXAM_ID}`, async (route: Route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          {
+            ...level1Comment,
+            replies: [
+              {
+                ...level2Comment,
+                replies: [level3Comment, level3ThreadReply],
+              },
+            ],
+          },
+        ]),
+      });
+    });
+
+    await page.route('**/api/v1/community/comments', async (route: Route) => {
+      if (route.request().method() !== 'POST') {
+        return;
+      }
+
+      const payload = route.request().postDataJSON() as CreateCommentPayload;
+      capturedParentId = payload.parentId;
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify(level3ThreadReply),
+      });
+    });
+
+    await navigateToCommentsPage(page);
+
+    const replyButtons = page.getByRole('button', { name: 'Trả lời' });
+    await replyButtons.nth(2).click();
+    await page.locator('textarea[placeholder="Viết phản hồi cho User 32..."]').fill('Reply beyond level 3 still in level 3 thread');
+    await page.getByRole('button', { name: 'Gửi reply' }).click();
+
+    expect(capturedParentId).toBe(32);
+    await expect(page.getByText('Reply beyond level 3 still in level 3 thread')).toBeVisible();
+    await expect(page.getByText('@User 32')).toBeVisible();
+  });
+
+  test('reply button appears on all visible levels', async ({ page }) => {
+    const level3Comment: CommentNode = makeCommentNode({
+      id: 32,
+      userId: 32,
+      content: 'Level 3 comment',
     });
     const level2Comment: CommentNode = makeCommentNode({
       id: 22,
+      userId: 22,
       content: 'Level 2 comment',
       replies: [level3Comment],
     });
     const level1Comment: CommentNode = makeCommentNode({
       id: 11,
+      userId: 11,
       content: 'Level 1 comment',
       replies: [level2Comment],
     });
@@ -511,38 +590,8 @@ test.describe('Max Reply Depth', () => {
 
     await navigateToCommentsPage(page);
 
-    await expect(page.getByText('Tầng 4')).toBeVisible();
-    await expect(page.getByText('Đã đạt tối đa tầng')).toBeVisible();
-
-    // Only first 3 levels keep Reply button; deepest level does not.
-    const replyButtons = page.getByRole('button', { name: 'Reply' });
+    const replyButtons = page.getByRole('button', { name: 'Trả lời' });
     await expect(replyButtons).toHaveCount(3);
-  });
-
-  test('reply button IS available at depth 1 and 2', async ({ page }) => {
-    const level2Comment: CommentNode = makeCommentNode({
-      id: 22,
-      content: 'Level 2 comment',
-    });
-    const level1Comment: CommentNode = makeCommentNode({
-      id: 11,
-      content: 'Level 1 comment',
-      replies: [level2Comment],
-    });
-
-    await page.route(`**/api/v1/community/comments/exam/${EXAM_ID}`, async (route: Route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify([level1Comment]),
-      });
-    });
-
-    await navigateToCommentsPage(page);
-
-    // Both levels should still have Reply buttons
-    const replyButtons = page.getByRole('button', { name: 'Reply' });
-    await expect(replyButtons).toHaveCount(2);
   });
 });
 
@@ -833,11 +882,12 @@ test.describe('Nested Reply UI', () => {
     await mockUserShellApis(page);
   });
 
-  test('three levels of replies are visually distinct with correct depth badges', async ({ page }) => {
-    const level3: CommentNode = makeCommentNode({ id: 33, content: 'Level 3 deep reply' });
-    const level2: CommentNode = makeCommentNode({ id: 22, content: 'Level 2 reply', replies: [level3] });
+  test('three levels of replies remain readable without depth badges', async ({ page }) => {
+    const level3: CommentNode = makeCommentNode({ id: 33, userId: 33, replyToUserId: 22, content: 'Level 3 deep reply' });
+    const level2: CommentNode = makeCommentNode({ id: 22, userId: 22, replyToUserId: 11, content: 'Level 2 reply', replies: [level3] });
     const level1: CommentNode = makeCommentNode({
       id: 11,
+      userId: 11,
       content: 'Level 1 comment',
       replies: [level2],
     });
@@ -857,10 +907,7 @@ test.describe('Nested Reply UI', () => {
     await expect(page.getByText('Level 2 reply')).toBeVisible();
     await expect(page.getByText('Level 3 deep reply')).toBeVisible();
 
-    // Depth badges
-    await expect(page.getByText('Tầng 1').first()).toBeVisible();
-    await expect(page.getByText('Tầng 2')).toBeVisible();
-    await expect(page.getByText('Tầng 3')).toBeVisible();
+    await expect(page.getByText('@User 22')).toBeVisible();
 
     // Nested cards should be indented.
     await expect(page.locator('div.ml-6').first()).toBeVisible();
@@ -892,11 +939,11 @@ test.describe('Comment Tree — Structural Integrity', () => {
     await mockUserShellApis(page);
   });
 
-  test('each comment in the list has a unique depth badge', async ({ page }) => {
+  test('top-level comments render their own author labels', async ({ page }) => {
     const comments: CommentNode[] = [
-      makeCommentNode({ id: 1, content: 'Top 1' }),
-      makeCommentNode({ id: 2, content: 'Top 2' }),
-      makeCommentNode({ id: 3, content: 'Top 3' }),
+      makeCommentNode({ id: 1, userId: 101, content: 'Top 1' }),
+      makeCommentNode({ id: 2, userId: 102, content: 'Top 2' }),
+      makeCommentNode({ id: 3, userId: 103, content: 'Top 3' }),
     ];
 
     await page.route(`**/api/v1/community/comments/exam/${EXAM_ID}`, async (route: Route) => {
@@ -909,9 +956,9 @@ test.describe('Comment Tree — Structural Integrity', () => {
     await expect(page.getByText('Top 1')).toBeVisible();
     await expect(page.getByText('Top 2')).toBeVisible();
     await expect(page.getByText('Top 3')).toBeVisible();
-
-    // Three "Tầng 1" badges (one per top-level comment)
-    await expect(page.getByText('Tầng 1')).toHaveCount(3);
+    await expect(page.getByText('User 101')).toBeVisible();
+    await expect(page.getByText('User 102')).toBeVisible();
+    await expect(page.getByText('User 103')).toBeVisible();
   });
 
   test('reply count badge reflects number of replies', async ({ page }) => {
@@ -933,7 +980,6 @@ test.describe('Comment Tree — Structural Integrity', () => {
     await expect(page.getByText('Parent with 2 replies')).toBeVisible();
     await expect(page.getByText('Reply 1')).toBeVisible();
     await expect(page.getByText('Reply 2')).toBeVisible();
-    await expect(page.getByText('Tầng 1')).toBeVisible();
-    await expect(page.getByText('Tầng 2')).toHaveCount(2);
+    await expect(page.getByText('2 replies', { exact: true })).toBeVisible();
   });
 });

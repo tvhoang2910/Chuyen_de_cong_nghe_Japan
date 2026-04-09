@@ -5,6 +5,7 @@ import CommentForm from "../components/CommentForm";
 import CommentTree from "../components/CommentTree";
 import type { CommentNode } from "../api/commentClient";
 import { createComment, fetchCommentsByExam } from "../api/commentClient";
+import { resolveCommentSubmitErrorMessage } from "../api/commentHelpers";
 
 const CommentsPage = () => {
   const { examId } = useParams<{ examId: string }>();
@@ -47,7 +48,8 @@ const CommentsPage = () => {
       await loadComments();
     } catch (error) {
       console.error(error);
-      toast.error("Gửi bình luận thất bại.");
+      const errorMessage = resolveCommentSubmitErrorMessage(error);
+      toast.error(errorMessage);
     }
   };
 
@@ -118,7 +120,7 @@ const CommentsPage = () => {
                 Danh sách bình luận
               </h3>
               <p className="text-sm text-slate-600">
-                Backend trả về tree comment/reply tối đa 3 tầng.
+                Reply sâu vẫn được giữ trong cùng luồng hội thoại.
               </p>
             </div>
             {isLoading && (

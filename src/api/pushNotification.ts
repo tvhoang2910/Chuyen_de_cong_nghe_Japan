@@ -3,6 +3,8 @@ const buildAuthHeaders = (): HeadersInit => {
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
+const getAccessToken = (): string | null => localStorage.getItem('access_token');
+
 interface PushSubscriptionRequestPayload {
   endpoint: string;
   p256dh: string;
@@ -35,21 +37,36 @@ export const fetchVapidPublicKey = async (): Promise<string> => {
 
 export const subscribePush = async (subscription: PushSubscriptionJSON): Promise<void> => {
   const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1/auth';
+  const token = getAccessToken();
+  if (!token) {
+    return;
+  }
   const payload = toPushSubscriptionRequestPayload(subscription);
   const res = await fetch(`${baseUrl}/push-subscription`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...buildAuthHeaders() },
     body: JSON.stringify(payload),
   });
-  if (!res.ok) throw new Error('Failed to subscribe push notification');
+  if (!res.ok) {
+    if (res.status === 401 || res.status === 403) {
+      return;
+    }
+    throw new Error('Failed to subscribe push notification');
+  }
 };
 
 export const unsubscribePush = async (endpoint: string): Promise<void> => {
   const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1/auth';
+  const token = getAccessToken();
+  if (!token) {
+    return;
+  }
   const res = await fetch(`${baseUrl}/push-subscription`, {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json', ...buildAuthHeaders() },
     body: JSON.stringify({ endpoint }),
   });
-  if (!res.ok) throw new Error('Failed to unsubscribe push notification');
+  if (!res.ok && res.status !== 401 && res.status !== 403) {
+    throw new Error('Failed to unsubscribe push notification');
+  }
 };

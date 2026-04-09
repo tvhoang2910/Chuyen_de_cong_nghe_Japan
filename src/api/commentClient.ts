@@ -3,13 +3,21 @@ import type { InternalAxiosRequestConfig } from "axios";
 
 const apiBaseUrl =
   import.meta.env.VITE_COMMUNITY_API_BASE_URL ||
-  "http://localhost:8080/api/v1/community";
+  "http://localhost:8084/api/v1/community";
 
 export type VoteType = "UP" | "DOWN" | "NONE";
 
 export type CommentNode = {
   id: number;
+  userId?: number;
+  authorName?: string | null;
+  userFullName?: string | null;
+  parentId?: number | null;
+  replyToUserId?: number | null;
+  replyToAuthorName?: string | null;
+  replyToUserFullName?: string | null;
   content: string;
+  createdAt?: string;
   replies: CommentNode[];
   upvotes: number;
   downvotes: number;

@@ -5,6 +5,8 @@ interface CommentFormProps {
   onSubmit: (content: string) => void;
   onCancel?: () => void;
   autoFocus?: boolean;
+  placeholder?: string;
+  contextText?: string;
 }
 
 const CommentForm = ({
@@ -12,6 +14,8 @@ const CommentForm = ({
   onSubmit,
   onCancel,
   autoFocus = false,
+  placeholder = "Nhập nội dung comment...",
+  contextText,
 }: CommentFormProps) => {
   const [content, setContent] = useState("");
 
@@ -25,10 +29,13 @@ const CommentForm = ({
       }}
       className="space-y-4"
     >
+      {contextText && (
+        <p className="text-sm font-medium text-slate-600">{contextText}</p>
+      )}
       <textarea
         value={content}
         onChange={(event) => setContent(event.target.value)}
-        placeholder="Nhập nội dung comment..."
+        placeholder={placeholder}
         rows={4}
         autoFocus={autoFocus}
         className="w-full rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"

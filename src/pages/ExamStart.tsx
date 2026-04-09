@@ -6,6 +6,7 @@ import CommentForm from "../components/CommentForm";
 import CommentTree from "../components/CommentTree";
 import type { CommentNode } from "../api/commentClient";
 import { createComment, fetchCommentsByExam } from "../api/commentClient";
+import { resolveCommentSubmitErrorMessage } from "../api/commentHelpers";
 import {
   fetchMyAttemptHistory,
   fetchPublicExamDetail,
@@ -57,7 +58,8 @@ const ExamStart: React.FC = () => {
       await loadComments(examId);
     } catch (error) {
       console.error(error);
-      toast.error("Gửi bình luận thất bại.");
+      const errorMessage = resolveCommentSubmitErrorMessage(error);
+      toast.error(errorMessage);
     }
   };
 

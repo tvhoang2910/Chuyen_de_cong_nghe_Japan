@@ -222,9 +222,19 @@ const publicAuthPaths = new Set([
 ]);
 export const AUTH_SESSION_CHANGED_EVENT = "auth-session-changed";
 export const SUBSCRIPTION_REVIEW_UPDATED_EVENT = "subscription-review-updated";
+const USER_FULL_NAME_STORAGE_KEY = "user_full_name";
 
 const notifyAuthSessionChanged = () => {
   globalThis.dispatchEvent(new Event(AUTH_SESSION_CHANGED_EVENT));
+};
+
+const cacheCurrentUserDisplayName = (profile: UserProfile) => {
+  if (profile.fullName.trim().length > 0) {
+    localStorage.setItem(USER_FULL_NAME_STORAGE_KEY, profile.fullName);
+    return;
+  }
+
+  localStorage.removeItem(USER_FULL_NAME_STORAGE_KEY);
 };
 
 const axiosClient = axios.create({
@@ -357,6 +367,7 @@ export const persistAuthSession = (payload: AuthPayload) => {
   if (payload.role) {
     localStorage.setItem("user_role", payload.role);
   }
+  localStorage.removeItem(USER_FULL_NAME_STORAGE_KEY);
   notifyAuthSessionChanged();
 };
 
@@ -365,6 +376,7 @@ export const clearAuthSession = () => {
   localStorage.removeItem("refresh_token");
   localStorage.removeItem("user_email");
   localStorage.removeItem("user_role");
+  localStorage.removeItem(USER_FULL_NAME_STORAGE_KEY);
   clearAllApiCache();
   notifyAuthSessionChanged();
 };
@@ -385,6 +397,7 @@ export const fetchCurrentUserProfile = async (): Promise<UserProfile> => {
     "profile:me",
     async () => {
       const response = await axiosClient.get<UserProfile>("/me");
+      cacheCurrentUserDisplayName(response.data);
       return response.data;
     },
     3000,
@@ -395,6 +408,7 @@ export const updateCurrentUserProfile = async (
   payload: UpdateMyProfilePayload,
 ): Promise<UserProfile> => {
   const response = await axiosClient.patch<UserProfile>("/me", payload);
+  cacheCurrentUserDisplayName(response.data);
   setCached("profile:me", response.data, 3000);
   return response.data;
 };
@@ -410,6 +424,7 @@ export const uploadCurrentUserAvatar = async (
       "Content-Type": "multipart/form-data",
     },
   });
+  cacheCurrentUserDisplayName(response.data);
   setCached("profile:me", response.data, 3000);
   return response.data;
 };
