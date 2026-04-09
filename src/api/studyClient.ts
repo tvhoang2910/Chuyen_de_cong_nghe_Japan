@@ -46,6 +46,71 @@ export type StudyStats = {
   dueCardsCount: number;
 };
 
+export type AchievementCode =
+  | 'TOP_SCORER'
+  | 'FIRST_COMPLETION'
+  | 'SPEED_DEMON'
+  | 'SHARPSHOOTER'
+  | 'SCHOLAR'
+  | 'NIGHT_GRINDER'
+  | 'WEEKEND_WARRIOR'
+  | 'STREAK_FIRE'
+  | 'BOOKWORM'
+  | 'PERSISTENT'
+  | 'INSPIRER'
+  | 'EXPLORER'
+  | 'LEARNING_AMBASSADOR'
+  | 'NIGHT_OWL'
+  | 'EXAM_DESTROYER'
+  | 'ANSWER_INSPECTOR';
+
+export type AchievementView = {
+  code: AchievementCode;
+  name: string;
+  description: string;
+  icon: string;
+  groupName: string;
+  points: number;
+  unlocked: boolean;
+  unlockedAt: string | null;
+};
+
+export type CalendarDay = {
+  date: string;
+  activityCompleted: boolean;
+  streakQualified: boolean;
+};
+
+export type StreakCalendar = {
+  month: string;
+  totalDays: number;
+  activityDays: number;
+  qualifiedDays: number;
+  days: CalendarDay[];
+};
+
+export type GamificationOverview = {
+  streakDays: number;
+  longestStreak: number;
+  dailyStudyMinutes: number;
+  dailyTargetMinutes: number;
+  todayQualified: boolean;
+  justQualifiedToday: boolean;
+  points: number;
+  newlyUnlockedAchievements: AchievementView[];
+  recentUnlockedAchievements: AchievementView[];
+};
+
+export type LeaderboardEntry = {
+  rank: number;
+  userId: number;
+  displayName: string;
+  points: number;
+  streakDays: number;
+  unlockedAchievements: number;
+  currentUser: boolean;
+};
+
 export type DueStudyCard = {
   cardId: number;
   itemId: number;
@@ -159,4 +224,32 @@ export const submitReviewAnswer = async (
     answerChangeCount,
   });
   return res.data;
+};
+
+export const fetchGamificationOverview = async (): Promise<GamificationOverview> => {
+  const res = await studyClient.get<GamificationOverview>('/gamification/me/overview');
+  return res.data;
+};
+
+export const fetchGamificationAchievements = async (): Promise<AchievementView[]> => {
+  const res = await studyClient.get<AchievementView[]>('/gamification/me/achievements');
+  return res.data;
+};
+
+export const fetchGamificationCalendar = async (month?: string): Promise<StreakCalendar> => {
+  const res = await studyClient.get<StreakCalendar>('/gamification/me/calendar', {
+    params: month ? { month } : undefined,
+  });
+  return res.data;
+};
+
+export const fetchGamificationLeaderboard = async (limit = 10): Promise<LeaderboardEntry[]> => {
+  const res = await studyClient.get<LeaderboardEntry[]>('/gamification/me/leaderboard', {
+    params: { limit },
+  });
+  return res.data;
+};
+
+export const markGamificationShared = async (): Promise<void> => {
+  await studyClient.post('/gamification/me/share');
 };

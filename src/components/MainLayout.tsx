@@ -31,6 +31,7 @@ import axiosClient, {
   uploadCurrentUserAvatar,
   type UserProfile 
 } from '../api/axiosClient';
+import { fetchGamificationOverview, type GamificationOverview } from '../api/studyClient';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -92,6 +93,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const [pendingReviewCount, setPendingReviewCount] = useState(0);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [notificationItems, setNotificationItems] = useState<NotificationItem[]>([]);
+  const [gamificationOverview, setGamificationOverview] = useState<GamificationOverview | null>(null);
   const notificationRef = useRef<HTMLDivElement | null>(null);
 
   const dismissedIdsStorageKey = useMemo(() => {
@@ -245,6 +247,32 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   }, [navigate, readDismissedIds, user?.role]);
 
   useEffect(() => {
+    if (user?.role !== 'USER') {
+      setGamificationOverview(null);
+      return;
+    }
+
+    let isMounted = true;
+    const loadGamificationOverview = async () => {
+      try {
+        const overview = await fetchGamificationOverview();
+        if (isMounted) {
+          setGamificationOverview(overview);
+        }
+      } catch {
+        if (isMounted) {
+          setGamificationOverview(null);
+        }
+      }
+    };
+
+    void loadGamificationOverview();
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.role]);
+
+  useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
         setIsNotificationOpen(false);
@@ -285,6 +313,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     { label: 'Nâng cấp Premium', icon: Banknote, path: '/dashboard/subscription-payments' },
     { label: 'Kho đề công khai', icon: BookOpen, path: '/dashboard/exams' },
     { label: 'Học tập (SM-2)', icon: Zap, path: '/dashboard/spaced-repetition' },
+    { label: 'Gamification', icon: Flame, path: '/dashboard/gamification' },
     { label: 'Cộng đồng', icon: Star, path: '/dashboard/community' },
   ];
 
@@ -470,11 +499,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             <div className="hidden sm:flex items-center gap-3">
               <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 rounded-lg border border-emerald-100/50">
                 <Flame className="w-4 h-4 text-emerald-500" />
-                <span className="text-xs font-bold text-emerald-700">12 Days</span>
+                <span className="text-xs font-bold text-emerald-700">{gamificationOverview?.streakDays ?? 0} Days</span>
               </div>
               <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 rounded-lg border border-amber-100/50">
                 <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
-                <span className="text-xs font-bold text-amber-700">850 Pts</span>
+                <span className="text-xs font-bold text-amber-700">{gamificationOverview?.points ?? 0} Pts</span>
               </div>
             </div>
             <div ref={notificationRef} className="relative">
