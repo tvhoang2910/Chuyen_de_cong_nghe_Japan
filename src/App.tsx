@@ -18,6 +18,7 @@ const Dashboard = lazy(() => import('./pages/Dashboard'));
 const OAuth2Success = lazy(() => import('./pages/OAuth2Success'));
 const AdminUsers = lazy(() => import('./pages/AdminUsers'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const AdminAchievements = lazy(() => import('./pages/AdminAchievements'));
 const AuditLogPage = lazy(() => import('./pages/AuditLogPage'));
 const ExamManagement = lazy(() => import('./pages/ExamManagement'));
 const PublicExams = lazy(() => import('./pages/PublicExams'));
@@ -352,6 +353,19 @@ function App() {
                   allowedRoles={['ADMIN']}
                 >
                   <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/achievements"
+              element={
+                <ProtectedRoute
+                  isAuthenticated={effectiveIsAuthenticated}
+                  userRole={effectiveRole}
+                  defaultPath={defaultAuthenticatedPath}
+                  allowedRoles={['ADMIN']}
+                >
+                  <AdminAchievements />
                 </ProtectedRoute>
               }
             />

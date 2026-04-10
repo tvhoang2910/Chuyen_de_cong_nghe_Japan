@@ -46,23 +46,7 @@ export type StudyStats = {
   dueCardsCount: number;
 };
 
-export type AchievementCode =
-  | 'TOP_SCORER'
-  | 'FIRST_COMPLETION'
-  | 'SPEED_DEMON'
-  | 'SHARPSHOOTER'
-  | 'SCHOLAR'
-  | 'NIGHT_GRINDER'
-  | 'WEEKEND_WARRIOR'
-  | 'STREAK_FIRE'
-  | 'BOOKWORM'
-  | 'PERSISTENT'
-  | 'INSPIRER'
-  | 'EXPLORER'
-  | 'LEARNING_AMBASSADOR'
-  | 'NIGHT_OWL'
-  | 'EXAM_DESTROYER'
-  | 'ANSWER_INSPECTOR';
+export type AchievementCode = string;
 
 export type AchievementView = {
   code: AchievementCode;
@@ -109,6 +93,36 @@ export type LeaderboardEntry = {
   streakDays: number;
   unlockedAchievements: number;
   currentUser: boolean;
+};
+
+export type AchievementDefinition = {
+  code: string;
+  name: string;
+  description: string;
+  icon: string;
+  groupName: string;
+  points: number;
+  active: boolean;
+  autoUnlockRule: string | null;
+  ruleType: string | null;
+  ruleThreshold: number | null;
+  ruleThresholdSecondary: number | null;
+  ruleConfigJson: string | null;
+};
+
+export type AdminAchievementUpsertRequest = {
+  code: string;
+  name: string;
+  description: string;
+  icon: string;
+  groupName: string;
+  points: number;
+  active: boolean;
+  autoUnlockRule?: string | null;
+  ruleType?: string | null;
+  ruleThreshold?: number | null;
+  ruleThresholdSecondary?: number | null;
+  ruleConfigJson?: string | null;
 };
 
 export type DueStudyCard = {
@@ -252,4 +266,32 @@ export const fetchGamificationLeaderboard = async (limit = 10): Promise<Leaderbo
 
 export const markGamificationShared = async (): Promise<void> => {
   await studyClient.post('/gamification/me/share');
+};
+
+export const fetchAdminGamificationAchievements = async (): Promise<AchievementDefinition[]> => {
+  const res = await studyClient.get<AchievementDefinition[]>('/gamification/admin/achievements');
+  return res.data;
+};
+
+export const createAdminGamificationAchievement = async (
+  payload: AdminAchievementUpsertRequest,
+): Promise<AchievementDefinition> => {
+  const res = await studyClient.post<AchievementDefinition>('/gamification/admin/achievements', payload);
+  return res.data;
+};
+
+export const updateAdminGamificationAchievement = async (
+  code: string,
+  payload: Omit<AdminAchievementUpsertRequest, 'code'>,
+): Promise<AchievementDefinition> => {
+  const res = await studyClient.put<AchievementDefinition>(`/gamification/admin/achievements/${code}`, payload);
+  return res.data;
+};
+
+export const deleteAdminGamificationAchievement = async (code: string): Promise<void> => {
+  await studyClient.delete(`/gamification/admin/achievements/${code}`);
+};
+
+export const assignAdminGamificationAchievementToUser = async (code: string, userId: number): Promise<void> => {
+  await studyClient.post(`/gamification/admin/achievements/${code}/assign`, { userId });
 };
