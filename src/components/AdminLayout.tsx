@@ -16,7 +16,8 @@ import {
   ClipboardCheck,
   Gem,
   BookOpen,
-  Flag
+  Flag,
+  Trophy
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axiosClient, { 
@@ -239,6 +240,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     { label: 'Dashboard', icon: LayoutDashboard, path: '/admin/dashboard' },
     { label: 'Quản lý Users', icon: Users, path: '/admin/users' },
     { label: 'Quản lý đề thi', icon: BookOpen, path: '/admin/exams' },
+    { label: 'Kho thành tựu', icon: Trophy, path: '/admin/achievements' },
     { label: 'Báo cáo câu hỏi', icon: Flag, path: '/admin/reports' },
     { label: 'Quản lý gói Premium', icon: Gem, path: '/admin/premium-plans' },
     { label: 'Duyệt thanh toán', icon: ClipboardCheck, path: '/admin/subscription-reviews' },

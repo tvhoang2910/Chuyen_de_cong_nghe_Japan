@@ -64,7 +64,40 @@ const iconByCode: Record<string, React.ReactNode> = {
   ANSWER_INSPECTOR: <Target className="h-4 w-4" />,
 };
 
-const groupOrder = ['Học thuật', 'Chuyên cần', 'Cộng đồng'];
+const SEEDED_NAME_OVERRIDES: Record<string, string> = {
+  CUMULATIVE_EXAM_ATTEMPTS_3: 'Khởi động thi cử',
+  CUMULATIVE_EXAM_ATTEMPTS_10: 'Bền bỉ luyện tập',
+  CUMULATIVE_STUDY_MINUTES_60: 'Nạp năng lượng',
+  CUMULATIVE_STUDY_MINUTES_180: 'Cỗ máy học tập',
+  STREAK_DAYS_5: 'Giữ nhịp học',
+  STREAK_DAYS_14: 'Kỷ luật thép',
+  QUALITY_MIN_SCORE_85_X1: 'Đánh dấu xuất sắc',
+  QUALITY_MIN_SCORE_90_X3: 'Phong độ cao',
+  COMPOUND_AND_STUDY_SCORE: 'Toàn tâm toàn lực',
+  COMPOUND_OR_STREAK_QUALITY: 'Bùng nổ năng lực',
+};
+
+const SEEDED_DESCRIPTION_OVERRIDES: Record<string, string> = {
+  CUMULATIVE_EXAM_ATTEMPTS_3: 'Hoàn thành 3 bài thi.',
+  CUMULATIVE_EXAM_ATTEMPTS_10: 'Hoàn thành 10 bài thi.',
+  CUMULATIVE_STUDY_MINUTES_60: 'Học đủ 60 phút trong ngày.',
+  CUMULATIVE_STUDY_MINUTES_180: 'Học đủ 180 phút trong ngày.',
+  STREAK_DAYS_5: 'Duy trì streak 5 ngày liên tiếp.',
+  STREAK_DAYS_14: 'Duy trì streak 14 ngày liên tiếp.',
+  QUALITY_MIN_SCORE_85_X1: 'Đạt từ 85% ít nhất 1 lần.',
+  QUALITY_MIN_SCORE_90_X3: 'Đạt từ 90% ít nhất 3 lần.',
+  COMPOUND_AND_STUDY_SCORE: 'Học đủ 120 phút và đạt từ 85% ít nhất 1 lần.',
+  COMPOUND_OR_STREAK_QUALITY: 'Streak từ 10 ngày hoặc đạt từ 90% ít nhất 2 lần.',
+};
+
+const GROUP_NAME_OVERRIDES: Record<string, string> = {
+  'Tich luy': 'Tích lũy',
+  Chuoi: 'Chuỗi',
+  'Chat luong': 'Chất lượng',
+  'Ket hop': 'Kết hợp',
+};
+
+const groupOrder = ['Tích lũy', 'Chuỗi', 'Chất lượng', 'Kết hợp', 'Học thuật', 'Chuyên cần', 'Cộng đồng', 'Khác'];
 
 const groupStyles: Record<string, { ring: string; bg: string; chip: string }> = {
   'Học thuật': {
@@ -82,12 +115,39 @@ const groupStyles: Record<string, { ring: string; bg: string; chip: string }> = 
     bg: 'from-rose-500/20 via-pink-500/10 to-fuchsia-500/20',
     chip: 'bg-rose-100 text-rose-700',
   },
+  'Tích lũy': {
+    ring: 'ring-blue-200',
+    bg: 'from-sky-500/20 via-blue-500/10 to-cyan-500/20',
+    chip: 'bg-sky-100 text-sky-700',
+  },
+  Chuỗi: {
+    ring: 'ring-orange-200',
+    bg: 'from-orange-500/20 via-amber-500/10 to-yellow-500/20',
+    chip: 'bg-orange-100 text-orange-700',
+  },
+  'Chất lượng': {
+    ring: 'ring-emerald-200',
+    bg: 'from-emerald-500/20 via-teal-500/10 to-cyan-500/20',
+    chip: 'bg-emerald-100 text-emerald-700',
+  },
+  'Kết hợp': {
+    ring: 'ring-violet-200',
+    bg: 'from-violet-500/20 via-fuchsia-500/10 to-pink-500/20',
+    chip: 'bg-violet-100 text-violet-700',
+  },
   Khác: {
     ring: 'ring-slate-200',
     bg: 'from-slate-500/20 via-slate-400/10 to-slate-300/20',
     chip: 'bg-slate-100 text-slate-700',
   },
 };
+
+const normalizeAchievementView = (achievement: AchievementView): AchievementView => ({
+  ...achievement,
+  name: SEEDED_NAME_OVERRIDES[achievement.code] ?? achievement.name,
+  description: SEEDED_DESCRIPTION_OVERRIDES[achievement.code] ?? achievement.description,
+  groupName: GROUP_NAME_OVERRIDES[achievement.groupName] ?? achievement.groupName,
+});
 
 const badgeEmojiByCode: Record<string, string> = {
   TOP_SCORER: '👑',
@@ -139,7 +199,7 @@ const Gamification: React.FC = () => {
         }
 
         if (achievementsRes.status === 'fulfilled') {
-          setAchievements(achievementsRes.value);
+          setAchievements(achievementsRes.value.map(normalizeAchievementView));
         } else {
           setAchievements([]);
           toast.error('Không thể tải kho thành tựu.');
@@ -181,7 +241,8 @@ const Gamification: React.FC = () => {
   const unlockedCount = achievements.filter((item) => item.unlocked).length;
   const groupedAchievements = useMemo(() => {
     return achievements.reduce<Record<string, AchievementView[]>>((acc, achievement) => {
-      const key = achievement.groupName || 'Khác';
+      const normalizedGroupName = GROUP_NAME_OVERRIDES[achievement.groupName] ?? achievement.groupName;
+      const key = normalizedGroupName || 'Khác';
       if (!acc[key]) {
         acc[key] = [];
       }
@@ -192,7 +253,8 @@ const Gamification: React.FC = () => {
 
   const orderedGroups = useMemo(() => {
     const existingGroups = Object.keys(groupedAchievements).filter((name) => !groupOrder.includes(name));
-    return [...groupOrder, ...existingGroups].filter((name) => groupedAchievements[name]?.length > 0);
+    const merged = [...groupOrder, ...existingGroups].filter((name) => groupedAchievements[name]?.length > 0);
+    return merged.filter((name, index) => merged.indexOf(name) === index);
   }, [groupedAchievements]);
 
   const toggleGroup = (groupName: string) => {
@@ -402,7 +464,7 @@ const Gamification: React.FC = () => {
               <div key={groupName}>
                 {(() => {
                   const style = groupStyles[groupName] || groupStyles.Khác;
-                  const isCollapsed = collapsedGroups[groupName] ?? false;
+                  const isCollapsed = collapsedGroups[groupName] ?? groupName === 'Khác';
                   const unlockedInGroup = groupedAchievements[groupName].filter((item) => item.unlocked).length;
                   const totalInGroup = groupedAchievements[groupName].length;
 
