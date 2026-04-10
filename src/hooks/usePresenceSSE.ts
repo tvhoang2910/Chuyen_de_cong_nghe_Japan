@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { authApiBaseUrl } from '../config/env';
 
 export interface PresenceEvent {
   eventType: 'JOIN' | 'LEAVE' | 'SNAPSHOT';
@@ -24,8 +25,7 @@ export function usePresenceSSE(accessToken: string | null) {
         return;
       }
 
-      const authBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1/auth';
-      const url = `${authBaseUrl}/sse/presence?token=${encodeURIComponent(accessToken)}`;
+      const url = `${authApiBaseUrl}/sse/presence?token=${encodeURIComponent(accessToken)}`;
 
       const es = new EventSource(url, { withCredentials: false });
       emitterRef.current = es;
@@ -65,8 +65,7 @@ export function usePresenceSSE(accessToken: string | null) {
     // Heartbeat every 30s
     const heartbeatInterval = setInterval(() => {
       if (accessToken) {
-        const authBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1/auth';
-        void fetch(`${authBaseUrl}/sse/presence/heartbeat`, {
+        void fetch(`${authApiBaseUrl}/sse/presence/heartbeat`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${accessToken}` },
         });

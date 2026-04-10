@@ -18,8 +18,9 @@ import {
 import { motion } from "framer-motion";
 import toast from "react-hot-toast";
 import axiosClient from "../api/axiosClient";
+import { authApiBaseUrl } from "../config/env";
 
-const GOOGLE_AUTH_URL = `${import.meta.env.VITE_AUTH_BASE_URL || "http://localhost:8080/api/v1/auth"}/oauth2/authorization/google`;
+const GOOGLE_AUTH_URL = `${authApiBaseUrl}/oauth2/authorization/google`;
 
 const registerSchema = z
   .object({

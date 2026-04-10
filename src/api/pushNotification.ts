@@ -1,3 +1,5 @@
+import { authApiBaseUrl } from '../config/env';
+
 const buildAuthHeaders = (): HeadersInit => {
   const token = localStorage.getItem('access_token');
   return token ? { Authorization: `Bearer ${token}` } : {};
@@ -26,8 +28,7 @@ const toPushSubscriptionRequestPayload = (
 };
 
 export const fetchVapidPublicKey = async (): Promise<string> => {
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1/auth';
-  const res = await fetch(`${baseUrl}/push-subscription/vapid-public-key`, {
+  const res = await fetch(`${authApiBaseUrl}/push-subscription/vapid-public-key`, {
     headers: buildAuthHeaders(),
   });
   if (!res.ok) throw new Error('Failed to fetch VAPID public key');
@@ -36,13 +37,12 @@ export const fetchVapidPublicKey = async (): Promise<string> => {
 };
 
 export const subscribePush = async (subscription: PushSubscriptionJSON): Promise<void> => {
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1/auth';
   const token = getAccessToken();
   if (!token) {
     return;
   }
   const payload = toPushSubscriptionRequestPayload(subscription);
-  const res = await fetch(`${baseUrl}/push-subscription`, {
+  const res = await fetch(`${authApiBaseUrl}/push-subscription`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...buildAuthHeaders() },
     body: JSON.stringify(payload),
@@ -56,12 +56,11 @@ export const subscribePush = async (subscription: PushSubscriptionJSON): Promise
 };
 
 export const unsubscribePush = async (endpoint: string): Promise<void> => {
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api/v1/auth';
   const token = getAccessToken();
   if (!token) {
     return;
   }
-  const res = await fetch(`${baseUrl}/push-subscription`, {
+  const res = await fetch(`${authApiBaseUrl}/push-subscription`, {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json', ...buildAuthHeaders() },
     body: JSON.stringify({ endpoint }),

@@ -1,5 +1,6 @@
 import axios, { AxiosError } from "axios";
 import type { InternalAxiosRequestConfig } from "axios";
+import { authApiBaseUrl } from "../config/env";
 
 type AuthPayload = {
   accessToken: string;
@@ -207,8 +208,6 @@ type RetryableRequestConfig = InternalAxiosRequestConfig & {
   _skipAuthRecovery?: boolean;
 };
 
-const authApiBaseUrl =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api/v1/auth";
 const publicAuthPaths = new Set([
   "/login",
   "/register",
