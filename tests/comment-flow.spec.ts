@@ -176,7 +176,7 @@ test.describe('Comment Creation Flow', () => {
     await expect(page.getByText('This is my first comment on this exam.')).toBeVisible();
 
     // Author metadata appears on comment bubble
-    await expect(page.getByText('User 1')).toBeVisible();
+    await expect(page.getByText('Người dùng').first()).toBeVisible();
   });
 
   test('displays existing comments on page load', async ({ page }) => {
@@ -263,7 +263,7 @@ test.describe('Comment Reply Flow', () => {
     await expect(page.getByRole('button', { name: 'Hủy' })).toBeVisible();
 
     // Fill and submit
-    const replyTextarea = page.locator('textarea[placeholder="Viết phản hồi cho User 50..."]');
+    const replyTextarea = page.locator('textarea[placeholder="Viết phản hồi cho Người dùng..."]');
     await replyTextarea.fill('This is a reply to the parent comment.');
     await page.getByRole('button', { name: 'Gửi reply' }).click();
 
@@ -271,7 +271,7 @@ test.describe('Comment Reply Flow', () => {
 
     // Reply appears nested and shows mention tag for target user.
     await expect(page.getByText('This is a reply to the parent comment.')).toBeVisible();
-    await expect(page.getByText('@User 50')).toBeVisible();
+    await expect(page.getByText('@Người dùng').first()).toBeVisible();
   });
 
   test('Cancel button hides the inline reply form without submitting', async ({ page }) => {
@@ -553,12 +553,12 @@ test.describe('Max Reply Depth', () => {
 
     const replyButtons = page.getByRole('button', { name: 'Trả lời' });
     await replyButtons.nth(2).click();
-    await page.locator('textarea[placeholder="Viết phản hồi cho User 32..."]').fill('Reply beyond level 3 still in level 3 thread');
+    await page.locator('textarea[placeholder="Viết phản hồi cho Người dùng..."]').fill('Reply beyond level 3 still in level 3 thread');
     await page.getByRole('button', { name: 'Gửi reply' }).click();
 
     expect(capturedParentId).toBe(32);
     await expect(page.getByText('Reply beyond level 3 still in level 3 thread')).toBeVisible();
-    await expect(page.getByText('@User 32')).toBeVisible();
+    await expect(page.getByText('@Người dùng')).toBeVisible();
   });
 
   test('reply button appears on all visible levels', async ({ page }) => {
@@ -907,7 +907,7 @@ test.describe('Nested Reply UI', () => {
     await expect(page.getByText('Level 2 reply')).toBeVisible();
     await expect(page.getByText('Level 3 deep reply')).toBeVisible();
 
-    await expect(page.getByText('@User 22')).toBeVisible();
+    await expect(page.getByText('@Người dùng').first()).toBeVisible();
 
     // Nested cards should be indented.
     await expect(page.locator('div.ml-6').first()).toBeVisible();
@@ -956,9 +956,7 @@ test.describe('Comment Tree — Structural Integrity', () => {
     await expect(page.getByText('Top 1')).toBeVisible();
     await expect(page.getByText('Top 2')).toBeVisible();
     await expect(page.getByText('Top 3')).toBeVisible();
-    await expect(page.getByText('User 101')).toBeVisible();
-    await expect(page.getByText('User 102')).toBeVisible();
-    await expect(page.getByText('User 103')).toBeVisible();
+    await expect(page.getByText('Người dùng')).toHaveCount(3);
   });
 
   test('reply count badge reflects number of replies', async ({ page }) => {

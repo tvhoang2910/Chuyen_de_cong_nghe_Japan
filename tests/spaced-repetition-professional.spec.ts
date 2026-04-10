@@ -232,7 +232,7 @@ test.describe('Professional coverage for spaced repetition', () => {
 
     await page.goto('/dashboard/spaced-repetition');
 
-    const completionCard = page.getByText('Ti le co lich su on').locator('xpath=..');
+    const completionCard = page.getByText('Tỉ lệ có lịch sử ôn').locator('xpath=..');
     await expect(completionCard).toContainText('50%');
   });
 
@@ -283,8 +283,8 @@ test.describe('Professional coverage for spaced repetition', () => {
 
     await page.goto('/dashboard/spaced-repetition/9/practice?attemptId=222');
 
-    await expect(page.getByRole('heading', { name: /Matched Attempt Deck - cac cau sai/i })).toBeVisible();
-    await expect(page.getByRole('heading', { name: /Cau hoi #302/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Matched Attempt Deck - các câu sai/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Câu hỏi #302/i })).toBeVisible();
   });
 
   test('navigates back to list when user clicks back button in practice page', async ({ page }) => {
@@ -294,10 +294,10 @@ test.describe('Professional coverage for spaced repetition', () => {
     await mockAttemptView(page);
 
     await page.goto('/dashboard/spaced-repetition/9/practice?attemptId=300');
-    await page.getByRole('button', { name: 'Quay lai danh sach deck' }).click();
+    await page.getByRole('button', { name: 'Quay lại danh sách deck' }).click();
 
     await expect(page).toHaveURL(/\/dashboard\/spaced-repetition$/);
-    await expect(page.getByRole('heading', { name: /On tap thong minh tu study_service/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Ôn tập thông minh từ study_service/i })).toBeVisible();
   });
 
   test('shows warning block when attempt-view has no options for question', async ({ page }) => {
@@ -319,7 +319,7 @@ test.describe('Professional coverage for spaced repetition', () => {
 
     await page.goto('/dashboard/spaced-repetition/9/practice?attemptId=300');
 
-    await expect(page.getByText(/Khong tai duoc danh sach dap an cho cau nay/i).first()).toBeVisible();
+    await expect(page.getByText(/Không tải được danh sách đáp án cho câu này/i).first()).toBeVisible();
   });
 
   test('sends isCorrect=false for wrong answer submission', async ({ page }) => {
@@ -348,7 +348,7 @@ test.describe('Professional coverage for spaced repetition', () => {
 
     await page.goto('/dashboard/spaced-repetition/9/practice?attemptId=300');
     await page.getByRole('button', { name: '2. Option B' }).click();
-    await page.getByRole('button', { name: 'Kiem tra cau nay' }).first().click();
+    await page.getByRole('button', { name: 'Kiểm tra câu này' }).first().click();
 
     expect(payload).toBeTruthy();
     expect(payload).toMatchObject({
@@ -356,7 +356,7 @@ test.describe('Professional coverage for spaced repetition', () => {
       isCorrect: false,
     });
 
-    await expect(page.getByText(/Chua dung\. Da cap nhat SM-2 cho cau 101/i)).toBeVisible();
+    await expect(page.getByText(/Chưa đúng\. Đã cập nhật SM-2 cho câu 101/i)).toBeVisible();
   });
 
   test('shows backend message when review save fails and stays on practice page', async ({ page }) => {
@@ -375,7 +375,7 @@ test.describe('Professional coverage for spaced repetition', () => {
 
     await page.goto('/dashboard/spaced-repetition/9/practice?attemptId=300');
     await page.getByRole('button', { name: '1. Option A' }).click();
-    await page.getByRole('button', { name: 'Kiem tra cau nay' }).first().click();
+    await page.getByRole('button', { name: 'Kiểm tra câu này' }).first().click();
 
     await expect(page.getByText('Cannot save review now')).toBeVisible();
     await expect(page).toHaveURL(/\/dashboard\/spaced-repetition\/9\/practice\?attemptId=300$/);
