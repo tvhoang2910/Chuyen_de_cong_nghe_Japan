@@ -115,7 +115,7 @@ const Login: React.FC = () => {
 
   const handleGoogleLogin = () => {
     const apiBaseUrl =
-      import.meta.env.VITE_API_BASE_URL || "http://localhost:8081/api/v1/auth";
+      import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api/v1/auth";
     globalThis.location.href = `${apiBaseUrl}/oauth2/authorization/google`;
   };
 
