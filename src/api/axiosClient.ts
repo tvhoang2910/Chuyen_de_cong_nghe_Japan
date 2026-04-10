@@ -371,11 +371,22 @@ export const persistAuthSession = (payload: AuthPayload) => {
 };
 
 export const clearAuthSession = () => {
+  const timerPrefix = "exam_bank_study_timer_v2:";
+  const keysToRemove: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith(timerPrefix)) {
+      keysToRemove.push(key);
+    }
+  }
+
   localStorage.removeItem("access_token");
   localStorage.removeItem("refresh_token");
   localStorage.removeItem("user_email");
   localStorage.removeItem("user_role");
   localStorage.removeItem(USER_FULL_NAME_STORAGE_KEY);
+  localStorage.removeItem("exam_bank_study_timer_v1");
+  keysToRemove.forEach((key) => localStorage.removeItem(key));
   clearAllApiCache();
   notifyAuthSessionChanged();
 };

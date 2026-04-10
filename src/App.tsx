@@ -26,6 +26,7 @@ const ExamAttempt = lazy(() => import('./pages/ExamAttempt'));
 const ExamResult = lazy(() => import('./pages/ExamResult'));
 const SpacedRepetition = lazy(() => import('./pages/SpacedRepetition.tsx'));
 const SpacedRepetitionPractice = lazy(() => import('./pages/SpacedRepetitionPractice.tsx'));
+const Gamification = lazy(() => import('./pages/Gamification'));
 const SubscriptionPayments = lazy(() => import('./pages/SubscriptionPayments'));
 const SubscriptionReviewQueue = lazy(() => import('./pages/SubscriptionReviewQueue'));
 const PremiumPlanManagement = lazy(() => import('./pages/PremiumPlanManagement'));
@@ -219,6 +220,19 @@ function App() {
                   allowedRoles={['USER']}
                 >
                   <SpacedRepetitionPractice />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/gamification"
+              element={
+                <ProtectedRoute
+                  isAuthenticated={effectiveIsAuthenticated}
+                  userRole={effectiveRole}
+                  defaultPath={defaultAuthenticatedPath}
+                  allowedRoles={['USER']}
+                >
+                  <Gamification />
                 </ProtectedRoute>
               }
             />
