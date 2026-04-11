@@ -539,7 +539,6 @@ const Gamification: React.FC = () => {
                         </span>
                       </div>
                       <h4 className="mt-3 font-bold text-slate-900">{achievement.name}</h4>
-                      <p className="mt-1 text-xs text-slate-500">Mã: {achievement.code}</p>
 
                       {expandedBadges[achievement.code] && (
                         <div

@@ -162,6 +162,10 @@ const UserTableRow: React.FC<UserTableRowProps> = ({
                {user.role === 'ADMIN' && <Fingerprint className="w-4 h-4 text-rose-500" />}
             </div>
             <div className="flex flex-col gap-1 text-slate-500">
+              <div className="flex items-center gap-1.5">
+                <Fingerprint className="w-3.5 h-3.5 opacity-70" />
+                <p className="text-[10px] font-black uppercase tracking-wider">ID: {user.id}</p>
+              </div>
                <div className="flex items-center gap-1.5">
                   <Mail className="w-3.5 h-3.5 opacity-70" />
                   <p className="text-xs font-bold truncate max-w-[180px]" title={user.email}>{user.email}</p>
