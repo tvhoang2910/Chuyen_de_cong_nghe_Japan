@@ -57,7 +57,7 @@ const ExamStart: React.FC = () => {
 
     try {
       await createComment(payload);
-      toast.success("Gửi bình luận thành công");
+      toast.success("Gửi bình luận thành công.");
       setReplyTargetId(null);
       await loadComments(examId);
     } catch (error) {
