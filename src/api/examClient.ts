@@ -28,6 +28,9 @@ export type ExamSummary = {
   durationMinutes: number;
   passingScore: number;
   maxAttempts: number;
+  premium: boolean;
+  teaserQuestionCount: number;
+  premiumLocked?: boolean;
   tags: TagOption[];
   totalQuestions: number;
   status: OnlineExamStatus;
@@ -47,9 +50,16 @@ export type CreateExamPayload = {
   durationMinutes: number;
   passingScore: number;
   maxAttempts: number;
+  premium: boolean;
+  teaserQuestionCount: number;
   tagIds: number[];
   newTags?: string[];
   questions: ExamQuestion[];
+};
+
+export type ApiErrorResponse = {
+  message?: string;
+  error?: string;
 };
 
 export type CreateTagPayload = {
@@ -223,6 +233,15 @@ export const fetchAttemptResult = async (attemptId: number): Promise<AttemptResu
 export const fetchMyAttemptHistory = async (): Promise<AttemptSummary[]> => {
   const response = await examClient.get<AttemptSummary[]>('/users/me/attempts');
   return response.data;
+};
+
+export const isPremiumUpgradeRequiredError = (status?: number, message?: string): boolean => {
+  if (status !== 403 || !message) {
+    return false;
+  }
+
+  const normalized = message.toLowerCase();
+  return normalized.includes('premium') && normalized.includes('upgrade');
 };
 
 export type ReportType =

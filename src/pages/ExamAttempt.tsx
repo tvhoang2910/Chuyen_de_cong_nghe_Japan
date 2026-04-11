@@ -2,11 +2,14 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import axios from 'axios';
+import PremiumUpsellModal from '../components/PremiumUpsellModal';
 import {
   fetchAttemptView,
+  isPremiumUpgradeRequiredError,
   saveAttemptAnswersBatch,
   startAttempt,
   submitAttempt,
+  type ApiErrorResponse,
   type ExamDetail,
   type SaveAttemptAnswerPayload,
 } from '../api/examClient';
@@ -30,6 +33,7 @@ const ExamAttempt: React.FC = () => {
   const [answers, setAnswers] = useState<Record<number, number[]>>({});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [showPremiumModal, setShowPremiumModal] = useState(false);
   const [remainingSeconds, setRemainingSeconds] = useState<number>(0);
   const [timerInitialized, setTimerInitialized] = useState(false);
 
@@ -92,16 +96,31 @@ const ExamAttempt: React.FC = () => {
     const load = async () => {
       try {
         setLoading(true);
-        const started = await startAttempt({ examId, clientVersion: 'exam-web-1.0.0' });
         const examDetail = await fetchAttemptView(examId);
-
         setExam(examDetail);
+
+        if (examDetail.premiumLocked) {
+          setShowPremiumModal(true);
+          return;
+        }
+
+        const started = await startAttempt({ examId, clientVersion: 'exam-web-1.0.0' });
         setAttemptId(started.attemptId);
         setExpiresAt(started.expiresAt);
       } catch (error) {
-        const message = axios.isAxiosError(error)
+        const status = axios.isAxiosError<ApiErrorResponse>(error)
+          ? error.response?.status
+          : undefined;
+        const message = axios.isAxiosError<ApiErrorResponse>(error)
           ? error.response?.data?.message || 'Không thể bắt đầu bài thi.'
           : 'Không thể bắt đầu bài thi.';
+
+        if (isPremiumUpgradeRequiredError(status, message)) {
+          setShowPremiumModal(true);
+          toast.error(message, { id: 'start-attempt-error' });
+          return;
+        }
+
         toast.error(message, { id: 'start-attempt-error' });
         navigate('/dashboard/exams');
       } finally {
@@ -196,9 +215,10 @@ const ExamAttempt: React.FC = () => {
   }, []);
 
   const totalQuestions = useMemo(() => exam?.questions.length || 0, [exam?.questions.length]);
+  const isPreviewMode = Boolean(exam?.premiumLocked) || (Boolean(exam?.premium) && !attemptId);
 
   const handleChooseOption = (questionId: number, optionId: number) => {
-    if (!attemptId) {
+    if (!attemptId || isPreviewMode) {
       return;
     }
 
@@ -278,10 +298,25 @@ const ExamAttempt: React.FC = () => {
             <h1 className="text-2xl font-bold text-slate-900">{exam.title}</h1>
             <p className="text-slate-500 text-sm mt-1">{totalQuestions} câu hỏi • Điểm đỗ {exam.passingScore}</p>
           </div>
-          <div className="rounded-xl bg-rose-50 border border-rose-200 px-4 py-2 text-rose-700 font-semibold">
-            Thời gian còn lại: {formatTimer(remainingSeconds)}
-          </div>
+          {attemptId ? (
+            <div className="rounded-xl bg-rose-50 border border-rose-200 px-4 py-2 text-rose-700 font-semibold">
+              Thời gian còn lại: {formatTimer(remainingSeconds)}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-amber-800 font-semibold">
+              Chế độ xem thử Premium
+            </div>
+          )}
         </div>
+
+        {isPreviewMode && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            <p className="font-semibold">Bạn đang xem thử nội dung Premium</p>
+            <p className="mt-1">
+              Để bắt đầu làm bài, lưu đáp án và nộp kết quả, vui lòng nâng cấp Premium.
+            </p>
+          </div>
+        )}
 
         <div className="space-y-4">
           {exam.questions.map((question, qIndex) => (
@@ -295,11 +330,14 @@ const ExamAttempt: React.FC = () => {
                     <button
                       key={opt.id || optIndex}
                       type="button"
+                      disabled={isPreviewMode || !question.id || !opt.id}
                       onClick={() => question.id && opt.id && handleChooseOption(question.id, opt.id)}
                       className={`w-full rounded-xl border px-3 py-2 text-left text-sm transition ${
                         active
                           ? 'border-blue-500 bg-blue-50 text-blue-800'
-                          : 'border-slate-200 hover:border-blue-300 hover:bg-blue-50/40 text-slate-700'
+                          : isPreviewMode
+                            ? 'border-slate-200 bg-slate-100 text-slate-500 cursor-not-allowed'
+                            : 'border-slate-200 hover:border-blue-300 hover:bg-blue-50/40 text-slate-700'
                       }`}
                     >
                       {optIndex + 1}. {opt.content}
@@ -311,17 +349,38 @@ const ExamAttempt: React.FC = () => {
           ))}
         </div>
 
-        <div className="sticky bottom-3 flex justify-end">
-          <button
-            type="button"
-            onClick={() => void handleSubmit()}
-            disabled={submitting}
-            className="rounded-xl bg-blue-600 px-5 py-2.5 font-semibold text-white hover:bg-blue-700 disabled:bg-blue-400"
-          >
-            {submitting ? 'Đang nộp bài...' : 'Nộp bài'}
-          </button>
-        </div>
+        {isPreviewMode ? (
+          <div className="sticky bottom-3 flex justify-end">
+            <button
+              type="button"
+              onClick={() => setShowPremiumModal(true)}
+              className="rounded-xl bg-amber-500 px-5 py-2.5 font-semibold text-white hover:bg-amber-600"
+            >
+              Nâng cấp Premium để làm bài
+            </button>
+          </div>
+        ) : (
+          <div className="sticky bottom-3 flex justify-end">
+            <button
+              type="button"
+              onClick={() => void handleSubmit()}
+              disabled={submitting}
+              className="rounded-xl bg-blue-600 px-5 py-2.5 font-semibold text-white hover:bg-blue-700 disabled:bg-blue-400"
+            >
+              {submitting ? 'Đang nộp bài...' : 'Nộp bài'}
+            </button>
+          </div>
+        )}
       </div>
+
+      <PremiumUpsellModal
+        open={showPremiumModal}
+        title="Đề thi này thuộc gói Premium"
+        description="Bạn cần nâng cấp Premium để mở toàn bộ câu hỏi, bắt đầu bài thi và nhận kết quả chấm điểm."
+        teaserQuestionCount={exam.teaserQuestionCount}
+        onClose={() => setShowPremiumModal(false)}
+        onUpgrade={() => navigate('/dashboard/subscription-payments')}
+      />
     </div>
   );
 };

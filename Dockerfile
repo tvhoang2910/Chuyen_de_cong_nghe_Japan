@@ -1,0 +1,26 @@
+# syntax=docker/dockerfile:1.7
+FROM node:22-alpine AS build
+WORKDIR /app
+
+COPY package*.json ./
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci
+
+COPY . .
+
+ARG VITE_AUTH_API_BASE_URL=/api/v1/auth
+ARG VITE_EXAM_API_BASE_URL=/api/v1/exam
+ARG VITE_STUDY_API_BASE_URL=/api/v1/study
+ARG VITE_COMMUNITY_API_BASE_URL=/api/v1/community
+ARG VITE_ANALYTICS_API_BASE_URL=/api/v1/exam/analytics
+
+ENV VITE_AUTH_API_BASE_URL=${VITE_AUTH_API_BASE_URL}
+ENV VITE_EXAM_API_BASE_URL=${VITE_EXAM_API_BASE_URL}
+ENV VITE_STUDY_API_BASE_URL=${VITE_STUDY_API_BASE_URL}
+ENV VITE_COMMUNITY_API_BASE_URL=${VITE_COMMUNITY_API_BASE_URL}
+ENV VITE_ANALYTICS_API_BASE_URL=${VITE_ANALYTICS_API_BASE_URL}
+
+RUN npm run build
+
+FROM scratch AS export-dist
+COPY --from=build /app/dist /dist

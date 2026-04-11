@@ -2,11 +2,13 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import MainLayout from "../components/MainLayout";
+import PremiumUpsellModal from "../components/PremiumUpsellModal";
 import CommentForm from "../components/CommentForm";
 import CommentTree from "../components/CommentTree";
 import type { CommentNode } from "../api/commentClient";
 import { createComment, fetchCommentsByExam } from "../api/commentClient";
 import { resolveCommentSubmitErrorMessage } from "../api/commentHelpers";
+import { fetchCurrentUserProfile, type UserProfile } from "../api/axiosClient";
 import {
   fetchMyAttemptHistory,
   fetchPublicExamDetail,
@@ -21,11 +23,13 @@ const ExamStart: React.FC = () => {
 
   const [exam, setExam] = useState<ExamSummary | null>(null);
   const [examAttempts, setExamAttempts] = useState<AttemptSummary[]>([]);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [showPremiumModal, setShowPremiumModal] = useState(false);
   const [comments, setComments] = useState<CommentNode[]>([]);
   const [isLoadingComments, setIsLoadingComments] = useState(false);
   const [replyTargetId, setReplyTargetId] = useState<number | null>(null);
-  const userId = 1;
+  const userId = profile?.id ?? 1;
 
   const loadComments = useCallback(async (examIdNumber: number) => {
     setIsLoadingComments(true);
@@ -73,12 +77,14 @@ const ExamStart: React.FC = () => {
     const load = async () => {
       try {
         setIsLoading(true);
-        const [detail, attempts] = await Promise.all([
+        const [detail, attempts, profileData] = await Promise.all([
           fetchPublicExamDetail(examId),
           fetchMyAttemptHistory(),
+          fetchCurrentUserProfile(),
         ]);
 
         setExam(detail);
+        setProfile(profileData);
         setExamAttempts(
           attempts.filter((attempt) => attempt.examId === examId),
         );
@@ -122,6 +128,18 @@ const ExamStart: React.FC = () => {
       ),
     [examAttempts],
   );
+
+  const isPremiumLocked = useMemo(() => {
+    if (!exam?.premium) {
+      return false;
+    }
+
+    return !profile?.premium;
+  }, [exam?.premium, profile?.premium]);
+
+  const openUpgrade = () => {
+    navigate("/dashboard/subscription-payments");
+  };
 
   if (isLoading) {
     return (
@@ -213,13 +231,34 @@ const ExamStart: React.FC = () => {
           Nội dung câu hỏi sẽ chỉ hiển thị sau khi bấm Bắt đầu làm bài.
         </div>
 
+        {exam.premium && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            <p className="font-semibold">Đây là đề Premium</p>
+            <p className="mt-1">
+              {isPremiumLocked
+                ? `Tài khoản hiện tại chưa có Premium. Bạn có thể xem thử ${exam.teaserQuestionCount} câu đầu ở trang làm bài.`
+                : "Bạn đang có quyền Premium và có thể mở toàn bộ đề thi."}
+            </p>
+          </div>
+        )}
+
         <div className="flex flex-wrap items-center gap-3">
-          <Link
-            to={`/dashboard/exams/${exam.id}/attempt`}
+          <button
+            type="button"
+            onClick={() => navigate(`/dashboard/exams/${exam.id}/attempt`)}
             className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
           >
-            Bắt đầu làm bài
-          </Link>
+            {isPremiumLocked ? "Xem thử đề Premium" : "Bắt đầu làm bài"}
+          </button>
+          {isPremiumLocked && (
+            <button
+              type="button"
+              onClick={() => setShowPremiumModal(true)}
+              className="rounded-xl border border-amber-300 bg-amber-50 px-5 py-2.5 text-sm font-semibold text-amber-800 hover:bg-amber-100"
+            >
+              Nâng cấp Premium
+            </button>
+          )}
           <Link
             to="/dashboard/exams"
             className="rounded-xl border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100"
@@ -286,6 +325,15 @@ const ExamStart: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <PremiumUpsellModal
+        open={showPremiumModal}
+        title="Nội dung này chỉ dành cho Premium"
+        description="Bạn cần nâng cấp để mở toàn bộ câu hỏi và gửi bài thi cho đề này."
+        teaserQuestionCount={exam.teaserQuestionCount}
+        onClose={() => setShowPremiumModal(false)}
+        onUpgrade={openUpgrade}
+      />
     </MainLayout>
   );
 };

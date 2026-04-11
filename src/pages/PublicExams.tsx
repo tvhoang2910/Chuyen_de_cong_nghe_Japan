@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Crown, Lock } from 'lucide-react';
 import toast from 'react-hot-toast';
 import MainLayout from '../components/MainLayout';
 import { fetchPublicExams, type ExamSummary } from '../api/examClient';
@@ -50,11 +51,28 @@ const PublicExams: React.FC = () => {
                   key={exam.id}
                   className="w-full rounded-2xl border border-slate-200 p-4 hover:border-blue-300 hover:bg-blue-50/40"
                 >
-                  <h3 className="font-bold text-slate-900">{exam.title}</h3>
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="font-bold text-slate-900">{exam.title}</h3>
+                    {exam.premium ? (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700">
+                        <Crown className="h-3.5 w-3.5" /> Premium
+                      </span>
+                    ) : (
+                      <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
+                        Miễn phí
+                      </span>
+                    )}
+                  </div>
                   <p className="text-sm text-slate-600 line-clamp-2 mt-1">{exam.description || 'Không có mô tả'}</p>
                   <p className="text-xs text-slate-400 mt-2">
                     {exam.totalQuestions} câu hỏi • {exam.durationMinutes} phút • Điểm đỗ {exam.passingScore}
                   </p>
+                  {exam.premium && (
+                    <p className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-amber-700">
+                      <Lock className="h-3.5 w-3.5" />
+                      Người dùng miễn phí chỉ xem thử {exam.teaserQuestionCount} câu đầu.
+                    </p>
+                  )}
                   {exam.tags.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {exam.tags.map((tag) => (

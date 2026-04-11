@@ -1,5 +1,5 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { Pencil, Trash2, Eye, Plus, Save, Megaphone, Archive, FilePlus2, Upload } from 'lucide-react';
+import { Pencil, Trash2, Eye, Plus, Save, Megaphone, Archive, FilePlus2, Upload, Crown, Lock } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { AxiosError } from 'axios';
@@ -54,6 +54,8 @@ const emptyPayload = (): CreateExamPayload => ({
   durationMinutes: 60,
   passingScore: 5,
   maxAttempts: 100,
+  premium: false,
+  teaserQuestionCount: 2,
   tagIds: [],
   questions: [emptyQuestion()],
 });
@@ -63,6 +65,8 @@ const importSampleExam = {
   description: 'Mẫu import JSON cho hệ thống exam bank',
   durationMinutes: 45,
   passingScore: 5,
+  premium: false,
+  teaserQuestionCount: 2,
   tags: ['Toán', 'Cơ bản', 'Trắc nghiệm'],
   questions: [
     {
@@ -264,6 +268,8 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
         durationMinutes: detail.durationMinutes,
         passingScore: detail.passingScore,
         maxAttempts: detail.maxAttempts || 100,
+        premium: Boolean(detail.premium),
+        teaserQuestionCount: detail.teaserQuestionCount || 2,
         tagIds: detail.tags?.map((tag) => tag.id) || [],
         newTags: [],
         questions: detail.questions.map((q) => ({
@@ -372,6 +378,9 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
   const validatePayload = (payload: CreateExamPayload): string | null => {
     if (!payload.title.trim()) return 'Tiêu đề đề thi không được để trống.';
     if (!payload.maxAttempts || payload.maxAttempts < 1) return 'Số lần làm tối đa phải lớn hơn hoặc bằng 1.';
+    if (!payload.teaserQuestionCount || payload.teaserQuestionCount < 1 || payload.teaserQuestionCount > 2) {
+      return 'Số câu teaser phải từ 1 đến 2.';
+    }
     if (payload.questions.length === 0) return 'Đề thi phải có ít nhất 1 câu hỏi.';
 
     for (let i = 0; i < payload.questions.length; i += 1) {
@@ -422,6 +431,8 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
       durationMinutes: Number(source.durationMinutes ?? 60),
       passingScore: Number(source.passingScore ?? 5),
       maxAttempts: Number(source.maxAttempts ?? 100),
+      premium: Boolean(source.premium),
+      teaserQuestionCount: Number(source.teaserQuestionCount ?? 2),
       tagIds: [],
       newTags: Array.isArray(source.tags) ? source.tags.map(String) : [],
       questions,
@@ -546,6 +557,7 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
       ...form,
       title: form.title.trim(),
       description: form.description?.trim() || '',
+      teaserQuestionCount: Math.max(1, Math.min(2, form.teaserQuestionCount || 2)),
       tagIds: selectedTags.map((tag) => tag.id),
       newTags: [],
       questions: form.questions.map((q) => ({
@@ -664,11 +676,23 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
               <div key={exam.id} className="rounded-2xl border border-slate-200 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
-                    <h3 className="font-bold text-slate-900">{exam.title}</h3>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="font-bold text-slate-900">{exam.title}</h3>
+                      {exam.premium && (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700">
+                          <Crown className="h-3.5 w-3.5" /> Premium
+                        </span>
+                      )}
+                    </div>
                     <p className="text-sm text-slate-500 line-clamp-2">{exam.description || 'Không có mô tả'}</p>
                     <p className="text-xs text-slate-400 mt-2">
                       {exam.totalQuestions} câu hỏi • {exam.durationMinutes} phút • Điểm đỗ {exam.passingScore} • Tối đa {exam.maxAttempts} lượt
                     </p>
+                    {exam.premium && (
+                      <p className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-amber-700">
+                        <Lock className="h-3.5 w-3.5" /> Xem thử {exam.teaserQuestionCount} câu cho user miễn phí
+                      </p>
+                    )}
                   </div>
                   <span className={`rounded-full px-3 py-1 text-xs font-bold ${
                     exam.status === 'PUBLISHED' ? 'bg-emerald-100 text-emerald-700' :
@@ -755,6 +779,12 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
                           <p className="text-sm text-slate-500 mt-2">
                             Trạng thái: {selectedExam.status} • {selectedExam.totalQuestions} câu hỏi • Tối đa {selectedExam.maxAttempts} lượt
                           </p>
+                          {selectedExam.premium && (
+                            <p className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-amber-700">
+                              <Crown className="h-4 w-4" />
+                              Đề Premium • User miễn phí xem thử {selectedExam.teaserQuestionCount} câu
+                            </p>
+                          )}
                           {selectedExam.tags && selectedExam.tags.length > 0 && (
                             <div className="mt-3 flex flex-wrap gap-2">
                               {selectedExam.tags.map((tag, idx) => (
@@ -984,6 +1014,39 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
                           onChange={(event) => setForm((prev) => ({ ...prev, maxAttempts: Number(event.target.value || 1) }))}
                           className="w-full rounded-xl border border-slate-300 px-3 py-2"
                           min={1}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      <label className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
+                        <input
+                          type="checkbox"
+                          checked={form.premium}
+                          onChange={(event) =>
+                            setForm((prev) => ({
+                              ...prev,
+                              premium: event.target.checked,
+                            }))
+                          }
+                        />
+                        <span className="text-sm font-semibold text-amber-800">Đề này là nội dung Premium</span>
+                      </label>
+
+                      <div>
+                        <label className="mb-1 block text-sm font-semibold text-slate-700">Số câu teaser cho user miễn phí</label>
+                        <input
+                          type="number"
+                          value={form.teaserQuestionCount}
+                          onChange={(event) =>
+                            setForm((prev) => ({
+                              ...prev,
+                              teaserQuestionCount: Number(event.target.value || 2),
+                            }))
+                          }
+                          className="w-full rounded-xl border border-slate-300 px-3 py-2"
+                          min={1}
+                          max={2}
                         />
                       </div>
                     </div>
