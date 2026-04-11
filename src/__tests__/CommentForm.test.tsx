@@ -186,5 +186,28 @@ describe("CommentForm component", () => {
 
       expect(onSubmit).toHaveBeenCalledWith(multiLine);
     });
+
+    it("submits when pressing Enter without Shift", () => {
+      const onSubmit = vi.fn();
+      render(<CommentForm {...defaultProps} onSubmit={onSubmit} />);
+
+      const textarea = screen.getByPlaceholderText("Nhập nội dung comment...");
+      fireEvent.change(textarea, { target: { value: "Gửi bằng Enter" } });
+      fireEvent.keyDown(textarea, { key: "Enter", code: "Enter" });
+
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+      expect(onSubmit).toHaveBeenCalledWith("Gửi bằng Enter");
+    });
+
+    it("does not submit when pressing Shift+Enter", () => {
+      const onSubmit = vi.fn();
+      render(<CommentForm {...defaultProps} onSubmit={onSubmit} />);
+
+      const textarea = screen.getByPlaceholderText("Nhập nội dung comment...");
+      fireEvent.change(textarea, { target: { value: "Không gửi" } });
+      fireEvent.keyDown(textarea, { key: "Enter", code: "Enter", shiftKey: true });
+
+      expect(onSubmit).not.toHaveBeenCalled();
+    });
   });
 });

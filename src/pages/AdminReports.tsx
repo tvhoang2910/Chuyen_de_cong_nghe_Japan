@@ -433,7 +433,7 @@ const AdminReports: React.FC<AdminReportsProps> = ({ mode }) => {
 
                 <p className="inline-flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
                   <AlertTriangle className="h-4 w-4" />
-                  Hệ thống không gửi web push trong luồng này, chỉ cập nhật trạng thái report và trạng thái ẩn/hiện câu hỏi.
+                  Khi chọn "Đã xử lý", hệ thống sẽ gửi web push tới các user đã báo lỗi (nếu user có bật push notification).
                 </p>
               </div>
             )}

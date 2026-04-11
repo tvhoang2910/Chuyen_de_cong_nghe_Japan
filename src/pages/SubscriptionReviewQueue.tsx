@@ -1,14 +1,20 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { AxiosError } from 'axios';
-import { CheckCheck, Eye, MailCheck, RefreshCw, ShieldCheck, XCircle } from 'lucide-react';
+import { BarChart3, CheckCheck, Eye, MailCheck, RefreshCw, ShieldCheck, X, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import AdminLayout from '../components/AdminLayout';
 import MainLayout from '../components/MainLayout';
 import {
+  cancelSubscriptionByAdmin,
+  fetchSubscriptionAnalyticsOverview,
+  fetchSubscriptionHistory,
   fetchSubscriptionApprovalAudits,
   notifySubscriptionReviewUpdated,
   fetchSubscriptionReviewQueue,
   reviewSubscriptionPurchaseRequest,
+  type SubscriptionAnalyticsOverview,
+  type SubscriptionHistoryItem,
+  type SubscriptionHistoryPage,
   type SubscriptionStatus,
   type SubscriptionApprovalAudit,
   type UserSubscriptionQueueItem,
@@ -18,7 +24,42 @@ type SubscriptionReviewQueueProps = {
   mode: 'admin' | 'contributor';
 };
 
+type HistoryFilters = {
+  search: string;
+  status: SubscriptionStatus | '';
+  from: string;
+  to: string;
+};
+
+const EMPTY_HISTORY_FILTERS: HistoryFilters = {
+  search: '',
+  status: '',
+  from: '',
+  to: '',
+};
+
+const formatMoney = (amount: number | null | undefined): string => {
+  return `${Number(amount ?? 0).toLocaleString('vi-VN')}đ`;
+};
+
+const statusBadgeClass = (status: SubscriptionStatus): string => {
+  if (status === 'APPROVED') {
+    return 'bg-emerald-100 text-emerald-700';
+  }
+  if (status === 'PENDING_REVIEW') {
+    return 'bg-amber-100 text-amber-700';
+  }
+  if (status === 'CANCELLED') {
+    return 'bg-rose-100 text-rose-700';
+  }
+  if (status === 'EXPIRED') {
+    return 'bg-slate-200 text-slate-700';
+  }
+  return 'bg-slate-100 text-slate-700';
+};
+
 const SubscriptionReviewQueue: React.FC<SubscriptionReviewQueueProps> = ({ mode }) => {
+  const isAdminMode = mode === 'admin';
   const [rows, setRows] = useState<UserSubscriptionQueueItem[]>([]);
   const [selected, setSelected] = useState<UserSubscriptionQueueItem | null>(null);
   const [statusFilter, setStatusFilter] = useState<SubscriptionStatus>('PENDING_REVIEW');
@@ -26,6 +67,20 @@ const SubscriptionReviewQueue: React.FC<SubscriptionReviewQueueProps> = ({ mode 
   const [reviewNote, setReviewNote] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [analytics, setAnalytics] = useState<SubscriptionAnalyticsOverview | null>(null);
+  const [isAnalyticsLoading, setIsAnalyticsLoading] = useState(false);
+
+  const [history, setHistory] = useState<SubscriptionHistoryPage | null>(null);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  const [historyFilters, setHistoryFilters] = useState<HistoryFilters>(EMPTY_HISTORY_FILTERS);
+  const [historyFilterDraft, setHistoryFilterDraft] = useState<HistoryFilters>(EMPTY_HISTORY_FILTERS);
+  const [historyPageIndex, setHistoryPageIndex] = useState(0);
+  const historyPageSize = 10;
+
+  const [cancelTarget, setCancelTarget] = useState<SubscriptionHistoryItem | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [isCancelling, setIsCancelling] = useState(false);
 
   const Layout = useMemo(() => (mode === 'admin' ? AdminLayout : MainLayout), [mode]);
 
@@ -62,6 +117,63 @@ const SubscriptionReviewQueue: React.FC<SubscriptionReviewQueueProps> = ({ mode 
     void loadAudits();
   }, [selected]);
 
+  const requestAnalytics = useCallback(async () => {
+    if (!isAdminMode) {
+      return;
+    }
+    try {
+      setIsAnalyticsLoading(true);
+      const response = await fetchSubscriptionAnalyticsOverview();
+      setAnalytics(response);
+    } catch {
+      toast.error('Không thể tải analytics subscription.');
+      setAnalytics(null);
+    } finally {
+      setIsAnalyticsLoading(false);
+    }
+  }, [isAdminMode]);
+
+  const requestHistory = useCallback(
+    async (filters: HistoryFilters, page: number) => {
+      if (!isAdminMode) {
+        return;
+      }
+      try {
+        setIsHistoryLoading(true);
+        const response = await fetchSubscriptionHistory({
+          search: filters.search || undefined,
+          status: filters.status || undefined,
+          from: filters.from || undefined,
+          to: filters.to || undefined,
+          page,
+          size: historyPageSize,
+          sort: 'createdAt,desc',
+        });
+        setHistory(response);
+      } catch {
+        toast.error('Không thể tải lịch sử subscription.');
+        setHistory(null);
+      } finally {
+        setIsHistoryLoading(false);
+      }
+    },
+    [historyPageSize, isAdminMode],
+  );
+
+  useEffect(() => {
+    if (!isAdminMode) {
+      return;
+    }
+    void requestAnalytics();
+  }, [isAdminMode, requestAnalytics]);
+
+  useEffect(() => {
+    if (!isAdminMode) {
+      return;
+    }
+    void requestHistory(historyFilters, historyPageIndex);
+  }, [historyFilters, historyPageIndex, isAdminMode, requestHistory]);
+
   const handleReview = async (approved: boolean) => {
     if (!selected) {
       return;
@@ -84,6 +196,57 @@ const SubscriptionReviewQueue: React.FC<SubscriptionReviewQueueProps> = ({ mode 
     }
   };
 
+  const handleApplyHistoryFilters = () => {
+    setHistoryPageIndex(0);
+    setHistoryFilters(historyFilterDraft);
+  };
+
+  const handleResetHistoryFilters = () => {
+    setHistoryFilterDraft(EMPTY_HISTORY_FILTERS);
+    setHistoryPageIndex(0);
+    setHistoryFilters(EMPTY_HISTORY_FILTERS);
+  };
+
+  const handleOpenCancelModal = (item: SubscriptionHistoryItem) => {
+    setCancelTarget(item);
+    setCancelReason('');
+  };
+
+  const handleCloseCancelModal = () => {
+    setCancelTarget(null);
+    setCancelReason('');
+  };
+
+  const handleConfirmCancel = async () => {
+    if (!cancelTarget) {
+      return;
+    }
+
+    const reason = cancelReason.trim();
+    if (!reason) {
+      toast.error('Vui lòng nhập lý do hủy gói.');
+      return;
+    }
+
+    try {
+      setIsCancelling(true);
+      const response = await cancelSubscriptionByAdmin(cancelTarget.id, { reason });
+      toast.success(`Đã hủy gói thành công. Refund dự kiến: ${formatMoney(response.refundAmount)}`);
+      notifySubscriptionReviewUpdated();
+      handleCloseCancelModal();
+      await Promise.all([
+        loadQueue(),
+        requestHistory(historyFilters, historyPageIndex),
+        requestAnalytics(),
+      ]);
+    } catch (error) {
+      const axiosError = error as AxiosError<{ message?: string }>;
+      toast.error(axiosError.response?.data?.message || 'Hủy subscription thất bại.');
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
   return (
     <Layout>
       <div className="space-y-6">
@@ -101,6 +264,32 @@ const SubscriptionReviewQueue: React.FC<SubscriptionReviewQueueProps> = ({ mode 
             </button>
           </div>
         </section>
+
+        {isAdminMode && (
+          <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
+              <p className="text-xs font-bold uppercase tracking-wide text-emerald-700">Doanh thu tháng</p>
+              <p className="mt-3 text-2xl font-black text-emerald-900">
+                {isAnalyticsLoading ? '...' : formatMoney(analytics?.monthlyRevenue)}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-cyan-200 bg-cyan-50 p-5 shadow-sm">
+              <p className="text-xs font-bold uppercase tracking-wide text-cyan-700">Premium active</p>
+              <p className="mt-3 text-2xl font-black text-cyan-900">
+                {isAnalyticsLoading ? '...' : Number(analytics?.activePremiumCount ?? 0).toLocaleString('vi-VN')}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-violet-200 bg-violet-50 p-5 shadow-sm">
+              <p className="text-xs font-bold uppercase tracking-wide text-violet-700">Top plan</p>
+              <p className="mt-3 text-lg font-black text-violet-900">{analytics?.topPlanName || 'Chưa có dữ liệu'}</p>
+              <p className="mt-1 text-xs font-semibold text-violet-700">
+                {isAnalyticsLoading
+                  ? '...'
+                  : `${Number(analytics?.topPlanSubscriptions ?? 0).toLocaleString('vi-VN')} subscriptions`}
+              </p>
+            </div>
+          </section>
+        )}
 
         <section className="grid grid-cols-1 gap-6 xl:grid-cols-[1.05fr,1fr]">
           <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -232,7 +421,255 @@ const SubscriptionReviewQueue: React.FC<SubscriptionReviewQueueProps> = ({ mode 
             )}
           </div>
         </section>
+
+        {isAdminMode && (
+          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="inline-flex items-center gap-2 text-xl font-black text-slate-900">
+                <BarChart3 className="h-5 w-5 text-cyan-600" /> Lịch sử subscription
+              </h2>
+              <button
+                type="button"
+                onClick={() => void requestHistory(historyFilters, historyPageIndex)}
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                <RefreshCw className="h-4 w-4" /> Tải lại
+              </button>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+              <input
+                value={historyFilterDraft.search}
+                onChange={(event) =>
+                  setHistoryFilterDraft((current) => ({
+                    ...current,
+                    search: event.target.value,
+                  }))
+                }
+                placeholder="Tìm theo user, email, plan, mã GD"
+                className="rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-cyan-500 focus:outline-none"
+              />
+              <select
+                value={historyFilterDraft.status}
+                onChange={(event) =>
+                  setHistoryFilterDraft((current) => ({
+                    ...current,
+                    status: event.target.value as SubscriptionStatus | '',
+                  }))
+                }
+                className="rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-cyan-500 focus:outline-none"
+              >
+                <option value="">Tất cả trạng thái</option>
+                <option value="PENDING_REVIEW">PENDING_REVIEW</option>
+                <option value="APPROVED">APPROVED</option>
+                <option value="REJECTED">REJECTED</option>
+                <option value="EXPIRED">EXPIRED</option>
+                <option value="CANCELLED">CANCELLED</option>
+              </select>
+              <input
+                type="date"
+                value={historyFilterDraft.from}
+                onChange={(event) =>
+                  setHistoryFilterDraft((current) => ({
+                    ...current,
+                    from: event.target.value,
+                  }))
+                }
+                className="rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-cyan-500 focus:outline-none"
+              />
+              <input
+                type="date"
+                value={historyFilterDraft.to}
+                onChange={(event) =>
+                  setHistoryFilterDraft((current) => ({
+                    ...current,
+                    to: event.target.value,
+                  }))
+                }
+                className="rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-cyan-500 focus:outline-none"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleApplyHistoryFilters}
+                  className="w-full rounded-xl bg-cyan-600 px-3 py-2 text-sm font-bold text-white hover:bg-cyan-700"
+                >
+                  Lọc
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResetHistoryFilters}
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-5 overflow-x-auto rounded-2xl border border-slate-200">
+              <table className="min-w-full divide-y divide-slate-200 text-sm">
+                <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3 text-left">User</th>
+                    <th className="px-4 py-3 text-left">Plan</th>
+                    <th className="px-4 py-3 text-left">Giá</th>
+                    <th className="px-4 py-3 text-left">Trạng thái</th>
+                    <th className="px-4 py-3 text-left">Tạo lúc</th>
+                    <th className="px-4 py-3 text-left">Lý do hủy</th>
+                    <th className="px-4 py-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white text-slate-700">
+                  {isHistoryLoading ? (
+                    <tr>
+                      <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
+                        Đang tải dữ liệu...
+                      </td>
+                    </tr>
+                  ) : !history || history.content.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
+                        Không có dữ liệu subscription history.
+                      </td>
+                    </tr>
+                  ) : (
+                    history.content.map((item) => {
+                      const canCancel = item.status === 'APPROVED';
+                      return (
+                        <tr key={item.id} className="hover:bg-slate-50">
+                          <td className="px-4 py-3">
+                            <p className="font-semibold text-slate-900">{item.userFullName}</p>
+                            <p className="text-xs text-slate-500">{item.userEmail}</p>
+                          </td>
+                          <td className="px-4 py-3">
+                            <p className="font-semibold text-slate-900">{item.planName}</p>
+                            <p className="text-xs text-slate-500">#{item.id}</p>
+                          </td>
+                          <td className="px-4 py-3 font-semibold">{formatMoney(item.purchasedPrice)}</td>
+                          <td className="px-4 py-3">
+                            <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${statusBadgeClass(item.status)}`}>
+                              {item.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-xs text-slate-500">
+                            {new Date(item.createdAt).toLocaleString('vi-VN')}
+                          </td>
+                          <td className="px-4 py-3 text-xs text-slate-500">
+                            {item.cancellationReason || '-'}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex justify-end gap-2">
+                              {item.billImageUrl ? (
+                                <a
+                                  href={item.billImageUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="rounded-lg border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                >
+                                  Bill
+                                </a>
+                              ) : null}
+                              <button
+                                type="button"
+                                disabled={!canCancel}
+                                onClick={() => handleOpenCancelModal(item)}
+                                className="rounded-lg bg-rose-600 px-2 py-1 text-xs font-semibold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-rose-200"
+                              >
+                                Hủy gói
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="mt-4 flex items-center justify-between text-sm text-slate-600">
+              <p>
+                Tổng bản ghi: {Number(history?.totalElements ?? 0).toLocaleString('vi-VN')}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setHistoryPageIndex((current) => Math.max(current - 1, 0))}
+                  disabled={Boolean(history?.first ?? true)}
+                  className="rounded-lg border border-slate-300 px-3 py-1.5 font-semibold hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Trước
+                </button>
+                <span className="font-semibold text-slate-700">
+                  Trang {Number(history?.number ?? 0) + 1} / {Math.max(Number(history?.totalPages ?? 1), 1)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setHistoryPageIndex((current) => current + 1)}
+                  disabled={Boolean(history?.last ?? true)}
+                  className="rounded-lg border border-slate-300 px-3 py-1.5 font-semibold hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Sau
+                </button>
+              </div>
+            </div>
+          </section>
+        )}
       </div>
+
+      {cancelTarget && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-black text-slate-900">Xác nhận hủy subscription</h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  #{cancelTarget.id} - {cancelTarget.userFullName} - {cancelTarget.planName}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleCloseCancelModal}
+                className="rounded-lg border border-slate-300 p-1.5 text-slate-500 hover:bg-slate-100"
+                aria-label="Đóng modal hủy"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <label className="mt-4 block">
+              <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">
+                Lý do hủy (bắt buộc)
+              </span>
+              <textarea
+                value={cancelReason}
+                onChange={(event) => setCancelReason(event.target.value)}
+                rows={4}
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-rose-500 focus:outline-none"
+                placeholder="VD: Khách hàng yêu cầu hủy, sai thông tin chuyển khoản..."
+              />
+            </label>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={handleCloseCancelModal}
+                className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+              >
+                Đóng
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleConfirmCancel()}
+                disabled={isCancelling || cancelReason.trim().length === 0}
+                className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-bold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-rose-300"
+              >
+                {isCancelling ? 'Đang hủy...' : 'Xác nhận hủy'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 };

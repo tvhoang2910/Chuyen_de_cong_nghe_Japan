@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type KeyboardEvent } from "react";
 
 interface CommentFormProps {
   submitLabel: string;
@@ -19,13 +19,30 @@ const CommentForm = ({
 }: CommentFormProps) => {
   const [content, setContent] = useState("");
 
+  const submitComment = () => {
+    const trimmedContent = content.trim();
+    if (!trimmedContent) {
+      return;
+    }
+
+    onSubmit(trimmedContent);
+    setContent("");
+  };
+
+  const handleTextareaKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) {
+      return;
+    }
+
+    event.preventDefault();
+    submitComment();
+  };
+
   return (
     <form
       onSubmit={(event) => {
         event.preventDefault();
-        if (!content.trim()) return;
-        onSubmit(content.trim());
-        setContent("");
+        submitComment();
       }}
       className="space-y-4"
     >
@@ -38,6 +55,7 @@ const CommentForm = ({
         placeholder={placeholder}
         rows={4}
         autoFocus={autoFocus}
+        onKeyDown={handleTextareaKeyDown}
         className="w-full rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
       />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

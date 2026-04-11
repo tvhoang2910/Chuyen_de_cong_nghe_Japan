@@ -24,8 +24,7 @@ const ReportModal: React.FC<ReportModalProps> = ({ questionId, attemptId, questi
   const [description, setDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
+  const submitReport = async () => {
     if (!reportType) {
       toast.error('Vui lòng chọn loại lỗi.');
       return;
@@ -45,6 +44,20 @@ const ReportModal: React.FC<ReportModalProps> = ({ questionId, attemptId, questi
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    await submitReport();
+  };
+
+  const handleDescriptionKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing || submitting) {
+      return;
+    }
+
+    event.preventDefault();
+    void submitReport();
   };
 
   return (
@@ -106,6 +119,7 @@ const ReportModal: React.FC<ReportModalProps> = ({ questionId, attemptId, questi
             <textarea
               value={description}
               onChange={(event) => setDescription(event.target.value)}
+              onKeyDown={handleDescriptionKeyDown}
               placeholder="Mô tả thêm lỗi bạn phát hiện..."
               rows={4}
               maxLength={1000}

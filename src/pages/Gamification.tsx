@@ -142,6 +142,35 @@ const groupStyles: Record<string, { ring: string; bg: string; chip: string }> = 
   },
 };
 
+const USER_FULL_NAME_STORAGE_KEY = 'user_full_name';
+
+const getCurrentUserDisplayName = (): string | null => {
+  const raw = localStorage.getItem(USER_FULL_NAME_STORAGE_KEY);
+  if (!raw) {
+    return null;
+  }
+
+  const normalized = raw.trim().replace(/\s+/g, ' ');
+  return normalized.length > 0 ? normalized : null;
+};
+
+const resolveLeaderboardDisplayName = (entry: LeaderboardEntry): string => {
+  if (!entry.currentUser) {
+    return entry.displayName;
+  }
+
+  if (entry.displayName.startsWith('Bạn (')) {
+    return entry.displayName;
+  }
+
+  const currentUserDisplayName = getCurrentUserDisplayName();
+  if (!currentUserDisplayName) {
+    return entry.displayName;
+  }
+
+  return `Bạn (${currentUserDisplayName})`;
+};
+
 const normalizeAchievementView = (achievement: AchievementView): AchievementView => ({
   ...achievement,
   name: SEEDED_NAME_OVERRIDES[achievement.code] ?? achievement.name,
@@ -363,7 +392,7 @@ const Gamification: React.FC = () => {
                       {entry.rank}
                     </span>
                     <div>
-                      <p className="text-sm font-semibold text-slate-900">{entry.displayName}</p>
+                      <p className="text-sm font-semibold text-slate-900">{resolveLeaderboardDisplayName(entry)}</p>
                       <p className="text-xs text-slate-500">Streak {entry.streakDays} ngày • {entry.unlockedAchievements} huy hiệu</p>
                     </div>
                   </div>

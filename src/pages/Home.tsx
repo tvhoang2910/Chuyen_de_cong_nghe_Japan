@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   BookOpen, 
@@ -14,8 +14,55 @@ import {
   Award,
   MousePointer2,
 } from 'lucide-react';
-import { motion, useScroll, useTransform } from 'framer-motion';
+import { motion, useInView, useScroll, useTransform } from 'framer-motion';
 import PublicHeader from '../components/PublicHeader';
+
+const numberFormatter = new Intl.NumberFormat('en-US');
+
+const formatStatValue = (value: number, suffix: string) => {
+  const renderedNumber = suffix === '%' ? String(value) : numberFormatter.format(value);
+  return `${renderedNumber}${suffix}`;
+};
+
+type AnimatedStatNumberProps = {
+  target: number;
+  suffix: string;
+  durationMs?: number;
+};
+
+const AnimatedStatNumber: React.FC<AnimatedStatNumberProps> = ({
+  target,
+  suffix,
+  durationMs = 1400,
+}) => {
+  const [value, setValue] = useState(0);
+  const numberRef = useRef<HTMLSpanElement | null>(null);
+  const isInView = useInView(numberRef, { once: true, amount: 0.7 });
+
+  useEffect(() => {
+    if (!isInView) {
+      return;
+    }
+
+    let frameId = 0;
+    const startAt = performance.now();
+
+    const update = (now: number) => {
+      const progress = Math.min((now - startAt) / durationMs, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setValue(Math.round(target * eased));
+
+      if (progress < 1) {
+        frameId = requestAnimationFrame(update);
+      }
+    };
+
+    frameId = requestAnimationFrame(update);
+    return () => cancelAnimationFrame(frameId);
+  }, [durationMs, isInView, target]);
+
+  return <span ref={numberRef}>{formatStatValue(value, suffix)}</span>;
+};
 
 const Home: React.FC = () => {
   const { scrollYProgress } = useScroll();
@@ -54,10 +101,10 @@ const Home: React.FC = () => {
   ];
 
   const stats = [
-    { label: 'Người dùng', value: '10,000+', icon: Users },
-    { label: 'Đề thi', value: '50,000+', icon: BookOpen },
-    { label: 'Tỉ lệ đỗ', value: '95%', icon: Award },
-    { label: 'Quốc gia', value: '5+', icon: Globe },
+    { label: 'Người dùng', target: 10000, suffix: '+', icon: Users },
+    { label: 'Đề thi', target: 50000, suffix: '+', icon: BookOpen },
+    { label: 'Tỉ lệ đỗ', target: 95, suffix: '%', icon: Award },
+    { label: 'Quốc gia', target: 5, suffix: '+', icon: Globe },
   ];
 
   return (
@@ -224,7 +271,9 @@ const Home: React.FC = () => {
                 <div className="inline-flex items-center justify-center w-12 h-12 bg-slate-50 rounded-2xl mb-4 group-hover:bg-blue-50 group-hover:scale-110 transition-all">
                   <stat.icon className="w-6 h-6 text-slate-400 group-hover:text-blue-600 transition-colors" />
                 </div>
-                <h3 className="text-4xl font-black text-slate-900 mb-2 tracking-tighter">{stat.value}</h3>
+                <h3 className="text-4xl font-black text-slate-900 mb-2 tracking-tighter">
+                  <AnimatedStatNumber target={stat.target} suffix={stat.suffix} />
+                </h3>
                 <p className="text-xs font-black uppercase tracking-widest text-slate-400">{stat.label}</p>
               </motion.div>
             ))}

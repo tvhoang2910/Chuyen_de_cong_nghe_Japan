@@ -205,6 +205,72 @@ export type ReviewSubscriptionRequestPayload = {
   reviewNote?: string;
 };
 
+export type SubscriptionHistoryItem = {
+  id: number;
+  userId: number;
+  userEmail: string;
+  userFullName: string;
+  planId: number;
+  planName: string;
+  purchasedPrice: number;
+  status: SubscriptionStatus;
+  billImageUrl: string;
+  paymentMethod?: string | null;
+  transactionRef?: string | null;
+  promoCode?: string | null;
+  trial: boolean;
+  startDate: string;
+  endDate: string;
+  createdAt: string;
+  cancellationReason?: string | null;
+  cancelledByEmail?: string | null;
+  cancelledAt?: string | null;
+  refundedAmount?: number | null;
+};
+
+export type SubscriptionHistoryPage = {
+  content: SubscriptionHistoryItem[];
+  totalPages: number;
+  totalElements: number;
+  number: number;
+  size: number;
+  first: boolean;
+  last: boolean;
+};
+
+export type FetchSubscriptionHistoryParams = {
+  search?: string;
+  status?: SubscriptionStatus;
+  from?: string;
+  to?: string;
+  page?: number;
+  size?: number;
+  sort?: string;
+};
+
+export type CancelSubscriptionPayload = {
+  reason: string;
+};
+
+export type CancelSubscriptionResult = {
+  subscriptionId: number;
+  previousStatus: SubscriptionStatus;
+  currentStatus: SubscriptionStatus;
+  reason: string;
+  refundPolicy: string;
+  refundRate: number;
+  refundAmount: number;
+  cancelledAt: string;
+};
+
+export type SubscriptionAnalyticsOverview = {
+  monthlyRevenue: number;
+  activePremiumCount: number;
+  topPlanName?: string | null;
+  topPlanSubscriptions: number;
+  generatedAt: string;
+};
+
 type RetryableRequestConfig = InternalAxiosRequestConfig & {
   _retry?: boolean;
   _skipAuthRecovery?: boolean;
@@ -663,6 +729,76 @@ export const fetchPendingSubscriptionReviewCount =
   async (): Promise<number> => {
     const page = await fetchSubscriptionReviewQueue(0, 1, "PENDING_REVIEW");
     return page.totalElements;
+  };
+
+export const fetchSubscriptionHistory = async (
+  params: FetchSubscriptionHistoryParams = {},
+): Promise<SubscriptionHistoryPage> => {
+  const page = params.page ?? 0;
+  const size = params.size ?? 20;
+  const sort = params.sort?.trim() || "createdAt,desc";
+  const search = params.search?.trim() || "";
+  const status = params.status || "";
+  const from = params.from?.trim() || "";
+  const to = params.to?.trim() || "";
+
+  const query = new URLSearchParams();
+  query.set("page", String(page));
+  query.set("size", String(size));
+  query.set("sort", sort);
+  if (search) {
+    query.set("search", search);
+  }
+  if (status) {
+    query.set("status", status);
+  }
+  if (from) {
+    query.set("from", from);
+  }
+  if (to) {
+    query.set("to", to);
+  }
+
+  const cacheKey = `subscription:history:${page}:${size}:${sort}:${search}:${status}:${from}:${to}`;
+  return withCachedGet<SubscriptionHistoryPage>(
+    cacheKey,
+    async () => {
+      const response = await axiosClient.get<SubscriptionHistoryPage>(
+        `/subscriptions/history?${query.toString()}`,
+      );
+      return response.data;
+    },
+    2500,
+  );
+};
+
+export const cancelSubscriptionByAdmin = async (
+  subscriptionId: number,
+  payload: CancelSubscriptionPayload,
+): Promise<CancelSubscriptionResult> => {
+  const response = await axiosClient.patch<CancelSubscriptionResult>(
+    `/subscriptions/${subscriptionId}/cancel`,
+    payload,
+  );
+  invalidateCacheByPrefix("subscription:history:");
+  invalidateCacheByPrefix("subscription:analytics:");
+  invalidateCacheByPrefix("subscription:review-queue:");
+  invalidateCacheByPrefix("subscription:my-requests");
+  return response.data;
+};
+
+export const fetchSubscriptionAnalyticsOverview =
+  async (): Promise<SubscriptionAnalyticsOverview> => {
+    return withCachedGet<SubscriptionAnalyticsOverview>(
+      "subscription:analytics:overview",
+      async () => {
+        const response = await axiosClient.get<SubscriptionAnalyticsOverview>(
+          "/subscriptions/analytics/overview",
+        );
+        return response.data;
+      },
+      3000,
+    );
   };
 
 export const reviewSubscriptionPurchaseRequest = async (
