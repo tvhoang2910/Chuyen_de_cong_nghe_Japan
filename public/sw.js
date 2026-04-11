@@ -24,8 +24,28 @@ self.addEventListener('push', (event) => {
     requireInteraction: false,
   };
 
+  const broadcastPromise = self.clients
+    .matchAll({ type: 'window', includeUncontrolled: true })
+    .then((clientList) => {
+      for (const client of clientList) {
+        client.postMessage({
+          type: 'EXAM_BANK_PUSH_RECEIVED',
+          payload: {
+            title: data.title || 'Exam Bank',
+            body: data.body || '',
+            url: data.url || '/',
+            tag: data.tag || 'default',
+          },
+          receivedAt: Date.now(),
+        });
+      }
+    });
+
   event.waitUntil(
-    self.registration.showNotification(data.title || 'Exam Bank', options)
+    Promise.all([
+      self.registration.showNotification(data.title || 'Exam Bank', options),
+      broadcastPromise,
+    ])
   );
 });
 

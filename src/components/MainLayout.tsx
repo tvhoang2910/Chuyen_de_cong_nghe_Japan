@@ -50,7 +50,18 @@ type DismissedNotificationEntry = {
   dismissedAt: number;
 };
 
+type InAppPushNotificationEntry = {
+  id: string;
+  title: string;
+  body: string;
+  url: string;
+  tag: string;
+  createdAt: number;
+};
+
 const DISMISSED_NOTIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
+const IN_APP_PUSH_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const PUSH_MESSAGE_TYPE = 'EXAM_BANK_PUSH_RECEIVED';
 
 const normalizeDismissedEntries = (parsed: unknown, now: number): DismissedNotificationEntry[] => {
   if (!Array.isArray(parsed)) {
@@ -80,6 +91,33 @@ const normalizeDismissedEntries = (parsed: unknown, now: number): DismissedNotif
   return Array.from(deduplicated.values());
 };
 
+const normalizePushEntries = (parsed: unknown, now: number): InAppPushNotificationEntry[] => {
+  if (!Array.isArray(parsed)) {
+    return [];
+  }
+
+  const deduplicated = new Map<string, InAppPushNotificationEntry>();
+  for (const item of parsed) {
+    if (
+      item &&
+      typeof item === 'object' &&
+      typeof (item as { id?: unknown }).id === 'string' &&
+      typeof (item as { title?: unknown }).title === 'string' &&
+      typeof (item as { body?: unknown }).body === 'string' &&
+      typeof (item as { url?: unknown }).url === 'string' &&
+      typeof (item as { tag?: unknown }).tag === 'string' &&
+      typeof (item as { createdAt?: unknown }).createdAt === 'number'
+    ) {
+      const entry = item as InAppPushNotificationEntry;
+      if (entry.createdAt > now - IN_APP_PUSH_TTL_MS) {
+        deduplicated.set(entry.id, entry);
+      }
+    }
+  }
+
+  return Array.from(deduplicated.values()).sort((a, b) => b.createdAt - a.createdAt);
+};
+
 const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -100,6 +138,12 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     const role = user?.role ?? 'GUEST';
     const email = user?.email ?? 'anonymous';
     return `main-dismissed-notification-ids:${role}:${email}`;
+  }, [user?.email, user?.role]);
+
+  const pushNotificationStorageKey = useMemo(() => {
+    const role = user?.role ?? 'GUEST';
+    const email = user?.email ?? 'anonymous';
+    return `main-push-notification-items:${role}:${email}`;
   }, [user?.email, user?.role]);
 
   const persistDismissedEntries = useCallback((entries: DismissedNotificationEntry[]) => {
@@ -130,6 +174,65 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     return new Set(readDismissedEntries().map((entry) => entry.id));
   }, [readDismissedEntries]);
 
+  const persistPushEntries = useCallback((entries: InAppPushNotificationEntry[]) => {
+    localStorage.setItem(pushNotificationStorageKey, JSON.stringify(entries));
+  }, [pushNotificationStorageKey]);
+
+  const readPushEntries = useCallback(() => {
+    const now = Date.now();
+    try {
+      const raw = localStorage.getItem(pushNotificationStorageKey);
+      if (!raw) {
+        return [] as InAppPushNotificationEntry[];
+      }
+
+      const parsed = JSON.parse(raw);
+      const normalized = normalizePushEntries(parsed, now);
+      if (JSON.stringify(parsed) !== JSON.stringify(normalized)) {
+        persistPushEntries(normalized);
+      }
+      return normalized;
+    } catch {
+      localStorage.removeItem(pushNotificationStorageKey);
+      return [] as InAppPushNotificationEntry[];
+    }
+  }, [persistPushEntries, pushNotificationStorageKey]);
+
+  const removePushEntry = useCallback((id: string) => {
+    const nextEntries = readPushEntries().filter((entry) => entry.id !== id);
+    persistPushEntries(nextEntries);
+  }, [persistPushEntries, readPushEntries]);
+
+  const mapPushEntryToNotification = useCallback((entry: InAppPushNotificationEntry): NotificationItem => {
+    return {
+      id: entry.id,
+      title: entry.title,
+      description: entry.body,
+      timeLabel: new Date(entry.createdAt).toLocaleString('vi-VN'),
+      onClick: () => navigate(entry.url || '/dashboard/gamification'),
+    };
+  }, [navigate]);
+
+  const mergeUserNotifications = useCallback((baseItems: NotificationItem[]) => {
+    if (user?.role !== 'USER') {
+      return baseItems;
+    }
+
+    const dismissedIds = readDismissedIds();
+    const pushItems = readPushEntries()
+      .map(mapPushEntryToNotification)
+      .filter((item) => !dismissedIds.has(item.id));
+
+    const deduplicated = new Map<string, NotificationItem>();
+    for (const item of [...pushItems, ...baseItems]) {
+      if (!deduplicated.has(item.id)) {
+        deduplicated.set(item.id, item);
+      }
+    }
+
+    return Array.from(deduplicated.values());
+  }, [mapPushEntryToNotification, readDismissedIds, readPushEntries, user?.role]);
+
   const dismissNotification = (id: string) => {
     setNotificationItems((current) => {
       const next = current.filter((item) => item.id !== id);
@@ -141,6 +244,10 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     const dismissedEntries = readDismissedEntries().filter((entry) => entry.id !== id);
     dismissedEntries.push({ id, dismissedAt: Date.now() });
     persistDismissedEntries(dismissedEntries);
+
+    if (id.startsWith('push-item-')) {
+      removePushEntry(id);
+    }
   };
 
   const [displayNameInput, setDisplayNameInput] = useState('');
@@ -213,12 +320,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
         if (isMounted) {
           setPendingReviewCount(0);
-          setNotificationItems(visibleItems);
+          setNotificationItems(mergeUserNotifications(visibleItems));
         }
       } catch {
         if (isMounted) {
-          setPendingReviewCount(0);
-          setNotificationItems([
+          const fallbackItems: NotificationItem[] = [
             {
               id: 'fallback-main',
               title: 'Không tải được thông báo',
@@ -226,7 +332,9 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
               timeLabel: 'Hệ thống',
               onClick: () => navigate(user?.role === 'CONTRIBUTOR' ? '/contributor/subscription-reviews' : '/dashboard/subscription-payments'),
             },
-          ]);
+          ];
+          setPendingReviewCount(0);
+          setNotificationItems(mergeUserNotifications(fallbackItems));
         }
       }
     };
@@ -244,7 +352,74 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       globalThis.clearInterval(intervalId);
       globalThis.removeEventListener(SUBSCRIPTION_REVIEW_UPDATED_EVENT, handleRefresh);
     };
-  }, [navigate, readDismissedIds, user?.role]);
+  }, [mergeUserNotifications, navigate, readDismissedIds, user?.role]);
+
+  useEffect(() => {
+    if (user?.role !== 'USER') {
+      return;
+    }
+
+    if (!('serviceWorker' in navigator)) {
+      return;
+    }
+
+    const handleServiceWorkerMessage = (event: MessageEvent<unknown>) => {
+      const eventData = event.data as {
+        type?: string;
+        payload?: { title?: string; body?: string; url?: string; tag?: string };
+        receivedAt?: number;
+      } | null;
+
+      if (!eventData || eventData.type !== PUSH_MESSAGE_TYPE) {
+        return;
+      }
+
+      const payload = eventData.payload;
+      if (!payload) {
+        return;
+      }
+
+      const normalizedTag = (payload.tag || '').toLowerCase();
+      const normalizedUrl = payload.url || '/dashboard/gamification';
+      const isGamificationNotification =
+        normalizedTag === 'achievement-unlocked' ||
+        normalizedTag === 'streak-qualified' ||
+        normalizedUrl.includes('gamification');
+
+      if (!isGamificationNotification) {
+        return;
+      }
+
+      const createdAt = typeof eventData.receivedAt === 'number' ? eventData.receivedAt : Date.now();
+      const entry: InAppPushNotificationEntry = {
+        id: `push-item-${createdAt}-${Math.random().toString(36).slice(2, 8)}`,
+        title: payload.title?.trim() || 'Thông báo học tập',
+        body: payload.body?.trim() || 'Bạn có cập nhật mới trong gamification.',
+        url: normalizedUrl,
+        tag: normalizedTag || 'gamification',
+        createdAt,
+      };
+
+      const nextEntries = normalizePushEntries([entry, ...readPushEntries()], Date.now());
+      persistPushEntries(nextEntries);
+
+      const dismissedIds = readDismissedIds();
+      if (dismissedIds.has(entry.id)) {
+        return;
+      }
+
+      const entryAsItem = mapPushEntryToNotification(entry);
+      setNotificationItems((current) => {
+        const next = [entryAsItem, ...current.filter((item) => item.id !== entry.id)];
+        return next;
+      });
+    };
+
+    navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
+    return () => {
+      navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
+    };
+  }, [mapPushEntryToNotification, persistPushEntries, readDismissedIds, readPushEntries, user?.role]);
 
   useEffect(() => {
     if (user?.role !== 'USER') {
