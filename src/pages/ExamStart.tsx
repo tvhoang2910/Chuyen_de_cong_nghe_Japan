@@ -120,15 +120,6 @@ const ExamStart: React.FC = () => {
     };
   }, [examAttempts]);
 
-  const hasSubmittedAttempt = useMemo(
-    () =>
-      examAttempts.some(
-        (attempt) =>
-          attempt.status === "SUBMITTED" || attempt.status === "AUTO_SUBMITTED",
-      ),
-    [examAttempts],
-  );
-
   const isPremiumLocked = useMemo(() => {
     if (!exam?.premium) {
       return false;
@@ -282,20 +273,12 @@ const ExamStart: React.FC = () => {
             </div>
           </div>
 
-          {!hasSubmittedAttempt && (
-            <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-              Bạn chỉ có thể bình luận sau khi nộp bài.
-            </div>
-          )}
-
-          {hasSubmittedAttempt && (
             <div className="mt-6 rounded-3xl bg-slate-50 p-5 border border-slate-200">
               <CommentForm
                 submitLabel="Gửi comment"
                 onSubmit={(content) => handleCommentSubmit(content, null)}
               />
             </div>
-          )}
 
           <div className="mt-6 space-y-4">
             {isLoadingComments ? (
@@ -313,7 +296,7 @@ const ExamStart: React.FC = () => {
                   comment={comment}
                   depth={0}
                   activeReplyTargetId={replyTargetId}
-                  canReply={hasSubmittedAttempt}
+                  canReply={true}
                   onReply={(commentId) => setReplyTargetId(commentId)}
                   onCancelReply={() => setReplyTargetId(null)}
                   onSubmitReply={(content, parentId) =>

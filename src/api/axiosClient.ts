@@ -138,6 +138,8 @@ export type CreatePremiumPlanPayload = {
   active?: boolean;
 };
 
+export type UpdatePremiumPlanPayload = CreatePremiumPlanPayload;
+
 export type SubscriptionStatus =
   | "PENDING_REVIEW"
   | "APPROVED"
@@ -529,14 +531,28 @@ export const fetchPremiumPlans = async (): Promise<PremiumPlanSummary[]> => {
   );
 };
 
-export const fetchManagedPremiumPlans = async (): Promise<
-  PremiumPlanSummary[]
-> => {
+export const fetchManagedPremiumPlans = async (params?: {
+  search?: string;
+  active?: boolean;
+}): Promise<PremiumPlanSummary[]> => {
+  const search = params?.search?.trim() ?? "";
+  const active = typeof params?.active === "boolean" ? String(params.active) : "";
+  const query = new URLSearchParams();
+  if (search) {
+    query.set("search", search);
+  }
+  if (active) {
+    query.set("active", active);
+  }
+  const queryString = query.toString();
+
   return withCachedGet<PremiumPlanSummary[]>(
-    "subscription:plans:manage",
+    `subscription:plans:manage:${search}:${active}`,
     async () => {
       const response = await axiosClient.get<PremiumPlanSummary[]>(
-        "/subscriptions/plans/manage",
+        queryString
+          ? `/subscriptions/plans/manage?${queryString}`
+          : "/subscriptions/plans/manage",
       );
       return response.data;
     },
@@ -552,6 +568,23 @@ export const createPremiumPlan = async (
   );
   invalidateCacheByPrefix("subscription:plans:");
   return response.data;
+};
+
+export const updatePremiumPlan = async (
+  planId: number,
+  payload: UpdatePremiumPlanPayload,
+): Promise<PremiumPlanSummary> => {
+  const response = await axiosClient.put<PremiumPlanSummary>(
+    `/subscriptions/plans/${planId}`,
+    payload,
+  );
+  invalidateCacheByPrefix("subscription:plans:");
+  return response.data;
+};
+
+export const deletePremiumPlan = async (planId: number): Promise<void> => {
+  await axiosClient.delete(`/subscriptions/plans/${planId}`);
+  invalidateCacheByPrefix("subscription:plans:");
 };
 
 export const createSubscriptionPurchaseRequest = async (

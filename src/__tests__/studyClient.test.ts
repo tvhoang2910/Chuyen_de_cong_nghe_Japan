@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  assignAdminGamificationAchievementToUser,
+  createAdminGamificationAchievement,
+  deleteAdminGamificationAchievement,
+  fetchAdminGamificationAchievements,
   fetchDueCards,
   fetchExamWrongDecks,
   fetchGamificationAchievements,
@@ -12,6 +16,7 @@ import {
   markGamificationShared,
   submitManualReview,
   submitReviewAnswer,
+  updateAdminGamificationAchievement,
 } from "../api/studyClient";
 
 const getItemMock = vi.fn();
@@ -29,6 +34,8 @@ const { mockClient } = vi.hoisted(() => ({
   mockClient: {
     get: vi.fn(),
     post: vi.fn(),
+    put: vi.fn(),
+    delete: vi.fn(),
     interceptors: {
       request: {
         use: vi.fn(),
@@ -47,6 +54,8 @@ describe("studyClient API", () => {
   beforeEach(() => {
     mockClient.get.mockReset();
     mockClient.post.mockReset();
+    mockClient.put.mockReset();
+    mockClient.delete.mockReset();
     getItemMock.mockReturnValue(null);
   });
 
@@ -295,5 +304,94 @@ describe("studyClient API", () => {
     await markGamificationShared();
 
     expect(mockClient.post).toHaveBeenCalledWith("/gamification/me/share");
+  });
+
+  it("fetchAdminGamificationAchievements calls expected endpoint", async () => {
+    const payload = [
+      {
+        code: "STREAK_DAYS_5",
+        name: "Giữ nhịp học",
+        description: "Streak 5 ngày",
+        icon: "FLAME",
+        groupName: "Chuỗi",
+        points: 160,
+        active: true,
+        autoUnlockRule: null,
+        ruleType: "STREAK_DAYS",
+        ruleThreshold: 5,
+        ruleThresholdSecondary: null,
+        ruleConfigJson: null,
+      },
+    ];
+    mockClient.get.mockResolvedValue({ data: payload });
+
+    const result = await fetchAdminGamificationAchievements();
+
+    expect(mockClient.get).toHaveBeenCalledWith("/gamification/admin/achievements");
+    expect(result[0].code).toBe("STREAK_DAYS_5");
+  });
+
+  it("createAdminGamificationAchievement posts payload to admin endpoint", async () => {
+    const payload = {
+      code: "CUMULATIVE_EXAM_ATTEMPTS_20",
+      name: "Bền bỉ",
+      description: "Hoàn thành 20 bài",
+      icon: "TROPHY",
+      groupName: "Tích lũy",
+      points: 220,
+      active: true,
+      autoUnlockRule: null,
+      ruleType: "CUMULATIVE_EXAM_ATTEMPTS",
+      ruleThreshold: 20,
+      ruleThresholdSecondary: null,
+      ruleConfigJson: null,
+    };
+    mockClient.post.mockResolvedValue({ data: payload });
+
+    const result = await createAdminGamificationAchievement(payload);
+
+    expect(mockClient.post).toHaveBeenCalledWith("/gamification/admin/achievements", payload);
+    expect(result.name).toBe("Bền bỉ");
+  });
+
+  it("updateAdminGamificationAchievement puts payload to admin code endpoint", async () => {
+    const payload = {
+      name: "Giữ nhịp học",
+      description: "Streak 5 ngày",
+      icon: "FLAME",
+      groupName: "Chuỗi",
+      points: 160,
+      active: true,
+      autoUnlockRule: null,
+      ruleType: "STREAK_DAYS",
+      ruleThreshold: 5,
+      ruleThresholdSecondary: null,
+      ruleConfigJson: null,
+    };
+    mockClient.put.mockResolvedValue({ data: { code: "STREAK_DAYS_5", ...payload } });
+
+    const result = await updateAdminGamificationAchievement("STREAK_DAYS_5", payload);
+
+    expect(mockClient.put).toHaveBeenCalledWith("/gamification/admin/achievements/STREAK_DAYS_5", payload);
+    expect(result.code).toBe("STREAK_DAYS_5");
+  });
+
+  it("deleteAdminGamificationAchievement calls delete endpoint", async () => {
+    mockClient.delete.mockResolvedValue({ data: undefined });
+
+    await deleteAdminGamificationAchievement("STREAK_DAYS_5");
+
+    expect(mockClient.delete).toHaveBeenCalledWith("/gamification/admin/achievements/STREAK_DAYS_5");
+  });
+
+  it("assignAdminGamificationAchievementToUser posts userId payload", async () => {
+    mockClient.post.mockResolvedValue({ data: undefined });
+
+    await assignAdminGamificationAchievementToUser("STREAK_DAYS_5", 88);
+
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/gamification/admin/achievements/STREAK_DAYS_5/assign",
+      { userId: 88 },
+    );
   });
 });

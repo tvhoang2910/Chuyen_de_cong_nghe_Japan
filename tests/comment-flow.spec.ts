@@ -1,5 +1,5 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
-import type { CommentNode, CreateCommentPayload, VotePayload, PinPayload } from '../src/api/commentClient';
+import type { CommentNode, CreateCommentPayload, VotePayload } from '../src/api/commentClient';
 
 // ---------------------------------------------------------------------------
 // Shared types & helpers
@@ -24,6 +24,8 @@ const DEFAULT_SEED: SeedOptions = {
 
 async function seedAuthenticatedUser(page: Page, options: SeedOptions = {}): Promise<void> {
   const opts = { ...DEFAULT_SEED, ...options };
+  const role = opts.role ?? 'USER';
+  const userEmail = opts.userEmail ?? 'e2e-user@example.com';
   await page.addInitScript(
     ({ role, userEmail }) => {
       localStorage.setItem('access_token', 'e2e-token');
@@ -31,7 +33,7 @@ async function seedAuthenticatedUser(page: Page, options: SeedOptions = {}): Pro
       localStorage.setItem('user_email', userEmail);
       localStorage.setItem('user_role', role);
     },
-    { role: opts.role, userEmail: opts.userEmail },
+    { role, userEmail },
   );
 }
 
