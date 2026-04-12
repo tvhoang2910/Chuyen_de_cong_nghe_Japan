@@ -1,6 +1,6 @@
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import AdminAchievements from '../pages/AdminAchievements';
 
@@ -9,7 +9,6 @@ const {
   createAdminGamificationAchievement,
   updateAdminGamificationAchievement,
   deleteAdminGamificationAchievement,
-  assignAdminGamificationAchievementToUser,
   toastSuccess,
   toastError,
 } = vi.hoisted(() => ({
@@ -17,7 +16,6 @@ const {
   createAdminGamificationAchievement: vi.fn(),
   updateAdminGamificationAchievement: vi.fn(),
   deleteAdminGamificationAchievement: vi.fn(),
-  assignAdminGamificationAchievementToUser: vi.fn(),
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
 }));
@@ -27,7 +25,6 @@ vi.mock('../api/studyClient', () => ({
   createAdminGamificationAchievement,
   updateAdminGamificationAchievement,
   deleteAdminGamificationAchievement,
-  assignAdminGamificationAchievementToUser,
 }));
 
 vi.mock('../components/AdminLayout', () => ({
@@ -188,9 +185,8 @@ describe('AdminAchievements page', () => {
     expect(toastSuccess).toHaveBeenCalledWith('Đã cập nhật thành tựu.');
   });
 
-  it('assigns selected active achievement to user', async () => {
+  it('does not render user assignment section', async () => {
     fetchAdminGamificationAchievements.mockResolvedValue([buildDefinition()]);
-    assignAdminGamificationAchievementToUser.mockResolvedValue(undefined);
 
     render(<AdminAchievements />);
 
@@ -198,20 +194,8 @@ describe('AdminAchievements page', () => {
       expect(screen.getByText('Giữ nhịp học')).toBeInTheDocument();
     });
 
-    const assignHeading = screen.getByRole('heading', { name: 'Gán thành tựu cho user' });
-    const assignForm = assignHeading.closest('form');
-    expect(assignForm).not.toBeNull();
-
-    const scoped = within(assignForm as HTMLFormElement);
-    fireEvent.change(scoped.getByRole('combobox'), { target: { value: 'STREAK_DAYS_5' } });
-    fireEvent.change(scoped.getByPlaceholderText('User ID'), { target: { value: '99' } });
-    fireEvent.submit(assignForm as HTMLFormElement);
-
-    await waitFor(() => {
-      expect(assignAdminGamificationAchievementToUser).toHaveBeenCalledWith('STREAK_DAYS_5', 99);
-    });
-
-    expect(toastSuccess).toHaveBeenCalledWith('Đã gán thành tựu STREAK_DAYS_5 cho user 99.');
+    expect(screen.queryByRole('heading', { name: 'Gán thành tựu cho user' })).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('User ID')).not.toBeInTheDocument();
   });
 
   it('deletes achievement and reloads list', async () => {

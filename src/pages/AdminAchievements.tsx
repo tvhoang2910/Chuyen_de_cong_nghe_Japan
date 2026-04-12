@@ -1,10 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Edit3, PlusCircle, Save, ShieldCheck, Trophy, UserPlus, XCircle } from 'lucide-react';
+import { Edit3, PlusCircle, Save, ShieldCheck, Trophy, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 import AdminLayout from '../components/AdminLayout';
 import {
-  assignAdminGamificationAchievementToUser,
   createAdminGamificationAchievement,
   deleteAdminGamificationAchievement,
   fetchAdminGamificationAchievements,
@@ -165,11 +164,8 @@ const AdminAchievements: React.FC = () => {
   const [items, setItems] = useState<AchievementDefinition[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isAssigning, setIsAssigning] = useState(false);
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(defaultForm);
-  const [assignCode, setAssignCode] = useState('');
-  const [assignUserId, setAssignUserId] = useState('');
 
   const selectedAchievement = useMemo(
     () => items.find((item) => item.code === selectedCode) ?? null,
@@ -471,30 +467,6 @@ const AdminAchievements: React.FC = () => {
     }
   };
 
-  const handleAssign = async (event: React.FormEvent) => {
-    event.preventDefault();
-
-    const code = assignCode.trim().toUpperCase();
-    const userId = Number(assignUserId);
-
-    if (!code || !Number.isInteger(userId) || userId <= 0) {
-      toast.error('Vui lòng chọn mã thành tựu và userId hợp lệ.');
-      return;
-    }
-
-    try {
-      setIsAssigning(true);
-      await assignAdminGamificationAchievementToUser(code, userId);
-      toast.success(`Đã gán thành tựu ${code} cho user ${userId}.`);
-      setAssignUserId('');
-      await loadItems();
-    } catch {
-      toast.error('Không thể gán thành tựu cho user.');
-    } finally {
-      setIsAssigning(false);
-    }
-  };
-
   return (
     <AdminLayout>
       <div className="space-y-6">
@@ -507,7 +479,7 @@ const AdminAchievements: React.FC = () => {
               </p>
               <h1 className="mt-3 text-3xl font-black">Kho thành tựu</h1>
               <p className="mt-1 text-sm text-cyan-100/90">
-                Quản trị thành tựu theo dữ liệu DB: tạo mới, cập nhật, xóa và gán trực tiếp cho user.
+                Quản trị thành tựu theo dữ liệu DB: tạo mới, cập nhật và xóa.
               </p>
             </div>
             <div className="rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-right">
@@ -821,45 +793,6 @@ const AdminAchievements: React.FC = () => {
               </button>
             </form>
 
-            <form onSubmit={handleAssign} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-              <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-slate-800">
-                <UserPlus className="h-5 w-5 text-emerald-500" />
-                Gán thành tựu cho user
-              </h2>
-
-              <div className="space-y-3">
-                <select
-                  value={assignCode}
-                  onChange={(event) => setAssignCode(event.target.value)}
-                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-cyan-500"
-                >
-                  <option value="">Chọn thành tựu</option>
-                  {items.filter((item) => item.active).map((item) => (
-                    <option key={item.code} value={item.code}>
-                      {item.code} - {item.name}
-                    </option>
-                  ))}
-                </select>
-
-                <input
-                  type="number"
-                  min={1}
-                  value={assignUserId}
-                  onChange={(event) => setAssignUserId(event.target.value)}
-                  placeholder="User ID"
-                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-cyan-500"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={isAssigning}
-                className="mt-4 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
-              >
-                <UserPlus className="h-4 w-4" />
-                {isAssigning ? 'Đang gán...' : 'Gán thành tựu'}
-              </button>
-            </form>
           </div>
         </section>
       </div>
