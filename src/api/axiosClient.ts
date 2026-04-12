@@ -271,6 +271,33 @@ export type SubscriptionAnalyticsOverview = {
   generatedAt: string;
 };
 
+export type NotificationPreference = {
+  emailEnabled: boolean;
+  webPushEnabled: boolean;
+};
+
+export type UserNotificationItem = {
+  id: number;
+  type: string;
+  title: string;
+  message: string;
+  actionUrl?: string | null;
+  read: boolean;
+  createdAt: string;
+  readAt?: string | null;
+};
+
+export type UserNotificationPage = {
+  content: UserNotificationItem[];
+  number: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+  first: boolean;
+  last: boolean;
+  unreadCount: number;
+};
+
 type RetryableRequestConfig = InternalAxiosRequestConfig & {
   _retry?: boolean;
   _skipAuthRecovery?: boolean;
@@ -821,6 +848,65 @@ export const fetchSubscriptionApprovalAudits = async (
     `/subscriptions/purchase-requests/${subscriptionId}/approvals`,
   );
   return response.data;
+};
+
+export const fetchNotificationPreferences = async (): Promise<NotificationPreference> => {
+  return withCachedGet<NotificationPreference>(
+    "notification:center:preferences",
+    async () => {
+      const response = await axiosClient.get<NotificationPreference>(
+        "/notifications/preferences",
+      );
+      return response.data;
+    },
+    1500,
+  );
+};
+
+export const updateNotificationPreferences = async (
+  payload: Partial<NotificationPreference>,
+): Promise<NotificationPreference> => {
+  const response = await axiosClient.patch<NotificationPreference>(
+    "/notifications/preferences",
+    payload,
+  );
+  setCached("notification:center:preferences", response.data, 1500);
+  return response.data;
+};
+
+export const fetchUserNotifications = async (
+  page = 0,
+  size = 20,
+): Promise<UserNotificationPage> => {
+  const cacheKey = `notification:center:list:${page}:${size}`;
+  return withCachedGet<UserNotificationPage>(
+    cacheKey,
+    async () => {
+      const response = await axiosClient.get<UserNotificationPage>(
+        `/notifications?page=${page}&size=${size}`,
+      );
+      return response.data;
+    },
+    1000,
+  );
+};
+
+export const markUserNotificationRead = async (
+  notificationId: number,
+): Promise<UserNotificationItem> => {
+  const response = await axiosClient.patch<UserNotificationItem>(
+    `/notifications/${notificationId}/read`,
+  );
+  invalidateCacheByPrefix("notification:center:list:");
+  return response.data;
+};
+
+export const markAllUserNotificationsRead = async (): Promise<number> => {
+  const response = await axiosClient.patch<{ updatedCount: number }>(
+    "/notifications/read-all",
+  );
+  invalidateCacheByPrefix("notification:center:list:");
+  return response.data.updatedCount;
 };
 
 axiosClient.interceptors.request.use((config) => {

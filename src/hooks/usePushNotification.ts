@@ -7,7 +7,57 @@ const isSupported = () =>
   'PushManager' in window &&
   'Notification' in window;
 
+export type BrowserPushState = {
+  supported: boolean;
+  permission: NotificationPermission | 'unsupported';
+  subscribed: boolean;
+};
+
 export function usePushNotification() {
+  const getBrowserPushState = useCallback(async (): Promise<BrowserPushState> => {
+    if (!isSupported()) {
+      return {
+        supported: false,
+        permission: 'unsupported',
+        subscribed: false,
+      };
+    }
+
+    try {
+      const permission = Notification.permission;
+      const registration = await navigator.serviceWorker.getRegistration();
+      if (!registration) {
+        return {
+          supported: true,
+          permission,
+          subscribed: false,
+        };
+      }
+
+      const subscription = await registration.pushManager.getSubscription();
+      return {
+        supported: true,
+        permission,
+        subscribed: Boolean(subscription),
+      };
+    } catch {
+      return {
+        supported: true,
+        permission: 'default',
+        subscribed: false,
+      };
+    }
+  }, []);
+
+  const resolveServiceWorkerRegistration = useCallback(async () => {
+    const existing = await navigator.serviceWorker.getRegistration();
+    if (existing) {
+      return existing;
+    }
+
+    return navigator.serviceWorker.register('/sw.js');
+  }, []);
+
   /**
    * Registers the service worker and subscribes the browser to push notifications.
    * Call this once after login when the user is authenticated.
@@ -29,7 +79,7 @@ export function usePushNotification() {
     }
 
     try {
-      const registration = await navigator.serviceWorker.ready;
+      const registration = await resolveServiceWorkerRegistration();
 
       // Re-sync any existing browser subscription to backend on each login.
       const existing = await registration.pushManager.getSubscription();
@@ -50,7 +100,7 @@ export function usePushNotification() {
       console.error('[usePushNotification] subscribe failed:', err);
       return false;
     }
-  }, []);
+  }, [resolveServiceWorkerRegistration]);
 
   /**
    * Unsubscribes the browser from push notifications.
@@ -59,7 +109,11 @@ export function usePushNotification() {
     if (!isSupported()) return false;
 
     try {
-      const registration = await navigator.serviceWorker.ready;
+      const registration = await navigator.serviceWorker.getRegistration();
+      if (!registration) {
+        return true;
+      }
+
       const sub = await registration.pushManager.getSubscription();
       if (!sub) return true; // already unsubscribed
 
@@ -72,7 +126,7 @@ export function usePushNotification() {
     }
   }, []);
 
-  return { subscribe, unsubscribe, isSupported };
+  return { subscribe, unsubscribe, isSupported, getBrowserPushState };
 }
 
 /** Converts a VAPID public key (base64url) to Uint8Array for PushManager */

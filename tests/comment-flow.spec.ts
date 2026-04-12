@@ -331,7 +331,6 @@ test.describe('Vote Flow', () => {
 
     // Vote buttons should exist
     const upvoteBtn = page.locator('[aria-label*="upvote"], button[name*="upvote"], button:has-text("👍")').first();
-    const downvoteBtn = page.locator('[aria-label*="downvote"], button[name*="downvote"], button:has-text("👎")').first();
 
     // If vote buttons are not yet implemented in UI, this test documents expected behaviour
     // For now assert they exist in the DOM

@@ -29,6 +29,7 @@ const SpacedRepetition = lazy(() => import('./pages/SpacedRepetition.tsx'));
 const SpacedRepetitionPractice = lazy(() => import('./pages/SpacedRepetitionPractice.tsx'));
 const Gamification = lazy(() => import('./pages/Gamification'));
 const SubscriptionPayments = lazy(() => import('./pages/SubscriptionPayments'));
+const NotificationSettings = lazy(() => import('./pages/NotificationSettings'));
 const SubscriptionReviewQueue = lazy(() => import('./pages/SubscriptionReviewQueue'));
 const PremiumPlanManagement = lazy(() => import('./pages/PremiumPlanManagement'));
 const AdminReports = lazy(() => import('./pages/AdminReports'));
@@ -156,6 +157,19 @@ function App() {
                   allowedRoles={['USER']}
                 >
                   <SubscriptionPayments />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/notifications"
+              element={
+                <ProtectedRoute
+                  isAuthenticated={effectiveIsAuthenticated}
+                  userRole={effectiveRole}
+                  defaultPath={defaultAuthenticatedPath}
+                  allowedRoles={['USER']}
+                >
+                  <NotificationSettings />
                 </ProtectedRoute>
               }
             />

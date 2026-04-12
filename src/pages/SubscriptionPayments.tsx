@@ -28,6 +28,8 @@ const statusLabel: Record<SubscriptionStatus, string> = {
   CANCELLED: 'Đã hủy',
 };
 
+const MAX_BILL_SIZE_BYTES = 20 * 1024 * 1024;
+
 const SubscriptionPayments: React.FC = () => {
   const [plans, setPlans] = useState<PremiumPlanSummary[]>([]);
   const [requests, setRequests] = useState<UserSubscriptionQueueItem[]>([]);
@@ -75,6 +77,10 @@ const SubscriptionPayments: React.FC = () => {
     }
     if (!billFile) {
       toast.error('Vui lòng tải lên bill chuyển khoản.');
+      return;
+    }
+    if (billFile.size > MAX_BILL_SIZE_BYTES) {
+      toast.error('Bill vuot qua gioi han 20MB. Vui long chon file nho hon.');
       return;
     }
 
@@ -203,6 +209,7 @@ const SubscriptionPayments: React.FC = () => {
                   onChange={(event) => setBillFile(event.target.files?.[0] || null)}
                   className="block w-full text-sm"
                 />
+                <p className="mt-2 text-xs text-slate-500">Gioi han kich thuoc: toi da 20MB.</p>
               </label>
 
               <button

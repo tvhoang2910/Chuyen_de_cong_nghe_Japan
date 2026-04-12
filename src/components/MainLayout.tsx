@@ -18,11 +18,12 @@ import {
   Banknote,
   ClipboardCheck,
   Gem,
-  Flag
+  Flag,
+  Settings2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axiosClient, { 
-  fetchMySubscriptionRequests,
+  fetchUserNotifications,
   fetchSubscriptionReviewQueue,
   SUBSCRIPTION_REVIEW_UPDATED_EVENT,
   clearAuthSession, 
@@ -198,14 +199,13 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           return;
         }
 
-        const myRequests = await fetchMySubscriptionRequests();
-        const recent = myRequests.slice(0, 5);
-        const items: NotificationItem[] = recent.map((row) => ({
-          id: `my-request-${row.id}`,
-          title: `Yêu cầu ${row.planName} đã ${row.status === 'APPROVED' ? 'được duyệt' : row.status === 'REJECTED' ? 'bị từ chối' : 'đang chờ duyệt'}`,
-          description: `Mã GD: ${row.transactionRef || '-'} • Số tiền ${Number(row.purchasedPrice).toLocaleString('vi-VN')}đ`,
+        const feed = await fetchUserNotifications(0, 5);
+        const items: NotificationItem[] = feed.content.map((row) => ({
+          id: `user-notification-${row.id}`,
+          title: row.title,
+          description: row.message,
           timeLabel: new Date(row.createdAt).toLocaleString('vi-VN'),
-          onClick: () => navigate('/dashboard/subscription-payments'),
+          onClick: () => navigate(row.actionUrl || '/dashboard/notifications'),
         }));
 
         const dismissedIds = readDismissedIds();
@@ -311,6 +311,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   ] : [
     { label: 'Tổng quan', icon: LayoutDashboard, path: '/dashboard' },
     { label: 'Nâng cấp Premium', icon: Banknote, path: '/dashboard/subscription-payments' },
+    { label: 'Cài đặt thông báo', icon: Settings2, path: '/dashboard/notifications' },
     { label: 'Kho đề công khai', icon: BookOpen, path: '/dashboard/exams' },
     { label: 'Học tập (SM-2)', icon: Zap, path: '/dashboard/spaced-repetition' },
     { label: 'Gamification', icon: Flame, path: '/dashboard/gamification' },

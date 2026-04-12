@@ -1,10 +1,9 @@
-# syntax=docker/dockerfile:1.7
+# ===== BUILD =====
 FROM node:22-alpine AS build
 WORKDIR /app
 
 COPY package*.json ./
-RUN --mount=type=cache,target=/root/.npm \
-    npm ci
+RUN npm install
 
 COPY . .
 
@@ -12,7 +11,7 @@ ARG VITE_AUTH_API_BASE_URL=/api/v1/auth
 ARG VITE_EXAM_API_BASE_URL=/api/v1/exam
 ARG VITE_STUDY_API_BASE_URL=/api/v1/study
 ARG VITE_COMMUNITY_API_BASE_URL=/api/v1/community
-ARG VITE_ANALYTICS_API_BASE_URL=/api/v1/exam/analytics
+ARG VITE_ANALYTICS_API_BASE_URL=/api/v1/analytics
 
 ENV VITE_AUTH_API_BASE_URL=${VITE_AUTH_API_BASE_URL}
 ENV VITE_EXAM_API_BASE_URL=${VITE_EXAM_API_BASE_URL}
@@ -22,5 +21,11 @@ ENV VITE_ANALYTICS_API_BASE_URL=${VITE_ANALYTICS_API_BASE_URL}
 
 RUN npm run build
 
-FROM scratch AS export-dist
-COPY --from=build /app/dist /dist
+# ===== RUN =====
+FROM nginx:1.26-alpine
+
+COPY --from=build /app/dist /usr/share/nginx/html
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
