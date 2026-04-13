@@ -18,9 +18,7 @@ import {
 import { motion } from "framer-motion";
 import toast from "react-hot-toast";
 import axiosClient from "../api/axiosClient";
-import { authApiBaseUrl } from "../config/env";
-
-const GOOGLE_AUTH_URL = `${authApiBaseUrl}/oauth2/authorization/google`;
+import { buildGoogleOAuthAuthorizationUrl } from "../config/env";
 
 const registerSchema = z
   .object({
@@ -50,7 +48,7 @@ const Register: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleGoogleSignup = () => {
-    globalThis.location.href = GOOGLE_AUTH_URL;
+    globalThis.location.href = buildGoogleOAuthAuthorizationUrl();
   };
 
   const onSubmit = async (data: RegisterFormData) => {

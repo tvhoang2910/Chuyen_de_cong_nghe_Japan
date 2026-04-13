@@ -2,7 +2,12 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Suspense, lazy, useEffect, useState, useRef } from 'react';
 import { usePushNotification } from '@/hooks/usePushNotification';
 import { Toaster } from 'react-hot-toast';
-import { AUTH_SESSION_CHANGED_EVENT, getCurrentSessionRole } from './api/axiosClient';
+import {
+  AUTH_SESSION_CHANGED_EVENT,
+  clearAuthSession,
+  fetchCurrentUserProfile,
+  getCurrentSessionRole,
+} from './api/axiosClient';
 
 const Home = lazy(() => import('./pages/Home'));
 const About = lazy(() => import('./pages/About'));
@@ -84,6 +89,46 @@ function App() {
       globalThis.removeEventListener(AUTH_SESSION_CHANGED_EVENT, syncAuthState);
     };
   }, []);
+
+  useEffect(() => {
+    if (!effectiveIsAuthenticated) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    const verifyRole = async () => {
+      try {
+        const profile = await fetchCurrentUserProfile();
+        if (cancelled) {
+          return;
+        }
+
+        const backendRole = profile.role;
+        const localRole = localStorage.getItem('user_role');
+
+        if (!localRole && backendRole) {
+          localStorage.setItem('user_role', backendRole);
+          setRole(backendRole);
+          return;
+        }
+
+        if (backendRole && localRole && backendRole !== localRole) {
+          console.warn('[App] Role mismatch detected, clearing local session');
+          clearAuthSession();
+        }
+      } catch {
+        // Ignore transient network errors and retry on next interval.
+      }
+    };
+
+    void verifyRole();
+    const intervalId = globalThis.setInterval(verifyRole, 5 * 60 * 1000);
+
+    return () => {
+      cancelled = true;
+      globalThis.clearInterval(intervalId);
+    };
+  }, [effectiveIsAuthenticated]);
 
   const { subscribe, unsubscribe } = usePushNotification();
   const prevAuth = useRef(false);

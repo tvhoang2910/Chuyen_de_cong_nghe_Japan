@@ -553,13 +553,20 @@ test.describe('Max Reply Depth', () => {
     await navigateToCommentsPage(page);
 
     const replyButtons = page.getByRole('button', { name: 'Trả lời' });
+    await expect(replyButtons.nth(2)).toBeVisible();
     await replyButtons.nth(2).click();
     await page.locator('textarea[placeholder="Viết phản hồi cho Người dùng..."]').fill('Reply beyond level 3 still in level 3 thread');
     await page.getByRole('button', { name: 'Gửi reply' }).click();
 
     expect(capturedParentId).toBe(32);
-    await expect(page.getByText('Reply beyond level 3 still in level 3 thread')).toBeVisible();
-    await expect(page.getByText('@Người dùng')).toBeVisible();
+    // Wait until inline reply form closes so the mention assertion is unambiguous.
+    await expect(page.getByText('Đang trả lời @Người dùng')).toHaveCount(0);
+
+    const insertedReply = page.locator('p.text-slate-900', {
+      hasText: 'Reply beyond level 3 still in level 3 thread',
+    });
+    await expect(insertedReply).toBeVisible();
+    await expect(insertedReply).toContainText('@Người dùng');
   });
 
   test('reply button appears on all visible levels', async ({ page }) => {
@@ -761,13 +768,21 @@ test.describe('Network Error Handling', () => {
   });
 
   test('loading comments failure shows error message', async ({ page }) => {
+    const failedLoadResponse = page.waitForResponse((response) =>
+      response.url().includes(`/api/v1/community/comments/exam/${EXAM_ID}`) &&
+      response.request().method() === 'GET' &&
+      response.status() === 500,
+    );
+
     await page.route(`**/api/v1/community/comments/exam/${EXAM_ID}`, async (route: Route) => {
       await route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ message: 'Load failed' }) });
     });
 
     await navigateToCommentsPage(page);
 
-    await expect(page.getByText(/không tải được|lỗi/i)).toBeVisible();
+    await failedLoadResponse;
+
+    await expect(page.getByText(/không tải được bình luận/i).first()).toBeVisible();
   });
 });
 

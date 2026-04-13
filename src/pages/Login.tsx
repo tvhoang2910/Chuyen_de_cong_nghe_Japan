@@ -17,7 +17,7 @@ import axiosClient, {
   fetchCurrentUserProfile,
   persistAuthSession,
 } from "../api/axiosClient";
-import { authApiBaseUrl } from "../config/env";
+import { buildGoogleOAuthAuthorizationUrl } from "../config/env";
 
 const GoogleIcon: React.FC = () => (
   <svg
@@ -115,7 +115,7 @@ const Login: React.FC = () => {
   };
 
   const handleGoogleLogin = () => {
-    globalThis.location.href = `${authApiBaseUrl}/oauth2/authorization/google`;
+    globalThis.location.href = buildGoogleOAuthAuthorizationUrl();
   };
 
   return (

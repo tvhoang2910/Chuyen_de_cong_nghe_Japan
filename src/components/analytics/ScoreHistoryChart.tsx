@@ -20,7 +20,7 @@ export const ScoreHistoryChart: React.FC<Props> = ({ points }) => {
   const data = [...points].reverse();
 
   return (
-    <ResponsiveContainer width="100%" height={240}>
+    <ResponsiveContainer width="100%" height={240} minWidth={0} minHeight={240}>
       <LineChart data={data} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
         <XAxis

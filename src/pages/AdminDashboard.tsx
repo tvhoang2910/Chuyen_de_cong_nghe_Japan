@@ -17,7 +17,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  ResponsiveContainer,
   BarChart,
   Bar,
 } from 'recharts';
@@ -52,6 +51,11 @@ type StatCardProps = {
   onClick?: () => void;
 };
 
+type ChartSize = {
+  width: number;
+  height: number;
+};
+
 const StatCard: React.FC<StatCardProps> = ({ title, value, icon: Icon, trend, trendValue, color, onClick }) => (
   <button
     type="button"
@@ -81,6 +85,54 @@ const AdminDashboard: React.FC = () => {
   const accessToken = localStorage.getItem('access_token');
   const { onlineCount } = usePresenceSSE(accessToken);
   const { activeAttempts, submissionsToday } = useExamEventsSSE(accessToken);
+  const userChartRef = React.useRef<HTMLDivElement | null>(null);
+  const subjectChartRef = React.useRef<HTMLDivElement | null>(null);
+  const [userChartSize, setUserChartSize] = React.useState<ChartSize>({ width: 0, height: 0 });
+  const [subjectChartSize, setSubjectChartSize] = React.useState<ChartSize>({ width: 0, height: 0 });
+
+  React.useEffect(() => {
+    const updateChartSize = (
+      entry: ResizeObserverEntry,
+      updateState: React.Dispatch<React.SetStateAction<ChartSize>>,
+    ) => {
+      const nextWidth = Math.max(Math.floor(entry.contentRect.width), 0);
+      const nextHeight = Math.max(Math.floor(entry.contentRect.height), 0);
+      updateState((current) =>
+        current.width === nextWidth && current.height === nextHeight
+          ? current
+          : { width: nextWidth, height: nextHeight },
+      );
+    };
+
+    const observers: ResizeObserver[] = [];
+
+    const observe = (
+      element: HTMLDivElement | null,
+      updateState: React.Dispatch<React.SetStateAction<ChartSize>>,
+    ) => {
+      if (!element) {
+        return;
+      }
+
+      const observer = new ResizeObserver((entries) => {
+        const entry = entries[0];
+        if (!entry) {
+          return;
+        }
+        updateChartSize(entry, updateState);
+      });
+
+      observer.observe(element);
+      observers.push(observer);
+    };
+
+    observe(userChartRef.current, setUserChartSize);
+    observe(subjectChartRef.current, setSubjectChartSize);
+
+    return () => {
+      observers.forEach((observer) => observer.disconnect());
+    };
+  }, []);
 
   return (
     <AdminLayout>
@@ -120,9 +172,9 @@ const AdminDashboard: React.FC = () => {
                 </span>
               </div>
             </div>
-            <div className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={data}>
+            <div ref={userChartRef} className="h-[300px] w-full min-w-0 min-h-[300px]">
+              {userChartSize.width > 0 && userChartSize.height > 0 ? (
+                <AreaChart width={userChartSize.width} height={userChartSize.height} data={data}>
                   <defs>
                     <linearGradient id="colorUsers" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.1} />
@@ -140,15 +192,15 @@ const AdminDashboard: React.FC = () => {
                   <Area type="monotone" dataKey="users" stroke="#06b6d4" strokeWidth={3} fillOpacity={1} fill="url(#colorUsers)" />
                   <Area type="monotone" dataKey="exams" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorExams)" />
                 </AreaChart>
-              </ResponsiveContainer>
+              ) : null}
             </div>
           </div>
 
           <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
             <h2 className="text-xl font-bold text-slate-900 mb-8">Môn học phổ biến</h2>
-            <div className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={subjectData} layout="vertical">
+            <div ref={subjectChartRef} className="h-[300px] w-full min-w-0 min-h-[300px]">
+              {subjectChartSize.width > 0 && subjectChartSize.height > 0 ? (
+                <BarChart width={subjectChartSize.width} height={subjectChartSize.height} data={subjectData} layout="vertical">
                   <XAxis type="number" hide />
                   <YAxis
                     dataKey="name"
@@ -161,7 +213,7 @@ const AdminDashboard: React.FC = () => {
                   <Tooltip cursor={{ fill: 'transparent' }} />
                   <Bar dataKey="count" radius={[0, 8, 8, 0]} barSize={20} fill="#06b6d4" />
                 </BarChart>
-              </ResponsiveContainer>
+              ) : null}
             </div>
             <div className="mt-4 space-y-3">
               {subjectData.map((s) => (

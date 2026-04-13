@@ -100,6 +100,8 @@ npm run preview
 - npm run test: vitest watch mode
 - npm run test:run: vitest run one-shot
 - npm run test:ui: vitest UI
+- npm run test:e2e: run all Playwright tests
+- npm run test:e2e:system: run system-level API + end-user flow E2E suite
 
 ## 6. E2E tests (Playwright)
 
@@ -126,6 +128,26 @@ Test files hien co:
 - tests/comment-flow.spec.ts
 - tests/spaced-repetition.spec.ts
 - tests/spaced-repetition-professional.spec.ts
+
+System E2E suite:
+
+```bash
+npm run test:e2e:system
+```
+
+System suite scope:
+
+- OpenAPI smoke cho auth/exam/study/community (fail neu co HTTP 5xx)
+- End-user flow xuyen service: exam attempt -> submit -> study analytics/gamification -> community comment/vote
+
+System E2E env vars (optional):
+
+- E2E_JWT_SECRET_BASE64 (fallback to JWT_SECRET, then local dev default)
+- E2E_JWT_ISSUER (default: auth_service)
+- E2E_AUTH_BASE_URL (default: http://localhost:8080/api/v1/auth)
+- E2E_EXAM_BASE_URL (default: http://localhost:8082/api/v1/exam)
+- E2E_STUDY_BASE_URL (default: http://localhost:8085/api/v1/study)
+- E2E_COMMUNITY_BASE_URL (default: http://localhost:8084/api/v1/community)
 
 ## 7. Route map chinh
 

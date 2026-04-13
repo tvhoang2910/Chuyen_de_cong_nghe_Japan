@@ -29,7 +29,7 @@ export const WeaknessRadarChart: React.FC<Props> = ({ points }) => {
           Radar đang dùng fallback tổng hợp vì dữ liệu bài làm chưa gắn tag.
         </p>
       )}
-      <ResponsiveContainer width="100%" height={280}>
+      <ResponsiveContainer width="100%" height={280} minWidth={0} minHeight={280}>
         <RadarChart cx="50%" cy="50%" outerRadius="75%" data={data}>
           <PolarGrid stroke="#e2e8f0" />
           <PolarAngleAxis

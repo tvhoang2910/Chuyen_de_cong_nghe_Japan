@@ -317,6 +317,34 @@ const publicAuthPaths = new Set([
 export const AUTH_SESSION_CHANGED_EVENT = "auth-session-changed";
 export const SUBSCRIPTION_REVIEW_UPDATED_EVENT = "subscription-review-updated";
 const USER_FULL_NAME_STORAGE_KEY = "user_full_name";
+const ACCESS_TOKEN_COOKIE_KEY = "access_token";
+const ACCESS_TOKEN_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
+
+const setAccessTokenCookie = (token: string) => {
+  if (!globalThis.document) {
+    return;
+  }
+
+  const secureAttribute =
+    globalThis.location?.protocol === "https:" ? "; Secure" : "";
+  globalThis.document.cookie = `${ACCESS_TOKEN_COOKIE_KEY}=${token}; Path=/; Max-Age=${ACCESS_TOKEN_COOKIE_MAX_AGE_SECONDS}; SameSite=Lax${secureAttribute}`;
+};
+
+const clearAccessTokenCookie = () => {
+  if (!globalThis.document) {
+    return;
+  }
+  globalThis.document.cookie = `${ACCESS_TOKEN_COOKIE_KEY}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`;
+};
+
+const syncAccessTokenCookieFromStorage = () => {
+  const token = localStorage.getItem("access_token");
+  if (token) {
+    setAccessTokenCookie(token);
+  }
+};
+
+syncAccessTokenCookieFromStorage();
 
 const notifyAuthSessionChanged = () => {
   globalThis.dispatchEvent(new Event(AUTH_SESSION_CHANGED_EVENT));
@@ -355,8 +383,25 @@ type CacheEntry<T> = {
 const DEFAULT_GET_CACHE_TTL_MS = Number(
   import.meta.env.VITE_GET_CACHE_TTL_MS ?? 5000,
 );
+const MAX_GET_CACHE_ENTRIES = Number(import.meta.env.VITE_GET_CACHE_MAX_ENTRIES ?? 200);
 const responseCache = new Map<string, CacheEntry<unknown>>();
 const inflightGetRequests = new Map<string, Promise<unknown>>();
+
+const evictCacheIfNeeded = () => {
+  if (responseCache.size < MAX_GET_CACHE_ENTRIES) {
+    return;
+  }
+
+  const removeCount = Math.max(1, Math.floor(MAX_GET_CACHE_ENTRIES * 0.2));
+  let removed = 0;
+  for (const key of responseCache.keys()) {
+    responseCache.delete(key);
+    removed += 1;
+    if (removed >= removeCount) {
+      break;
+    }
+  }
+};
 
 const getCached = <T>(cacheKey: string): T | null => {
   const entry = responseCache.get(cacheKey);
@@ -375,6 +420,7 @@ const setCached = <T>(
   data: T,
   ttlMs = DEFAULT_GET_CACHE_TTL_MS,
 ) => {
+  evictCacheIfNeeded();
   responseCache.set(cacheKey, {
     data,
     expiresAt: Date.now() + ttlMs,
@@ -452,6 +498,7 @@ export const exchangeOAuth2Code = async (code: string): Promise<AuthPayload> => 
 
 export const persistAuthSession = (payload: AuthPayload) => {
   localStorage.setItem("access_token", payload.accessToken);
+  setAccessTokenCookie(payload.accessToken);
   if (payload.refreshToken) {
     localStorage.setItem("refresh_token", payload.refreshToken);
   }
@@ -480,6 +527,7 @@ export const clearAuthSession = () => {
   localStorage.removeItem("user_email");
   localStorage.removeItem("user_role");
   localStorage.removeItem(USER_FULL_NAME_STORAGE_KEY);
+  clearAccessTokenCookie();
   localStorage.removeItem("exam_bank_study_timer_v1");
   keysToRemove.forEach((key) => localStorage.removeItem(key));
   clearAllApiCache();

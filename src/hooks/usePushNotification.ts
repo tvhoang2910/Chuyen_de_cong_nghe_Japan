@@ -73,9 +73,10 @@ export function usePushNotification() {
       return false;
     }
 
+    // Do not trigger browser permission prompts automatically during app bootstrap.
+    // Subscription is attempted only when permission was already granted.
     if (permission !== 'granted') {
-      const result = await Notification.requestPermission();
-      if (result !== 'granted') return false;
+      return false;
     }
 
     try {
