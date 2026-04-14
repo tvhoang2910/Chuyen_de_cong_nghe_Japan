@@ -1,9 +1,9 @@
 import axios from 'axios';
 
-const analyticsBaseUrl = import.meta.env.VITE_ANALYTICS_API_BASE_URL || 'http://localhost:8082/api/v1/analytics';
+import { analyticsApiBaseUrl } from '../config/env';
 
 const analyticsClient = axios.create({
-  baseURL: analyticsBaseUrl,
+  baseURL: analyticsApiBaseUrl,
   headers: {
     'Content-Type': 'application/json',
   },

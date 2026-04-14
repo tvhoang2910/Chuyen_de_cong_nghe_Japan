@@ -7,6 +7,7 @@ import MainLayout from '../components/MainLayout';
 import {
   cancelSubscriptionByAdmin,
   fetchSubscriptionAnalyticsOverview,
+  fetchSubscriptionBillImage,
   fetchSubscriptionHistory,
   fetchSubscriptionApprovalAudits,
   notifySubscriptionReviewUpdated,
@@ -81,6 +82,9 @@ const SubscriptionReviewQueue: React.FC<SubscriptionReviewQueueProps> = ({ mode 
   const [cancelTarget, setCancelTarget] = useState<SubscriptionHistoryItem | null>(null);
   const [cancelReason, setCancelReason] = useState('');
   const [isCancelling, setIsCancelling] = useState(false);
+  const [billPreviewTarget, setBillPreviewTarget] = useState<{ id: number; label: string } | null>(null);
+  const [billPreviewUrl, setBillPreviewUrl] = useState<string | null>(null);
+  const [isBillPreviewLoading, setIsBillPreviewLoading] = useState(false);
 
   const Layout = useMemo(() => (mode === 'admin' ? AdminLayout : MainLayout), [mode]);
 
@@ -201,6 +205,39 @@ const SubscriptionReviewQueue: React.FC<SubscriptionReviewQueueProps> = ({ mode 
     setHistoryFilters(historyFilterDraft);
   };
 
+  const handleCloseBillPreview = () => {
+    setBillPreviewTarget(null);
+    setIsBillPreviewLoading(false);
+    setBillPreviewUrl((current) => {
+      if (current) {
+        URL.revokeObjectURL(current);
+      }
+      return null;
+    });
+  };
+
+  const handleOpenBillPreview = async (subscriptionId: number, label: string) => {
+    setBillPreviewTarget({ id: subscriptionId, label });
+    setIsBillPreviewLoading(true);
+    setBillPreviewUrl((current) => {
+      if (current) {
+        URL.revokeObjectURL(current);
+      }
+      return null;
+    });
+
+    try {
+      const blob = await fetchSubscriptionBillImage(subscriptionId);
+      const objectUrl = URL.createObjectURL(blob);
+      setBillPreviewUrl(objectUrl);
+    } catch {
+      toast.error('Không thể tải bill chuyển khoản.');
+      setBillPreviewTarget(null);
+    } finally {
+      setIsBillPreviewLoading(false);
+    }
+  };
+
   const handleResetHistoryFilters = () => {
     setHistoryFilterDraft(EMPTY_HISTORY_FILTERS);
     setHistoryPageIndex(0);
@@ -216,6 +253,14 @@ const SubscriptionReviewQueue: React.FC<SubscriptionReviewQueueProps> = ({ mode 
     setCancelTarget(null);
     setCancelReason('');
   };
+
+  useEffect(() => {
+    return () => {
+      if (billPreviewUrl) {
+        URL.revokeObjectURL(billPreviewUrl);
+      }
+    };
+  }, [billPreviewUrl]);
 
   const handleConfirmCancel = async () => {
     if (!cancelTarget) {
@@ -356,9 +401,13 @@ const SubscriptionReviewQueue: React.FC<SubscriptionReviewQueueProps> = ({ mode 
                   <p><strong>Số tiền:</strong> {Number(selected.purchasedPrice).toLocaleString('vi-VN')}đ</p>
                   <p><strong>Phương thức:</strong> {selected.paymentMethod || '-'}</p>
                   <p><strong>Mã giao dịch:</strong> {selected.transactionRef || '-'}</p>
-                  <a href={selected.billImageUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 font-semibold text-cyan-700 hover:text-cyan-900">
+                  <button
+                    type="button"
+                    onClick={() => void handleOpenBillPreview(selected.id, `Request #${selected.id}`)}
+                    className="inline-flex w-fit items-center gap-2 font-semibold text-cyan-700 hover:text-cyan-900"
+                  >
                     <Eye className="h-4 w-4" /> Mở bill chuyển khoản
-                  </a>
+                  </button>
                 </div>
 
                 <label className="block">
@@ -560,14 +609,13 @@ const SubscriptionReviewQueue: React.FC<SubscriptionReviewQueueProps> = ({ mode 
                           <td className="px-4 py-3 text-right">
                             <div className="flex justify-end gap-2">
                               {item.billImageUrl ? (
-                                <a
-                                  href={item.billImageUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
+                                <button
+                                  type="button"
+                                  onClick={() => void handleOpenBillPreview(item.id, `Lịch sử #${item.id}`)}
                                   className="rounded-lg border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
                                 >
                                   Bill
-                                </a>
+                                </button>
                               ) : null}
                               <button
                                 type="button"
@@ -616,6 +664,50 @@ const SubscriptionReviewQueue: React.FC<SubscriptionReviewQueueProps> = ({ mode 
           </section>
         )}
       </div>
+
+      {billPreviewTarget && (
+        <div className="fixed inset-0 z-[125] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
+          <button
+            type="button"
+            className="absolute inset-0"
+            aria-label="Đóng xem bill"
+            onClick={handleCloseBillPreview}
+          />
+          <div className="relative w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+              <div>
+                <h3 className="text-base font-black text-slate-900">Bill chuyển khoản</h3>
+                <p className="text-xs text-slate-500">{billPreviewTarget.label}</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleCloseBillPreview}
+                className="rounded-lg border border-slate-300 p-1.5 text-slate-500 hover:bg-slate-100"
+                aria-label="Đóng modal bill"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="max-h-[78vh] overflow-auto bg-slate-100 p-4">
+              {isBillPreviewLoading ? (
+                <div className="flex h-[60vh] items-center justify-center rounded-xl border border-slate-300 bg-white text-sm font-semibold text-slate-500">
+                  Đang tải bill...
+                </div>
+              ) : billPreviewUrl ? (
+                <img
+                  src={billPreviewUrl}
+                  alt={`Bill ${billPreviewTarget.id}`}
+                  className="mx-auto max-h-[72vh] w-auto rounded-lg border border-slate-300 bg-white shadow"
+                />
+              ) : (
+                <div className="flex h-[60vh] items-center justify-center rounded-xl border border-slate-300 bg-white text-sm font-semibold text-slate-500">
+                  Không có dữ liệu bill để hiển thị.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {cancelTarget && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">

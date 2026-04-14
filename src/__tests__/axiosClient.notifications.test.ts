@@ -101,8 +101,8 @@ describe('axiosClient notification extensions', () => {
         {
           id: 501,
           type: 'SUBSCRIPTION_REVIEWED',
-          title: 'Yeu cau Premium da duoc duyet',
-          message: 'Goi Premium 30 da duoc duyet',
+          title: 'Yêu cầu Premium đã được duyệt',
+          message: 'Gói Premium 30 đã được duyệt',
           actionUrl: '/dashboard/subscription-payments',
           read: false,
           createdAt: '2026-04-11T08:00:00Z',
@@ -148,8 +148,8 @@ describe('axiosClient notification extensions', () => {
         {
           id: 601,
           type: 'SUBSCRIPTION_EXPIRY_REMINDER',
-          title: 'Goi Premium sap het han',
-          message: 'Goi Premium 30 se het han vao 2026-04-14T00:00:00Z',
+          title: 'Gói Premium sắp hết hạn',
+          message: 'Gói Premium 30 sẽ hết hạn vào 2026-04-14T00:00:00Z',
           actionUrl: '/dashboard/subscription-payments',
           read: false,
           createdAt: '2026-04-11T09:00:00Z',

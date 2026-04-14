@@ -6,6 +6,7 @@ const DEFAULT_DEV_JWT_SECRET_BASE64 =
   'MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWYwMTIzNDU2Nzg5YWJjZGVmMDEyMzQ1Njc4OWFiY2RlZg==';
 
 type ServiceTargets = {
+  webBaseUrl: string;
   authBaseUrl: string;
   examBaseUrl: string;
   studyBaseUrl: string;
@@ -121,6 +122,10 @@ export const buildSystemTestContext = (): SystemTestContext => {
     getConfigValue('E2E_AUTH_BASE_URL', 'VITE_AUTH_API_BASE_URL') ?? '',
     'http://localhost:8080/api/v1/auth',
   );
+  const webBaseUrl = normalizeBaseUrl(
+    getConfigValue('E2E_WEB_BASE_URL', 'PLAYWRIGHT_SYSTEM_BASE_URL', 'PLAYWRIGHT_BASE_URL') ?? '',
+    'http://localhost:5173',
+  );
   const examBaseUrl = normalizeBaseUrl(
     getConfigValue('E2E_EXAM_BASE_URL', 'VITE_EXAM_API_BASE_URL') ?? '',
     'http://localhost:8082/api/v1/exam',
@@ -155,6 +160,7 @@ export const buildSystemTestContext = (): SystemTestContext => {
   const adminToken = signHs256Jwt(adminIdentity, secretBase64, issuer);
 
   return {
+    webBaseUrl,
     authBaseUrl,
     examBaseUrl,
     studyBaseUrl,

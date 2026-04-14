@@ -165,12 +165,12 @@ test.describe('Admin subscription reviews history + cancel flow', () => {
     await expect(modal).toBeVisible();
 
     const reasonBox = page.locator('textarea').first();
-    await reasonBox.fill('Khach hang yeu cau huy goi ngay.');
+    await reasonBox.fill('Khách hàng yêu cầu hủy gói ngay.');
 
     await page.getByRole('button', { name: 'Xác nhận hủy' }).click();
 
     await expect(page.getByText('Đã hủy gói thành công')).toBeVisible();
     await expect(page.getByRole('cell', { name: 'CANCELLED' })).toBeVisible();
-    await expect(page.getByText('Khach hang yeu cau huy goi ngay.')).toBeVisible();
+    await expect(page.getByText('Khách hàng yêu cầu hủy gói ngay.')).toBeVisible();
   });
 });

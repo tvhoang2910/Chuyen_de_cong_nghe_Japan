@@ -135,8 +135,8 @@ function App() {
 
   useEffect(() => {
     if (effectiveIsAuthenticated && !prevAuth.current) {
-      // User just logged in — subscribe to push notifications
-      void subscribe();
+      // User just logged in — refresh browser subscription with backend.
+      void subscribe({ forceRefreshExisting: true });
     }
     if (!effectiveIsAuthenticated && prevAuth.current) {
       // User just logged out — remove stale browser subscription binding

@@ -1,6 +1,8 @@
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import '@testing-library/jest-dom/vitest';
+import { MemoryRouter } from 'react-router-dom';
 import NotificationSettings from '../pages/NotificationSettings';
 
 const {
@@ -90,6 +92,14 @@ const buildPage = (
   unreadCount,
 });
 
+const renderPage = () => {
+  return render(
+    <MemoryRouter>
+      <NotificationSettings />
+    </MemoryRouter>,
+  );
+};
+
 describe('NotificationSettings page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -117,8 +127,8 @@ describe('NotificationSettings page', () => {
     const unreadItem: NotificationItem = {
       id: 101,
       type: 'SUBSCRIPTION_REVIEWED',
-      title: 'Yeu cau Premium da duoc duyet',
-      message: 'Goi Premium 30 da duoc duyet',
+      title: 'Yêu cầu Premium đã được duyệt',
+      message: 'Gói Premium 30 đã được duyệt',
       actionUrl: '/dashboard/subscription-payments',
       read: false,
       createdAt: '2026-04-11T10:00:00Z',
@@ -132,23 +142,23 @@ describe('NotificationSettings page', () => {
       readAt: '2026-04-11T10:01:00Z',
     });
 
-    render(<NotificationSettings />);
+    renderPage();
 
     await waitFor(() => {
       expect(fetchNotificationPreferences).toHaveBeenCalledTimes(1);
       expect(fetchUserNotifications).toHaveBeenCalledWith(0, 20);
     });
 
-    expect(screen.getByText('Yeu cau Premium da duoc duyet')).toBeInTheDocument();
+    expect(screen.getByText('Yêu cầu Premium đã được duyệt')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Danh dau da doc' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Đánh dấu đã đọc' }));
 
     await waitFor(() => {
       expect(markUserNotificationRead).toHaveBeenCalledWith(101);
     });
 
-    expect(screen.queryByRole('button', { name: 'Danh dau da doc' })).not.toBeInTheDocument();
-    expect(screen.getByText('0 chua doc')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Đánh dấu đã đọc' })).not.toBeInTheDocument();
+    expect(screen.getByText('0 chưa đọc')).toBeInTheDocument();
   });
 
   it('toggles email preference and calls update API', async () => {
@@ -157,13 +167,13 @@ describe('NotificationSettings page', () => {
       webPushEnabled: true,
     });
 
-    render(<NotificationSettings />);
+    renderPage();
 
     await waitFor(() => {
       expect(fetchNotificationPreferences).toHaveBeenCalledTimes(1);
     });
 
-    const toggleButtons = screen.getAllByRole('button', { name: 'Dang bat - Bam de tat' });
+    const toggleButtons = screen.getAllByRole('button', { name: 'Đang bật - Bấm để tắt' });
     fireEvent.click(toggleButtons[0]);
 
     await waitFor(() => {
@@ -172,7 +182,7 @@ describe('NotificationSettings page', () => {
 
     expect(subscribe).not.toHaveBeenCalled();
     expect(unsubscribe).not.toHaveBeenCalled();
-    expect(toastSuccess).toHaveBeenCalledWith('Da tat nhan thong bao email.');
+    expect(toastSuccess).toHaveBeenCalledWith('Đã tắt nhận thông báo email.');
   });
 
   it('marks all notifications as read and refreshes list', async () => {
@@ -180,8 +190,8 @@ describe('NotificationSettings page', () => {
       {
         id: 201,
         type: 'SUBSCRIPTION_REVIEWED',
-        title: 'Yeu cau Premium da duoc duyet',
-        message: 'Ban vua duoc duyet Premium',
+        title: 'Yêu cầu Premium đã được duyệt',
+        message: 'Bạn vừa được duyệt Premium',
         actionUrl: '/dashboard/subscription-payments',
         read: false,
         createdAt: '2026-04-11T10:00:00Z',
@@ -190,8 +200,8 @@ describe('NotificationSettings page', () => {
       {
         id: 202,
         type: 'SUBSCRIPTION_EXPIRY_REMINDER',
-        title: 'Goi Premium sap het han',
-        message: 'Goi Premium 30 se het han vao 2026-04-14T00:00:00Z',
+        title: 'Gói Premium sắp hết hạn',
+        message: 'Gói Premium 30 sẽ hết hạn vào 2026-04-14T00:00:00Z',
         actionUrl: '/dashboard/subscription-payments',
         read: false,
         createdAt: '2026-04-11T09:00:00Z',
@@ -210,21 +220,56 @@ describe('NotificationSettings page', () => {
       .mockResolvedValueOnce(buildPage(readItems, 0));
     markAllUserNotificationsRead.mockResolvedValue(2);
 
-    render(<NotificationSettings />);
+    renderPage();
 
     await waitFor(() => {
-      expect(screen.getByText('2 chua doc')).toBeInTheDocument();
+      expect(screen.getByText('2 chưa đọc')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Danh dau tat ca da doc' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Đánh dấu tất cả đã đọc' }));
 
     await waitFor(() => {
       expect(markAllUserNotificationsRead).toHaveBeenCalledTimes(1);
       expect(fetchUserNotifications).toHaveBeenCalledTimes(2);
     });
 
-    expect(toastSuccess).toHaveBeenCalledWith('Da danh dau 2 thong bao la da doc.');
-    expect(screen.getByText('0 chua doc')).toBeInTheDocument();
+    expect(toastSuccess).toHaveBeenCalledWith('Đã đánh dấu 2 thông báo là đã đọc.');
+    expect(screen.getByText('0 chưa đọc')).toBeInTheDocument();
+  });
+
+  it('marks an unread notification when opening related page', async () => {
+    const unreadItem: NotificationItem = {
+      id: 301,
+      type: 'SUBSCRIPTION_REVIEWED',
+      title: 'Yêu cầu Premium đã được duyệt',
+      message: 'Gói Premium 30 đã được duyệt',
+      actionUrl: '/dashboard/subscription-payments',
+      read: false,
+      createdAt: '2026-04-11T10:00:00Z',
+      readAt: null,
+    };
+
+    fetchUserNotifications.mockResolvedValue(buildPage([unreadItem], 1));
+    markUserNotificationRead.mockResolvedValue({
+      ...unreadItem,
+      read: true,
+      readAt: '2026-04-11T10:01:00Z',
+    });
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Yêu cầu Premium đã được duyệt')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mở trang liên quan' }));
+
+    await waitFor(() => {
+      expect(markUserNotificationRead).toHaveBeenCalledWith(301);
+    });
+
+    expect(screen.queryByRole('button', { name: 'Đánh dấu đã đọc' })).not.toBeInTheDocument();
+    expect(screen.getByText('0 chưa đọc')).toBeInTheDocument();
   });
 
   it('shows web push as off when browser has no subscription even if preference is enabled', async () => {
@@ -242,13 +287,13 @@ describe('NotificationSettings page', () => {
       webPushEnabled: true,
     });
 
-    render(<NotificationSettings />);
+    renderPage();
 
     await waitFor(() => {
-      expect(screen.getByText('Tai khoan dang bat Web Push, nhung trinh duyet chua dang ky push subscription.')).toBeInTheDocument();
+      expect(screen.getByText('Tài khoản đang bật Web Push, nhưng trình duyệt chưa đăng ký push subscription.')).toBeInTheDocument();
     });
 
-    const turnOnButtons = screen.getAllByRole('button', { name: 'Dang tat - Bam de bat' });
+    const turnOnButtons = screen.getAllByRole('button', { name: 'Đang tắt - Bấm để bật' });
     fireEvent.click(turnOnButtons[0]);
 
     await waitFor(() => {

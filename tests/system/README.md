@@ -24,10 +24,31 @@ This folder contains production-like system E2E tests for the full Exam Bank pla
     7. Verify study analytics/gamification endpoints
     8. Create comment and vote in community service
 
+- `deploy-end-user-ui-smoke.spec.ts`
+  - Runs a real browser + real API smoke flow for demo readiness:
+    1. Provision a fresh USER account via admin API
+    2. Upload avatar and verify returned URL stays on app domain (no MinIO direct URL)
+    3. Create/fetch subscription request with bill image
+    4. Login from UI and open "Xem bill đã tải lên"
+    5. Assert bill is previewed in modal (blob URL), not external MinIO navigation
+    6. Assert no mixed-content/minio browser warnings and no gamification 502 response
+    7. Verify notification center endpoints return healthy responses
+
 ## Run
 
 ```bash
 npm run test:e2e:system
+```
+
+Run specifically against deploy/ngrok domain:
+
+```bash
+$env:E2E_WEB_BASE_URL='https://your-domain.ngrok-free.dev'; \
+$env:E2E_AUTH_BASE_URL='https://your-domain.ngrok-free.dev/api/v1/auth'; \
+$env:E2E_EXAM_BASE_URL='https://your-domain.ngrok-free.dev/api/v1/exam'; \
+$env:E2E_STUDY_BASE_URL='https://your-domain.ngrok-free.dev/api/v1/study'; \
+$env:E2E_COMMUNITY_BASE_URL='https://your-domain.ngrok-free.dev/api/v1/community'; \
+npm run test:e2e:system -- tests/system/deploy-end-user-ui-smoke.spec.ts
 ```
 
 ## Required services

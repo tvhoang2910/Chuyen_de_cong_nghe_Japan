@@ -115,7 +115,7 @@ const Dashboard: React.FC = () => {
   const welcomeMessage = user ? `Chào buổi sáng, ${user.fullName}! 👋` : 'Chào buổi sáng! 👋';
 
   return (
-    <MainLayout>
+    <MainLayout fallbackStreakDays={studyStats?.streakDays}>
       <div className="space-y-8">
         <div className="flex items-end justify-between">
           <div>

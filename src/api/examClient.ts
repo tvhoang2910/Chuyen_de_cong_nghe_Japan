@@ -1,4 +1,5 @@
 import axios from "axios";
+import { examApiBaseUrl } from "../config/env";
 
 export type OnlineExamStatus = "DRAFT" | "PUBLISHED" | "ARCHIVED";
 
@@ -133,9 +134,6 @@ export type AttemptSummary = {
   scorePercent?: number;
   passed?: boolean;
 };
-
-const examApiBaseUrl =
-  import.meta.env.VITE_EXAM_API_BASE_URL || "http://localhost:8082/api/v1/exam";
 
 const examClient = axios.create({
   baseURL: examApiBaseUrl,

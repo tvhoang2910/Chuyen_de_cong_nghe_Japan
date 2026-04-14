@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { AxiosError } from 'axios';
-import { CheckCircle2, Clock3, FileImage, Landmark, ReceiptText, UploadCloud, XCircle } from 'lucide-react';
+import { CheckCircle2, Clock3, FileImage, Landmark, ReceiptText, UploadCloud, X, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import MainLayout from '../components/MainLayout';
 import {
   createSubscriptionPurchaseRequest,
+  fetchSubscriptionBillImage,
   fetchMySubscriptionRequests,
   fetchPremiumPlans,
   type PremiumPlanSummary,
@@ -40,6 +41,9 @@ const SubscriptionPayments: React.FC = () => {
   const [billFile, setBillFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [billPreviewTarget, setBillPreviewTarget] = useState<{ id: number; label: string } | null>(null);
+  const [billPreviewUrl, setBillPreviewUrl] = useState<string | null>(null);
+  const [isBillPreviewLoading, setIsBillPreviewLoading] = useState(false);
 
   const selectedPlan = useMemo(
     () => plans.find((plan) => plan.id === selectedPlanId) ?? null,
@@ -69,6 +73,47 @@ const SubscriptionPayments: React.FC = () => {
     void loadData();
   }, [loadData]);
 
+  const handleCloseBillPreview = useCallback(() => {
+    setBillPreviewTarget(null);
+    setIsBillPreviewLoading(false);
+    setBillPreviewUrl((current) => {
+      if (current) {
+        URL.revokeObjectURL(current);
+      }
+      return null;
+    });
+  }, []);
+
+  const handleOpenBillPreview = useCallback(async (subscriptionId: number, label: string) => {
+    setBillPreviewTarget({ id: subscriptionId, label });
+    setIsBillPreviewLoading(true);
+    setBillPreviewUrl((current) => {
+      if (current) {
+        URL.revokeObjectURL(current);
+      }
+      return null;
+    });
+
+    try {
+      const blob = await fetchSubscriptionBillImage(subscriptionId);
+      const objectUrl = URL.createObjectURL(blob);
+      setBillPreviewUrl(objectUrl);
+    } catch {
+      toast.error('Không thể tải bill chuyển khoản.');
+      setBillPreviewTarget(null);
+    } finally {
+      setIsBillPreviewLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (billPreviewUrl) {
+        URL.revokeObjectURL(billPreviewUrl);
+      }
+    };
+  }, [billPreviewUrl]);
+
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!selectedPlanId) {
@@ -80,7 +125,7 @@ const SubscriptionPayments: React.FC = () => {
       return;
     }
     if (billFile.size > MAX_BILL_SIZE_BYTES) {
-      toast.error('Bill vuot qua gioi han 20MB. Vui long chon file nho hon.');
+      toast.error('Bill vượt quá giới hạn 20MB. Vui lòng chọn file nhỏ hơn.');
       return;
     }
 
@@ -209,7 +254,7 @@ const SubscriptionPayments: React.FC = () => {
                   onChange={(event) => setBillFile(event.target.files?.[0] || null)}
                   className="block w-full text-sm"
                 />
-                <p className="mt-2 text-xs text-slate-500">Gioi han kich thuoc: toi da 20MB.</p>
+                <p className="mt-2 text-xs text-slate-500">Giới hạn kích thước: tối đa 20MB.</p>
               </label>
 
               <button
@@ -250,20 +295,67 @@ const SubscriptionPayments: React.FC = () => {
                   <div className="mt-3 text-sm text-slate-600">
                     <p>Số tiền: {Number(request.purchasedPrice).toLocaleString('vi-VN')}đ</p>
                     <p>Mã giao dịch: {request.transactionRef || '-'}</p>
-                    <a
-                      href={request.billImageUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="font-semibold text-cyan-700 hover:text-cyan-800"
-                    >
-                      Xem bill đã tải lên
-                    </a>
+                    {request.billImageUrl ? (
+                      <button
+                        type="button"
+                        onClick={() => void handleOpenBillPreview(request.id, `${request.planName} #${request.id}`)}
+                        className="font-semibold text-cyan-700 hover:text-cyan-800"
+                      >
+                        Xem bill đã tải lên
+                      </button>
+                    ) : (
+                      <p>-</p>
+                    )}
                   </div>
                 </div>
               ))
             )}
           </div>
         </section>
+
+        {billPreviewTarget && (
+          <div className="fixed inset-0 z-[125] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
+            <button
+              type="button"
+              className="absolute inset-0"
+              aria-label="Đóng xem bill"
+              onClick={handleCloseBillPreview}
+            />
+            <div className="relative w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+              <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+                <div>
+                  <h3 className="text-base font-black text-slate-900">Bill chuyển khoản</h3>
+                  <p className="text-xs text-slate-500">{billPreviewTarget.label}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCloseBillPreview}
+                  className="rounded-lg border border-slate-300 p-1.5 text-slate-500 hover:bg-slate-100"
+                  aria-label="Đóng modal bill"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="max-h-[78vh] overflow-auto bg-slate-100 p-4">
+                {isBillPreviewLoading ? (
+                  <div className="flex h-[60vh] items-center justify-center rounded-xl border border-slate-300 bg-white text-sm font-semibold text-slate-500">
+                    Đang tải bill...
+                  </div>
+                ) : billPreviewUrl ? (
+                  <img
+                    src={billPreviewUrl}
+                    alt={`Bill ${billPreviewTarget.id}`}
+                    className="mx-auto max-h-[72vh] w-auto rounded-lg border border-slate-300 bg-white shadow"
+                  />
+                ) : (
+                  <div className="flex h-[60vh] items-center justify-center rounded-xl border border-slate-300 bg-white text-sm font-semibold text-slate-500">
+                    Không có bill để hiển thị.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </MainLayout>
   );

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Bell, BellRing, Mail, RefreshCcw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import MainLayout from '../components/MainLayout';
@@ -26,6 +27,7 @@ const DEFAULT_BROWSER_PUSH_STATE: BrowserPushState = {
 };
 
 const NotificationSettings: React.FC = () => {
+  const navigate = useNavigate();
   const [preferences, setPreferences] = useState<NotificationPreference | null>(null);
   const [notifications, setNotifications] = useState<UserNotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -74,7 +76,7 @@ const NotificationSettings: React.FC = () => {
     try {
       await Promise.all([refreshPreferences(), loadNotifications(0, false), refreshBrowserPushState()]);
     } catch {
-      toast.error('Khong the tai cai dat thong bao.');
+      toast.error('Không thể tải cài đặt thông báo.');
     } finally {
       setIsLoading(false);
     }
@@ -92,9 +94,9 @@ const NotificationSettings: React.FC = () => {
     try {
       const updated = await updateNotificationPreferences({ emailEnabled: nextValue });
       setPreferences(updated);
-      toast.success(nextValue ? 'Da bat nhan thong bao email.' : 'Da tat nhan thong bao email.');
+      toast.success(nextValue ? 'Đã bật nhận thông báo email.' : 'Đã tắt nhận thông báo email.');
     } catch {
-      toast.error('Cap nhat cai dat email that bai.');
+      toast.error('Cập nhật cài đặt email thất bại.');
     } finally {
       setIsSavingEmail(false);
     }
@@ -109,35 +111,35 @@ const NotificationSettings: React.FC = () => {
     try {
       if (nextValue) {
         if (!isSupported()) {
-          toast.error('Trinh duyet khong ho tro Web Push.');
+          toast.error('Trình duyệt không hỗ trợ Web Push.');
           return;
         }
 
-        const subscribed = await subscribe();
+        const subscribed = await subscribe({ requestPermissionIfNeeded: true, forceRefreshExisting: true });
         if (!subscribed) {
-          toast.error('Khong the bat Web Push. Hay cap quyen thong bao tren trinh duyet.');
+          toast.error('Không thể bật Web Push. Hãy cấp quyền thông báo trên trình duyệt.');
           await refreshBrowserPushState();
           return;
         }
 
         const updated = await updateNotificationPreferences({ webPushEnabled: true });
         setPreferences(updated);
-        toast.success('Da bat nhan thong bao Web Push.');
+        toast.success('Đã bật nhận thông báo Web Push.');
       } else {
         const unsubscribed = await unsubscribe();
         if (!unsubscribed) {
-          toast.error('Khong the tat dang ky Web Push tren trinh duyet.');
+          toast.error('Không thể tắt đăng ký Web Push trên trình duyệt.');
           return;
         }
 
         const updated = await updateNotificationPreferences({ webPushEnabled: false });
         setPreferences(updated);
-        toast.success('Da tat nhan thong bao Web Push.');
+        toast.success('Đã tắt nhận thông báo Web Push.');
       }
 
       await refreshBrowserPushState();
     } catch {
-      toast.error('Cap nhat cai dat Web Push that bai.');
+      toast.error('Cập nhật cài đặt Web Push thất bại.');
     } finally {
       setIsSavingWebPush(false);
     }
@@ -148,18 +150,43 @@ const NotificationSettings: React.FC = () => {
     try {
       await loadNotifications(currentPage + 1, true);
     } catch {
-      toast.error('Khong the tai them thong bao.');
+      toast.error('Không thể tải thêm thông báo.');
     }
   };
 
-  const handleMarkAsRead = async (notificationId: number) => {
+  const markNotificationAsRead = useCallback(async (notificationId: number, showErrorToast: boolean) => {
     try {
       const updated = await markUserNotificationRead(notificationId);
       setNotifications((current) => current.map((item) => (item.id === notificationId ? updated : item)));
       setUnreadCount((current) => Math.max(0, current - 1));
+      return true;
     } catch {
-      toast.error('Danh dau da doc that bai.');
+      if (showErrorToast) {
+        toast.error('Đánh dấu đã đọc thất bại.');
+      }
+      return false;
     }
+  }, []);
+
+  const handleMarkAsRead = async (notificationId: number) => {
+    await markNotificationAsRead(notificationId, true);
+  };
+
+  const handleOpenRelatedPage = async (item: UserNotificationItem) => {
+    if (!item.actionUrl) {
+      return;
+    }
+
+    if (!item.read) {
+      await markNotificationAsRead(item.id, false);
+    }
+
+    if (/^https?:\/\//i.test(item.actionUrl)) {
+      globalThis.location.assign(item.actionUrl);
+      return;
+    }
+
+    navigate(item.actionUrl);
   };
 
   const handleMarkAllAsRead = async () => {
@@ -169,9 +196,9 @@ const NotificationSettings: React.FC = () => {
       if (changed > 0) {
         await loadNotifications(0, false);
       }
-      toast.success(changed > 0 ? `Da danh dau ${changed} thong bao la da doc.` : 'Tat ca thong bao da duoc doc.');
+      toast.success(changed > 0 ? `Đã đánh dấu ${changed} thông báo là đã đọc.` : 'Tất cả thông báo đã được đọc.');
     } catch {
-      toast.error('Khong the danh dau da doc tat ca thong bao.');
+      toast.error('Không thể đánh dấu đã đọc tất cả thông báo.');
     } finally {
       setIsMarkingAllRead(false);
     }
@@ -193,26 +220,26 @@ const NotificationSettings: React.FC = () => {
 
   const webPushStatusMessage = useMemo(() => {
     if (!browserPushState.supported) {
-      return 'Trinh duyet hien tai khong ho tro Web Push.';
+      return 'Trình duyệt hiện tại không hỗ trợ Web Push.';
     }
 
     if (browserPushState.permission === 'denied') {
-      return 'Trinh duyet dang chan quyen Notification. Hay cho phep thong bao trong cai dat trinh duyet.';
+      return 'Trình duyệt đang chặn quyền Notification. Hãy cho phép thông báo trong cài đặt trình duyệt.';
     }
 
     if (preferences?.webPushEnabled && !browserPushState.subscribed) {
-      return 'Tai khoan dang bat Web Push, nhung trinh duyet chua dang ky push subscription.';
+      return 'Tài khoản đang bật Web Push, nhưng trình duyệt chưa đăng ký push subscription.';
     }
 
     if (!preferences?.webPushEnabled && browserPushState.subscribed) {
-      return 'Trinh duyet da dang ky push, nhung he thong dang tat gui Web Push cho tai khoan.';
+      return 'Trình duyệt đã đăng ký push, nhưng hệ thống đang tắt gửi Web Push cho tài khoản.';
     }
 
     if (isWebPushEffectivelyEnabled) {
-      return 'Web Push dang hoat dong tren trinh duyet nay.';
+      return 'Web Push đang hoạt động trên trình duyệt này.';
     }
 
-    return 'Web Push dang tat. Bam de bat va nhan thong bao realtime.';
+    return 'Web Push đang tắt. Bấm để bật và nhận thông báo realtime.';
   }, [browserPushState.permission, browserPushState.subscribed, browserPushState.supported, isWebPushEffectivelyEnabled, preferences?.webPushEnabled]);
 
   return (
@@ -221,9 +248,9 @@ const NotificationSettings: React.FC = () => {
         <section className="rounded-[2rem] bg-gradient-to-br from-slate-900 via-slate-800 to-cyan-800 p-8 text-white shadow-xl shadow-slate-900/30">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-black tracking-tight">Cai dat thong bao</h1>
+              <h1 className="text-3xl font-black tracking-tight">Cài đặt thông báo</h1>
               <p className="mt-2 text-sm text-cyan-100/90">
-                Quan ly tap trung thong bao Email, Web Push va lich su thong bao he thong.
+                Quản lý tập trung thông báo Email, Web Push và lịch sử thông báo hệ thống.
               </p>
             </div>
             <button
@@ -231,7 +258,7 @@ const NotificationSettings: React.FC = () => {
               onClick={() => void refreshAll()}
               className="inline-flex items-center gap-2 rounded-xl border border-white/25 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
             >
-              <RefreshCcw className="h-4 w-4" /> Lam moi
+              <RefreshCcw className="h-4 w-4" /> Làm mới
             </button>
           </div>
         </section>
@@ -240,10 +267,10 @@ const NotificationSettings: React.FC = () => {
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="mb-4 flex items-center gap-2 text-slate-900">
               <Mail className="h-5 w-5 text-cyan-600" />
-              <h2 className="text-lg font-bold">Nhan thong bao email</h2>
+              <h2 className="text-lg font-bold">Nhận thông báo email</h2>
             </div>
             <p className="mb-4 text-sm text-slate-600">
-              Bao gom ket qua duyet/huy Premium va nhac nho sap het han goi.
+              Bao gồm kết quả duyệt/hủy Premium và nhắc nhở sắp hết hạn gói.
             </p>
             <button
               type="button"
@@ -256,20 +283,20 @@ const NotificationSettings: React.FC = () => {
               } disabled:cursor-not-allowed disabled:opacity-60`}
             >
               {isSavingEmail
-                ? 'Dang cap nhat...'
+                ? 'Đang cập nhật...'
                 : preferences?.emailEnabled
-                  ? 'Dang bat - Bam de tat'
-                  : 'Dang tat - Bam de bat'}
+                  ? 'Đang bật - Bấm để tắt'
+                  : 'Đang tắt - Bấm để bật'}
             </button>
           </div>
 
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="mb-4 flex items-center gap-2 text-slate-900">
               <BellRing className="h-5 w-5 text-emerald-600" />
-              <h2 className="text-lg font-bold">Nhan thong bao Web Push</h2>
+              <h2 className="text-lg font-bold">Nhận thông báo Web Push</h2>
             </div>
             <p className="mb-4 text-sm text-slate-600">
-              Cac thong bao realtime tren trinh duyet. Ban can cap quyen Notification de su dung.
+              Các thông báo realtime trên trình duyệt. Bạn cần cấp quyền Notification để sử dụng.
             </p>
             <p className="mb-4 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700">
               {webPushStatusMessage}
@@ -285,10 +312,10 @@ const NotificationSettings: React.FC = () => {
               } disabled:cursor-not-allowed disabled:opacity-60`}
             >
               {isSavingWebPush
-                ? 'Dang cap nhat...'
+                ? 'Đang cập nhật...'
                 : isWebPushEffectivelyEnabled
-                  ? 'Dang bat - Bam de tat'
-                  : 'Dang tat - Bam de bat'}
+                  ? 'Đang bật - Bấm để tắt'
+                  : 'Đang tắt - Bấm để bật'}
             </button>
           </div>
         </section>
@@ -297,9 +324,9 @@ const NotificationSettings: React.FC = () => {
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-slate-900">
               <Bell className="h-5 w-5 text-indigo-600" />
-              <h2 className="text-lg font-bold">Trung tam thong bao</h2>
+              <h2 className="text-lg font-bold">Trung tâm thông báo</h2>
               <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs font-bold text-rose-700">
-                {unreadBadgeLabel} chua doc
+                {unreadBadgeLabel} chưa đọc
               </span>
             </div>
             <button
@@ -308,14 +335,14 @@ const NotificationSettings: React.FC = () => {
               disabled={isMarkingAllRead || unreadCount === 0}
               className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {isMarkingAllRead ? 'Dang xu ly...' : 'Danh dau tat ca da doc'}
+              {isMarkingAllRead ? 'Đang xử lý...' : 'Đánh dấu tất cả đã đọc'}
             </button>
           </div>
 
           {isLoading ? (
-            <p className="rounded-2xl bg-slate-50 p-6 text-center text-sm text-slate-500">Dang tai thong bao...</p>
+            <p className="rounded-2xl bg-slate-50 p-6 text-center text-sm text-slate-500">Đang tải thông báo...</p>
           ) : notifications.length === 0 ? (
-            <p className="rounded-2xl bg-slate-50 p-6 text-center text-sm text-slate-500">Chua co thong bao nao.</p>
+            <p className="rounded-2xl bg-slate-50 p-6 text-center text-sm text-slate-500">Chưa có thông báo nào.</p>
           ) : (
             <div className="space-y-3">
               {notifications.map((item) => (
@@ -335,18 +362,19 @@ const NotificationSettings: React.FC = () => {
                         onClick={() => void handleMarkAsRead(item.id)}
                         className="rounded-lg border border-cyan-200 bg-white px-3 py-1.5 text-xs font-semibold text-cyan-700 hover:bg-cyan-100"
                       >
-                        Danh dau da doc
+                        Đánh dấu đã đọc
                       </button>
                     )}
                   </div>
                   {item.actionUrl && (
                     <div className="mt-3">
-                      <a
-                        href={item.actionUrl}
+                      <button
+                        type="button"
+                        onClick={() => void handleOpenRelatedPage(item)}
                         className="text-xs font-semibold text-indigo-600 underline-offset-2 hover:underline"
                       >
-                        Mo trang lien quan
-                      </a>
+                        Mở trang liên quan
+                      </button>
                     </div>
                   )}
                 </div>
@@ -358,7 +386,7 @@ const NotificationSettings: React.FC = () => {
                   onClick={() => void handleLoadMore()}
                   className="w-full rounded-xl border border-slate-200 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                 >
-                  Tai them thong bao
+                  Tải thêm thông báo
                 </button>
               )}
             </div>

@@ -43,8 +43,15 @@ export const loadAllOpenApiOperations = (workspaceRoot: string): OpenApiOperatio
     'openapi-community.generated.yaml',
   ];
 
-  const operations = openApiFiles.flatMap((fileName) => {
-    const fullPath = path.join(workspaceRoot, fileName);
+  const existingOpenApiFiles = openApiFiles
+    .map((fileName) => path.join(workspaceRoot, fileName))
+    .filter((fullPath) => fs.existsSync(fullPath));
+
+  if (existingOpenApiFiles.length === 0) {
+    return [];
+  }
+
+  const operations = existingOpenApiFiles.flatMap((fullPath) => {
     return parseOperationsFromFile(fullPath);
   });
 

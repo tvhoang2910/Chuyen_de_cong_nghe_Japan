@@ -86,9 +86,9 @@ test.describe('Report resolved notification flow', () => {
             content: [
               {
                 questionId: 501,
-                questionPreview: 'Cau hoi can duoc xu ly bao cao',
+                questionPreview: 'Câu hỏi cần được xử lý báo cáo',
                 examId: 41,
-                examTitle: 'De thi thong bao bao cao',
+                examTitle: 'Đề thi thông báo báo cáo',
                 topReportType: 'WRONG_ANSWER',
                 topReportTypeLabel: 'Sai đáp án',
                 totalReportCount: 2,
@@ -118,9 +118,9 @@ test.describe('Report resolved notification flow', () => {
             content: [
               {
                 questionId: 501,
-                questionPreview: 'Cau hoi can duoc xu ly bao cao',
+                questionPreview: 'Câu hỏi cần được xử lý báo cáo',
                 examId: 41,
-                examTitle: 'De thi thong bao bao cao',
+                examTitle: 'Đề thi thông báo báo cáo',
                 topReportType: 'WRONG_ANSWER',
                 topReportTypeLabel: 'Sai đáp án',
                 totalReportCount: 2,
@@ -157,18 +157,18 @@ test.describe('Report resolved notification flow', () => {
             {
               id: 901,
               questionId: 501,
-              questionPreview: 'Cau hoi can duoc xu ly bao cao',
+              questionPreview: 'Câu hỏi cần được xử lý báo cáo',
               attemptId: 1001,
               examId: 41,
-              examTitle: 'De thi thong bao bao cao',
+              examTitle: 'Đề thi thông báo báo cáo',
               reporterId: 7001,
               reporterUsername: 'User #7001',
               reportType: 'WRONG_ANSWER',
               reportTypeLabel: 'Sai đáp án',
-              description: 'Dap an hien tai khong dung',
+              description: 'Đáp án hiện tại không đúng',
               status: 'RESOLVED',
               statusLabel: 'Đã xử lý',
-              resolutionNote: 'Da sua dap an',
+              resolutionNote: 'Đã sửa đáp án',
               resolvedBy: 71,
               resolvedByUsername: 'User #71',
               resolvedAt: ISO_NOW,
@@ -177,18 +177,18 @@ test.describe('Report resolved notification flow', () => {
             {
               id: 902,
               questionId: 501,
-              questionPreview: 'Cau hoi can duoc xu ly bao cao',
+              questionPreview: 'Câu hỏi cần được xử lý báo cáo',
               attemptId: 1002,
               examId: 41,
-              examTitle: 'De thi thong bao bao cao',
+              examTitle: 'Đề thi thông báo báo cáo',
               reporterId: 7002,
               reporterUsername: 'User #7002',
               reportType: 'WRONG_ANSWER',
               reportTypeLabel: 'Sai đáp án',
-              description: 'Dap an hien tai khong dung',
+              description: 'Đáp án hiện tại không đúng',
               status: 'RESOLVED',
               statusLabel: 'Đã xử lý',
-              resolutionNote: 'Da sua dap an',
+              resolutionNote: 'Đã sửa đáp án',
               resolvedBy: 71,
               resolvedByUsername: 'User #71',
               resolvedAt: ISO_NOW,
@@ -199,15 +199,15 @@ test.describe('Report resolved notification flow', () => {
             {
               id: 901,
               questionId: 501,
-              questionPreview: 'Cau hoi can duoc xu ly bao cao',
+              questionPreview: 'Câu hỏi cần được xử lý báo cáo',
               attemptId: 1001,
               examId: 41,
-              examTitle: 'De thi thong bao bao cao',
+              examTitle: 'Đề thi thông báo báo cáo',
               reporterId: 7001,
               reporterUsername: 'User #7001',
               reportType: 'WRONG_ANSWER',
               reportTypeLabel: 'Sai đáp án',
-              description: 'Dap an hien tai khong dung',
+              description: 'Đáp án hiện tại không đúng',
               status: 'REPORTED',
               statusLabel: 'Mới',
               resolutionNote: null,
@@ -219,15 +219,15 @@ test.describe('Report resolved notification flow', () => {
             {
               id: 902,
               questionId: 501,
-              questionPreview: 'Cau hoi can duoc xu ly bao cao',
+              questionPreview: 'Câu hỏi cần được xử lý báo cáo',
               attemptId: 1002,
               examId: 41,
-              examTitle: 'De thi thong bao bao cao',
+              examTitle: 'Đề thi thông báo báo cáo',
               reporterId: 7002,
               reporterUsername: 'User #7002',
               reportType: 'WRONG_ANSWER',
               reportTypeLabel: 'Sai đáp án',
-              description: 'Dap an hien tai khong dung',
+              description: 'Đáp án hiện tại không đúng',
               status: 'REPORTED',
               statusLabel: 'Mới',
               resolutionNote: null,
@@ -254,7 +254,7 @@ test.describe('Report resolved notification flow', () => {
               actionLabel: 'Đã xử lý',
               previousStatus: 'REPORTED',
               newStatus: 'RESOLVED',
-              note: 'Da sua dap an',
+              note: 'Đã sửa đáp án',
               processedBy: 71,
               processedAt: ISO_NOW,
             },
@@ -282,10 +282,10 @@ test.describe('Report resolved notification flow', () => {
     await page.goto('/contributor/reports');
 
     await expect(page.getByRole('heading', { name: 'Trung tâm báo cáo câu hỏi' })).toBeVisible();
-    await expect(page.getByText('Q#501 • De thi thong bao bao cao')).toBeVisible();
+    await expect(page.getByText('Q#501 • Đề thi thông báo báo cáo')).toBeVisible();
 
     await page.getByLabel('Trạng thái mới').selectOption('RESOLVED');
-    await page.getByPlaceholder('Mô tả cách xử lý hoặc lý do từ chối báo cáo').fill('Da sua dap an');
+    await page.getByPlaceholder('Mô tả cách xử lý hoặc lý do từ chối báo cáo').fill('Đã sửa đáp án');
     await page.getByRole('button', { name: 'Cập nhật xử lý' }).click();
 
     await expect(page.getByText('Đã cập nhật trạng thái xử lý báo cáo.')).toBeVisible();
@@ -297,7 +297,7 @@ test.describe('Report resolved notification flow', () => {
     expect(resolveCallCount).toBe(1);
     expect(capturedPayload).toEqual({
       status: 'RESOLVED',
-      resolutionNote: 'Da sua dap an',
+      resolutionNote: 'Đã sửa đáp án',
       unhideQuestion: false,
     });
   });

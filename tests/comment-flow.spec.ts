@@ -746,7 +746,7 @@ test.describe('Network Error Handling', () => {
     await expect(page.getByText(/lỗi|error|failed/i)).toBeVisible();
 
     // Count should not have changed (optimistic update reverted)
-    await expect(page.getByText('5')).toBeVisible();
+    await expect(page.locator('[data-testid="upvote-btn"] span').first()).toHaveText('5');
   });
 
   test('comment submission failure shows error toast', async ({ page }) => {

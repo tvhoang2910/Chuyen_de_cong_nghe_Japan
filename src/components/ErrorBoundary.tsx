@@ -33,9 +33,9 @@ export class ErrorBoundary extends Component<Props, State> {
  <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-8">
  <div className="bg-white rounded-xl shadow-sm border border-red-100 p-8 max-w-md w-full text-center">
  <div className="text-5xl mb-4">!</div>
- <h1 className="text-xl font-bold text-slate-900 mb-2">Da xay ra loi</h1>
+ <h1 className="text-xl font-bold text-slate-900 mb-2">Đã xảy ra lỗi</h1>
  <p className="text-slate-600 mb-6 text-sm">
- Da co loi khong mong muon xay ra. Vui long tai lai trang.
+ Đã có lỗi không mong muốn xảy ra. Vui lòng tải lại trang.
  </p>
  <button
  type="button"
@@ -45,7 +45,7 @@ export class ErrorBoundary extends Component<Props, State> {
  }}
  className="inline-flex items-center justify-center rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors"
  >
- Tai lai trang
+ Tải lại trang
  </button>
  </div>
  </div>

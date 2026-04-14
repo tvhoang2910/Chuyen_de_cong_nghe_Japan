@@ -24,6 +24,7 @@ import {
 import toast from 'react-hot-toast';
 import axiosClient, { 
   fetchUserNotifications,
+  markUserNotificationRead,
   fetchSubscriptionReviewQueue,
   SUBSCRIPTION_REVIEW_UPDATED_EVENT,
   clearAuthSession, 
@@ -36,6 +37,8 @@ import { fetchGamificationOverview, type GamificationOverview } from '../api/stu
 
 interface MainLayoutProps {
   children: React.ReactNode;
+  fallbackStreakDays?: number;
+  fallbackPoints?: number;
 }
 
 type NotificationItem = {
@@ -43,7 +46,7 @@ type NotificationItem = {
   title: string;
   description: string;
   timeLabel: string;
-  onClick: () => void;
+  onClick: () => void | Promise<void>;
 };
 
 type DismissedNotificationEntry = {
@@ -119,7 +122,7 @@ const normalizePushEntries = (parsed: unknown, now: number): InAppPushNotificati
   return Array.from(deduplicated.values()).sort((a, b) => b.createdAt - a.createdAt);
 };
 
-const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
+const MainLayout: React.FC<MainLayoutProps> = ({ children, fallbackStreakDays, fallbackPoints }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -289,7 +292,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         if (user?.role === 'CONTRIBUTOR') {
           const queue = await fetchSubscriptionReviewQueue(0, 5, 'PENDING_REVIEW');
           const items: NotificationItem[] = queue.content.map((row) => ({
-            id: `review-item-${row.id}`,
+            id: `review-item-${row.id}-${row.createdAt}`,
             title: `Request #${row.id} cần bạn duyệt`,
             description: `${row.userFullName} • ${row.planName} • ${Number(row.purchasedPrice).toLocaleString('vi-VN')}đ`,
             timeLabel: new Date(row.createdAt).toLocaleString('vi-VN'),
@@ -308,11 +311,20 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
         const feed = await fetchUserNotifications(0, 5);
         const items: NotificationItem[] = feed.content.map((row) => ({
-          id: `user-notification-${row.id}`,
+          id: `user-notification-${row.id}-${row.createdAt}`,
           title: row.title,
           description: row.message,
           timeLabel: new Date(row.createdAt).toLocaleString('vi-VN'),
-          onClick: () => navigate(row.actionUrl || '/dashboard/notifications'),
+          onClick: async () => {
+            if (!row.read) {
+              try {
+                await markUserNotificationRead(row.id);
+              } catch {
+                // Ignore mark-read errors here and continue navigation for UX continuity.
+              }
+            }
+            navigate(row.actionUrl || '/dashboard/notifications');
+          },
         }));
 
         const dismissedIds = readDismissedIds();
@@ -385,18 +397,23 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         normalizedTag === 'achievement-unlocked' ||
         normalizedTag === 'streak-qualified' ||
         normalizedUrl.includes('gamification');
+      const isSubscriptionNotification =
+        normalizedTag.includes('subscription') ||
+        normalizedUrl.includes('subscription-payments');
 
-      if (!isGamificationNotification) {
+      if (!isGamificationNotification && !isSubscriptionNotification) {
         return;
       }
 
       const createdAt = typeof eventData.receivedAt === 'number' ? eventData.receivedAt : Date.now();
       const entry: InAppPushNotificationEntry = {
         id: `push-item-${createdAt}-${Math.random().toString(36).slice(2, 8)}`,
-        title: payload.title?.trim() || 'Thông báo học tập',
-        body: payload.body?.trim() || 'Bạn có cập nhật mới trong gamification.',
+        title: payload.title?.trim() || (isSubscriptionNotification ? 'Thông báo Premium' : 'Thông báo học tập'),
+        body: payload.body?.trim() || (isSubscriptionNotification
+          ? 'Yêu cầu nâng cấp Premium của bạn có cập nhật mới.'
+          : 'Bạn có cập nhật mới trong gamification.'),
         url: normalizedUrl,
-        tag: normalizedTag || 'gamification',
+        tag: normalizedTag || (isSubscriptionNotification ? 'subscription' : 'gamification'),
         createdAt,
       };
 
@@ -577,7 +594,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
       {/* Sidebar */}
       <aside className={`
-        fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-slate-200 transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0
+        fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-slate-200 transform transition-transform duration-300 ease-in-out flex flex-col lg:relative lg:translate-x-0
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
         <div className="h-20 flex items-center justify-between px-6 border-b border-slate-100">
@@ -592,7 +609,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           </button>
         </div>
 
-        <nav className="flex-1 px-4 py-8 flex flex-col gap-1 overflow-y-auto">
+        <nav className="flex-1 min-h-0 px-4 py-8 flex flex-col gap-1 overflow-y-auto">
           <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 px-3">Hoạt động</div>
           {navItems.map((item) => {
             const isActive = location.pathname === item.path;
@@ -675,11 +692,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             <div className="hidden sm:flex items-center gap-3">
               <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 rounded-lg border border-emerald-100/50">
                 <Flame className="w-4 h-4 text-emerald-500" />
-                <span className="text-xs font-bold text-emerald-700">{gamificationOverview?.streakDays ?? 0} Days</span>
+                <span className="text-xs font-bold text-emerald-700">{fallbackStreakDays ?? gamificationOverview?.streakDays ?? 0} Days</span>
               </div>
               <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 rounded-lg border border-amber-100/50">
                 <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
-                <span className="text-xs font-bold text-amber-700">{gamificationOverview?.points ?? 0} Pts</span>
+                <span className="text-xs font-bold text-amber-700">{fallbackPoints ?? gamificationOverview?.points ?? 0} Pts</span>
               </div>
             </div>
             <div ref={notificationRef} className="relative">
@@ -718,7 +735,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                           onClick={() => {
                             dismissNotification(item.id);
                             setIsNotificationOpen(false);
-                            item.onClick();
+                            void item.onClick();
                           }}
                           className="w-full border-b border-slate-100 px-4 py-3 text-left hover:bg-slate-50"
                         >

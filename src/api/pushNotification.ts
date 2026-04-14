@@ -28,9 +28,7 @@ const toPushSubscriptionRequestPayload = (
 };
 
 export const fetchVapidPublicKey = async (): Promise<string> => {
-  const res = await fetch(`${authApiBaseUrl}/push-subscription/vapid-public-key`, {
-    headers: buildAuthHeaders(),
-  });
+  const res = await fetch(`${authApiBaseUrl}/push-subscription/vapid-public-key`);
   if (!res.ok) throw new Error('Failed to fetch VAPID public key');
   const data = (await res.json()) as { publicKey: string };
   return data.publicKey;

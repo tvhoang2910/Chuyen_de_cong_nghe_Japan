@@ -305,6 +305,7 @@ type RetryableRequestConfig = InternalAxiosRequestConfig & {
 
 const publicAuthPaths = new Set([
   "/login",
+  "/refresh",
   "/register",
   "/register/resend-verification",
   "/register/verify-email",
@@ -894,6 +895,18 @@ export const fetchSubscriptionApprovalAudits = async (
 ): Promise<SubscriptionApprovalAudit[]> => {
   const response = await axiosClient.get<SubscriptionApprovalAudit[]>(
     `/subscriptions/purchase-requests/${subscriptionId}/approvals`,
+  );
+  return response.data;
+};
+
+export const fetchSubscriptionBillImage = async (
+  subscriptionId: number,
+): Promise<Blob> => {
+  const response = await axiosClient.get<Blob>(
+    `/subscriptions/purchase-requests/${subscriptionId}/bill`,
+    {
+      responseType: "blob",
+    },
   );
   return response.data;
 };

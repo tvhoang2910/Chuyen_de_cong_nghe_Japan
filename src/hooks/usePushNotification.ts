@@ -13,6 +13,11 @@ export type BrowserPushState = {
   subscribed: boolean;
 };
 
+export type SubscribePushOptions = {
+  requestPermissionIfNeeded?: boolean;
+  forceRefreshExisting?: boolean;
+};
+
 export function usePushNotification() {
   const getBrowserPushState = useCallback(async (): Promise<BrowserPushState> => {
     if (!isSupported()) {
@@ -63,7 +68,7 @@ export function usePushNotification() {
    * Call this once after login when the user is authenticated.
    * Safe to call multiple times — checks existing subscription before re-subscribing.
    */
-  const subscribe = useCallback(async (): Promise<boolean> => {
+  const subscribe = useCallback(async (options: SubscribePushOptions = {}): Promise<boolean> => {
     if (!isSupported()) return false;
 
     let permission: NotificationPermission = 'default';
@@ -73,26 +78,55 @@ export function usePushNotification() {
       return false;
     }
 
-    // Do not trigger browser permission prompts automatically during app bootstrap.
-    // Subscription is attempted only when permission was already granted.
     if (permission !== 'granted') {
-      return false;
+      if (!options.requestPermissionIfNeeded) {
+        return false;
+      }
+
+      try {
+        permission = await Notification.requestPermission();
+      } catch {
+        return false;
+      }
+
+      if (permission !== 'granted') {
+        return false;
+      }
     }
 
     try {
       const registration = await resolveServiceWorkerRegistration();
+      const publicKey = await fetchVapidPublicKey();
+      const applicationServerKey = urlBase64ToUint8Array(publicKey);
 
       // Re-sync any existing browser subscription to backend on each login.
       const existing = await registration.pushManager.getSubscription();
       if (existing) {
-        await subscribePush(existing.toJSON());
-        return true;
+        const existingApplicationServerKey = existing.options?.applicationServerKey;
+        const hasMatchingKey = isSameApplicationServerKey(existingApplicationServerKey, applicationServerKey);
+
+        if (hasMatchingKey && !options.forceRefreshExisting) {
+          await subscribePush(existing.toJSON());
+          return true;
+        }
+
+        // Refresh existing browser subscription so the backend receives a fresh endpoint.
+        try {
+          await unsubscribePush(existing.endpoint);
+        } catch {
+          // Best-effort cleanup only.
+        }
+
+        try {
+          await existing.unsubscribe();
+        } catch {
+          // Continue creating a fresh subscription even if local cleanup fails.
+        }
       }
 
-      const publicKey = await fetchVapidPublicKey();
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(publicKey) as BufferSource,
+        applicationServerKey: applicationServerKey as BufferSource,
       });
 
       await subscribePush(subscription.toJSON());
@@ -128,6 +162,28 @@ export function usePushNotification() {
   }, []);
 
   return { subscribe, unsubscribe, isSupported, getBrowserPushState };
+}
+
+function isSameApplicationServerKey(
+  existingKey: ArrayBuffer | null | undefined,
+  expectedKey: Uint8Array,
+): boolean {
+  if (!existingKey) {
+    return false;
+  }
+
+  const actual = new Uint8Array(existingKey);
+  if (actual.length !== expectedKey.length) {
+    return false;
+  }
+
+  for (let index = 0; index < actual.length; index += 1) {
+    if (actual[index] !== expectedKey[index]) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 /** Converts a VAPID public key (base64url) to Uint8Array for PushManager */

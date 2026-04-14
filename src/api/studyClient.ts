@@ -1,9 +1,9 @@
 import axios from 'axios';
 
-const STUDY_API = import.meta.env.VITE_STUDY_API_BASE_URL || 'http://localhost:8085/api/v1/study';
+import { studyApiBaseUrl } from '../config/env';
 
 const studyClient = axios.create({
-  baseURL: STUDY_API,
+  baseURL: studyApiBaseUrl,
   headers: { 'Content-Type': 'application/json' },
 });
 

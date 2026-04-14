@@ -24,7 +24,10 @@ RUN npm run build
 # ===== RUN =====
 FROM nginx:1.26-alpine
 
+# nginx.conf is copied into the image so the container is self-contained.
+# (No volume mount of ./Nginx/nginx.conf from host required.)
 COPY --from=build /app/dist /usr/share/nginx/html
+COPY Nginx/nginx.conf /etc/nginx/nginx.conf
 
 EXPOSE 80
 

@@ -6,6 +6,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { examApiBaseUrl } from '../config/env';
 
 export interface ExamSseEvent {
  eventType: 'EXAM_SUBMITTED' | 'ATTEMPT_STARTED' | 'ATTEMPT_ENDED' | 'SNAPSHOT';
@@ -38,9 +39,7 @@ export function useExamEventsSSE(accessToken: string | null) {
  return;
  }
 
- // exam_service runs on port 8082 with context path /api/v1/exam
- const examServiceUrl = import.meta.env.VITE_EXAM_SERVICE_URL || 'http://localhost:8082';
- const url = `${examServiceUrl}/api/v1/exam/sse/events`;
+ const url = `${examApiBaseUrl}/sse/events`;
 
  const es = new EventSource(url, { withCredentials: true });
  emitterRef.current = es;

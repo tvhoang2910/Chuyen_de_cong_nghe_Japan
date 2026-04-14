@@ -111,7 +111,7 @@ describe('axiosClient subscription review extensions', () => {
       subscriptionId: 10,
       previousStatus: 'APPROVED',
       currentStatus: 'CANCELLED',
-      reason: 'Khach hang yeu cau',
+      reason: 'Khách hàng yêu cầu',
       refundPolicy: 'PRORATED_BY_REMAINING_TIME',
       refundRate: 0.5,
       refundAmount: 99500,
@@ -120,11 +120,11 @@ describe('axiosClient subscription review extensions', () => {
     mockClient.patch.mockResolvedValue({ data: payload });
 
     const result = await cancelSubscriptionByAdmin(10, {
-      reason: 'Khach hang yeu cau',
+      reason: 'Khách hàng yêu cầu',
     });
 
     expect(mockClient.patch).toHaveBeenCalledWith('/subscriptions/10/cancel', {
-      reason: 'Khach hang yeu cau',
+      reason: 'Khách hàng yêu cầu',
     });
     expect(result.currentStatus).toBe('CANCELLED');
     expect(result.refundAmount).toBe(99500);
