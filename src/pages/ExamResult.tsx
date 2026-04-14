@@ -6,14 +6,22 @@ import MainLayout from "../components/MainLayout";
 import CommentForm from "../components/CommentForm";
 import CommentTree from "../components/CommentTree";
 import ReportModal from "../components/ReportModal";
+import ExamRatingStars from "../components/ExamRatingStars";
 import { ExamDifficultyBadge } from "../components/ExamDifficultyBadge";
 import { fetchAttemptResult, type AttemptResult } from "../api/examClient";
 import {
   createComment,
   fetchCommentsByExam,
+  pinComment,
   type CommentNode,
+  voteComment,
 } from "../api/commentClient";
 import { resolveCommentSubmitErrorMessage } from "../api/commentHelpers";
+import {
+  fetchExamRatingSummary,
+  submitExamRating,
+  type ExamRatingSummary,
+} from "../api/examRatingClient";
 
 const ExamResult: React.FC = () => {
   const params = useParams();
@@ -28,6 +36,12 @@ const ExamResult: React.FC = () => {
   const [reportedQuestionIds, setReportedQuestionIds] = useState<Set<number>>(
     new Set(),
   );
+  const [ratingSummary, setRatingSummary] = useState<ExamRatingSummary | null>(
+    null,
+  );
+  const [isLoadingRating, setIsLoadingRating] = useState(false);
+  const [isSavingRating, setIsSavingRating] = useState(false);
+  const [selectedRating, setSelectedRating] = useState(0);
 
   const userId = 1;
 
@@ -42,6 +56,49 @@ const ExamResult: React.FC = () => {
       toast.error("Không tải được bình luận.");
     }
   }, [result?.examId]);
+
+  const loadRating = useCallback(async () => {
+    if (!result?.examId) return;
+
+    try {
+      setIsLoadingRating(true);
+      const summary = await fetchExamRatingSummary(result.examId);
+      setRatingSummary(summary);
+      setSelectedRating(summary.userRating ?? 0);
+    } catch (error) {
+      console.error(error);
+      setRatingSummary(null);
+    } finally {
+      setIsLoadingRating(false);
+    }
+  }, [result?.examId]);
+
+  const handleRatingSubmit = async () => {
+    if (!result?.examId) {
+      return;
+    }
+
+    if (selectedRating < 1 || selectedRating > 5) {
+      toast.error("Vui lòng chọn từ 1 đến 5 sao.");
+      return;
+    }
+
+    try {
+      setIsSavingRating(true);
+      const updated = await submitExamRating({
+        examId: result.examId,
+        rating: selectedRating,
+      });
+      setRatingSummary(updated);
+      setSelectedRating(updated.userRating ?? selectedRating);
+      toast.success("Đã lưu đánh giá đề thi");
+    } catch (error) {
+      console.error(error);
+      toast.error("Không thể lưu đánh giá.");
+    } finally {
+      setIsSavingRating(false);
+    }
+  };
 
   const handleCommentSubmit = async (
     content: string,
@@ -65,6 +122,26 @@ const ExamResult: React.FC = () => {
       console.error(error);
       const errorMessage = resolveCommentSubmitErrorMessage(error);
       toast.error(errorMessage);
+    }
+  };
+
+  const handleVote = async (commentId: number, voteType: "UP" | "DOWN") => {
+    try {
+      await voteComment(commentId, voteType);
+      await loadComments();
+    } catch (error) {
+      console.error(error);
+      toast.error("Không thể cập nhật lượt thích.");
+    }
+  };
+
+  const handleTogglePin = async (commentId: number, pinned: boolean) => {
+    try {
+      await pinComment(commentId, pinned);
+      await loadComments();
+    } catch (error) {
+      console.error(error);
+      toast.error("Không thể cập nhật trạng thái ghim.");
     }
   };
 
@@ -93,8 +170,9 @@ const ExamResult: React.FC = () => {
   useEffect(() => {
     if (result) {
       void loadComments();
+      void loadRating();
     }
-  }, [result, loadComments]);
+  }, [result, loadComments, loadRating]);
 
   if (loading) {
     return (
@@ -131,13 +209,78 @@ const ExamResult: React.FC = () => {
           >
             {result.passed ? "Đạt" : "Chưa đạt"} (mốc đỗ: {result.passingScore})
           </p>
-          <p className="text-xs text-slate-500 mt-1">Trạng thái: {result.status}</p>
+          <p className="text-xs text-slate-500 mt-1">
+            Trạng thái: {result.status}
+          </p>
           <Link
             to="/dashboard/exams"
             className="inline-block mt-3 text-sm font-semibold text-blue-700 hover:text-blue-800"
           >
             ← Quay lại kho đề
           </Link>
+
+          <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-amber-900">
+                  Đánh giá đề thi
+                </p>
+                <p className="text-sm text-amber-800">
+                  {isLoadingRating
+                    ? "Đang tải đánh giá..."
+                    : ratingSummary
+                      ? `${ratingSummary.ratingCount} lượt đánh giá`
+                      : "Chưa có đánh giá"}
+                </p>
+              </div>
+              <ExamRatingStars
+                value={ratingSummary?.averageRating ?? 0}
+                size="md"
+                showValue
+                valueLabel={
+                  ratingSummary
+                    ? `${ratingSummary.averageRating.toFixed(1)}/5`
+                    : "0.0/5"
+                }
+                countLabel={
+                  ratingSummary
+                    ? `(${ratingSummary.ratingCount} lượt)`
+                    : "(0 lượt)"
+                }
+              />
+            </div>
+
+            <div className="mt-4 flex flex-col gap-4 rounded-2xl border border-amber-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">
+                  Chấm điểm đề thi sau khi làm xong
+                </p>
+                <p className="text-sm text-slate-600">
+                  Bạn đã nộp bài, hãy chấm sao theo trải nghiệm thực tế của đề.
+                </p>
+              </div>
+              <div className="flex flex-col gap-3 sm:items-end">
+                <ExamRatingStars
+                  value={selectedRating}
+                  size="lg"
+                  onChange={setSelectedRating}
+                  disabled={isSavingRating}
+                  showValue
+                  valueLabel={
+                    selectedRating > 0 ? `${selectedRating}/5` : "Chọn sao"
+                  }
+                />
+                <button
+                  type="button"
+                  onClick={() => void handleRatingSubmit()}
+                  disabled={isSavingRating}
+                  className="inline-flex items-center justify-center rounded-xl bg-amber-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:bg-amber-300"
+                >
+                  {isSavingRating ? "Đang lưu..." : "Lưu đánh giá"}
+                </button>
+              </div>
+            </div>
+          </div>
         </header>
 
         <section className="space-y-3">
@@ -172,8 +315,9 @@ const ExamResult: React.FC = () => {
                   ? question.selectedOptionIds
                       .map(
                         (optionId) =>
-                          question.options.find((option) => option.id === optionId)
-                            ?.content || `#${optionId}`,
+                          question.options.find(
+                            (option) => option.id === optionId,
+                          )?.content || `#${optionId}`,
                       )
                       .join(", ")
                   : "Bỏ trống"}
@@ -209,7 +353,9 @@ const ExamResult: React.FC = () => {
         </section>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-5">
-          <h2 className="text-xl font-semibold text-slate-900 mb-4">Bình luận</h2>
+          <h2 className="text-xl font-semibold text-slate-900 mb-4">
+            Bình luận
+          </h2>
           <CommentForm
             submitLabel="Gửi bình luận"
             onSubmit={(content) => handleCommentSubmit(content, null)}
@@ -230,6 +376,8 @@ const ExamResult: React.FC = () => {
                   onSubmitReply={(content, parentId) =>
                     handleCommentSubmit(content, parentId)
                   }
+                  onVote={handleVote}
+                  onTogglePin={handleTogglePin}
                 />
               ))
             )}
