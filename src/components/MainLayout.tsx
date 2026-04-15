@@ -33,7 +33,7 @@ import axiosClient, {
   uploadCurrentUserAvatar,
   type UserProfile 
 } from '../api/axiosClient';
-import { fetchGamificationOverview, type GamificationOverview } from '../api/studyClient';
+import { fetchGamificationOverview, fetchStudyStats, type GamificationOverview } from '../api/studyClient';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -136,6 +136,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, fallbackStreakDays, f
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [notificationItems, setNotificationItems] = useState<NotificationItem[]>([]);
   const [gamificationOverview, setGamificationOverview] = useState<GamificationOverview | null>(null);
+  const [headerStreakDays, setHeaderStreakDays] = useState<number | null>(null);
   const notificationRef = useRef<HTMLDivElement | null>(null);
 
   const dismissedIdsStorageKey = useMemo(() => {
@@ -441,24 +442,35 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, fallbackStreakDays, f
   useEffect(() => {
     if (user?.role !== 'USER') {
       setGamificationOverview(null);
+      setHeaderStreakDays(null);
       return;
     }
 
     let isMounted = true;
-    const loadGamificationOverview = async () => {
-      try {
-        const overview = await fetchGamificationOverview();
-        if (isMounted) {
-          setGamificationOverview(overview);
-        }
-      } catch {
-        if (isMounted) {
-          setGamificationOverview(null);
-        }
+    const loadHeaderMetrics = async () => {
+      const [overviewResult, studyStatsResult] = await Promise.allSettled([
+        fetchGamificationOverview(),
+        fetchStudyStats(),
+      ]);
+
+      if (!isMounted) {
+        return;
+      }
+
+      if (overviewResult.status === 'fulfilled') {
+        setGamificationOverview(overviewResult.value);
+      } else {
+        setGamificationOverview(null);
+      }
+
+      if (studyStatsResult.status === 'fulfilled') {
+        setHeaderStreakDays(studyStatsResult.value.streakDays);
+      } else {
+        setHeaderStreakDays(null);
       }
     };
 
-    void loadGamificationOverview();
+    void loadHeaderMetrics();
     return () => {
       isMounted = false;
     };
@@ -507,7 +519,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, fallbackStreakDays, f
     { label: 'Kho đề công khai', icon: BookOpen, path: '/dashboard/exams' },
     { label: 'Học tập (SM-2)', icon: Zap, path: '/dashboard/spaced-repetition' },
     { label: 'Gamification', icon: Flame, path: '/dashboard/gamification' },
-    { label: 'Cộng đồng', icon: Star, path: '/dashboard/community' },
   ];
 
   const avatarUrl = user?.avatarUrl?.trim();
@@ -692,7 +703,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, fallbackStreakDays, f
             <div className="hidden sm:flex items-center gap-3">
               <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 rounded-lg border border-emerald-100/50">
                 <Flame className="w-4 h-4 text-emerald-500" />
-                <span className="text-xs font-bold text-emerald-700">{fallbackStreakDays ?? gamificationOverview?.streakDays ?? 0} Days</span>
+                <span className="text-xs font-bold text-emerald-700">{fallbackStreakDays ?? headerStreakDays ?? gamificationOverview?.streakDays ?? 0} Days</span>
               </div>
               <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 rounded-lg border border-amber-100/50">
                 <Star className="w-4 h-4 text-amber-500 fill-amber-500" />

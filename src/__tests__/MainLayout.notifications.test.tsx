@@ -15,6 +15,7 @@ const {
   updateCurrentUserProfile,
   uploadCurrentUserAvatar,
   fetchGamificationOverview,
+  fetchStudyStats,
 } = vi.hoisted(() => ({
   axiosPost: vi.fn(),
   fetchUserNotifications: vi.fn(),
@@ -25,6 +26,7 @@ const {
   updateCurrentUserProfile: vi.fn(),
   uploadCurrentUserAvatar: vi.fn(),
   fetchGamificationOverview: vi.fn(),
+  fetchStudyStats: vi.fn(),
 }));
 
 vi.mock('../api/axiosClient', () => ({
@@ -43,6 +45,7 @@ vi.mock('../api/axiosClient', () => ({
 
 vi.mock('../api/studyClient', () => ({
   fetchGamificationOverview,
+  fetchStudyStats,
 }));
 
 vi.mock('react-hot-toast', () => ({
@@ -79,6 +82,14 @@ describe('MainLayout notification bell regression', () => {
       points: 120,
       newlyUnlockedAchievements: [],
       recentUnlockedAchievements: [],
+    });
+
+    fetchStudyStats.mockResolvedValue({
+      totalAttempts: 15,
+      avgScorePercent: 82,
+      streakDays: 1,
+      totalStudyMinutes: 210,
+      dueCardsCount: 3,
     });
 
     fetchUserNotifications.mockResolvedValue({

@@ -206,9 +206,9 @@ const SubscriptionPayments: React.FC = () => {
             <div className="space-y-4">
               <div className="rounded-2xl border border-dashed border-cyan-300 bg-cyan-50 p-4 text-sm text-cyan-900">
                 <p className="font-semibold">Thông tin chuyển khoản mẫu</p>
-                <p className="mt-2">Ngân hàng: MB Bank</p>
-                <p>STK: 1234567899</p>
-                <p>Nội dung: PREMIUM {selectedPlan?.id || 'PLAN'} USER</p>
+                <p className="mt-2">Ngân hàng: BIDV</p>
+                <p>STK: 5131003949</p>
+                <p>Nội dung: PREMIUM {selectedPlan?.id || 'PLAN'} USER CHUYEN TIEN CHO THAI VIET HOANG</p>
               </div>
 
               <label className="block">

@@ -268,6 +268,10 @@ const ExamAttempt: React.FC = () => {
     }
   };
 
+  const handleExitPreview = () => {
+    navigate('/dashboard/exams');
+  };
+
   const formatTimer = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -303,8 +307,17 @@ const ExamAttempt: React.FC = () => {
               Thời gian còn lại: {formatTimer(remainingSeconds)}
             </div>
           ) : (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-amber-800 font-semibold">
-              Chế độ xem thử Premium
+            <div className="flex items-center gap-2">
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-amber-800 font-semibold">
+                Chế độ xem thử Premium
+              </div>
+              <button
+                type="button"
+                onClick={handleExitPreview}
+                className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-400 hover:bg-slate-50"
+              >
+                Thoát xem thử
+              </button>
             </div>
           )}
         </div>
@@ -350,7 +363,14 @@ const ExamAttempt: React.FC = () => {
         </div>
 
         {isPreviewMode ? (
-          <div className="sticky bottom-3 flex justify-end">
+          <div className="sticky bottom-3 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={handleExitPreview}
+              className="rounded-xl border border-slate-300 bg-white px-5 py-2.5 font-semibold text-slate-700 hover:border-slate-400 hover:bg-slate-50"
+            >
+              Thoát xem thử
+            </button>
             <button
               type="button"
               onClick={() => setShowPremiumModal(true)}

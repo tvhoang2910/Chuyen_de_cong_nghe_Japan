@@ -1,11 +1,18 @@
-import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import axios, { type AxiosError } from 'axios';
-import toast from 'react-hot-toast';
-import { ChevronLeft, ChevronRight, Users, ShieldCheck, User as UserIcon, CheckCircle2, UserPlus, FileUp, Sparkles, Filter, List, LayoutGrid } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
-  fetchAdminUsers,
+  ChevronLeft,
+  ChevronRight,
+  FileUp,
+  Filter,
+  Search,
+  UserPlus,
+  X
+} from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import toast from 'react-hot-toast';
+import {
   createAdminUser,
+  fetchAdminUsers,
   importAdminUsers,
   updateAdminUserRole,
   updateAdminUserStatus,
@@ -14,10 +21,9 @@ import {
   type ImportAdminUsersResponse,
 } from '../api/axiosClient';
 import AdminLayout from '../components/AdminLayout';
-import UserTable from '../components/admin/UserTable';
-import UserFilters from '../components/admin/UserFilters';
 import CreateUserForm from '../components/admin/CreateUserForm';
 import ImportUserSection from '../components/admin/ImportUserSection';
+import UserTable from '../components/admin/UserTable';
 
 const pageSize = 10;
 const SAMPLE_IMPORT_PASSWORD = ['User', '@', '123', '456'].join('');
@@ -55,6 +61,8 @@ const AdminUsers: React.FC = () => {
   const [lastImportResult, setLastImportResult] = useState<ImportAdminUsersResponse | null>(null);
   const [activeTab, setActiveTab] = useState<'ALL' | AppRole>('ALL');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [isCreateFormOpen, setIsCreateFormOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [spotlightUserId, setSpotlightUserId] = useState<number | null>(null);
 
   const [createForm, setCreateForm] = useState({
@@ -70,9 +78,24 @@ const AdminUsers: React.FC = () => {
       total: totalElements,
       active: users.filter(u => u.status).length,
       contributors: users.filter(u => u.role === 'CONTRIBUTOR').length,
+      admins: users.filter(u => u.role === 'ADMIN').length,
       blocked: users.filter(u => !u.status).length,
     };
   }, [totalElements, users]);
+
+  const visiblePages = useMemo(() => {
+    if (totalPages <= 0) {
+      return [] as number[];
+    }
+
+    const maxVisible = 5;
+    const half = Math.floor(maxVisible / 2);
+    let start = Math.max(0, page - half);
+    let end = Math.min(totalPages - 1, start + maxVisible - 1);
+    start = Math.max(0, end - maxVisible + 1);
+
+    return Array.from({ length: end - start + 1 }, (_, index) => start + index);
+  }, [page, totalPages]);
 
   const loadUsers = useCallback(async () => {
     try {
@@ -216,259 +239,287 @@ const AdminUsers: React.FC = () => {
     }
   };
 
-  const tabs: Array<{ id: 'ALL' | AppRole; label: string; icon: typeof Users; color: string; bg: string }> = [
-    { id: 'ALL', label: 'Tất cả', icon: Users, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-    { id: 'USER', label: 'Học sinh', icon: UserIcon, color: 'text-cyan-600', bg: 'bg-cyan-50' },
-    { id: 'CONTRIBUTOR', label: 'Giáo viên', icon: ShieldCheck, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    { id: 'ADMIN', label: 'Quản trị', icon: ShieldCheck, color: 'text-rose-600', bg: 'bg-rose-50' },
+  const handleDeleteUser = (user: AdminUserItem) => {
+    toast(`API xóa user #${user.id} chưa được backend hỗ trợ. Tạm thời hãy khóa tài khoản.`);
+  };
+
+  const handleCopySample = async () => {
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(adminImportSampleUsers, null, 2));
+      toast.success('Đã copy JSON mẫu.');
+    } catch {
+      toast.error('Không thể copy JSON mẫu, vui lòng copy thủ công.');
+    }
+  };
+
+  const currentStart = totalElements === 0 ? 0 : page * pageSize + 1;
+  const currentEnd = totalElements === 0 ? 0 : Math.min((page + 1) * pageSize, totalElements);
+
+  const tabs: Array<{ id: 'ALL' | AppRole; label: string }> = [
+    { id: 'ALL', label: 'Tất cả' },
+    { id: 'USER', label: 'Học sinh' },
+    { id: 'CONTRIBUTOR', label: 'Giáo viên' },
+    { id: 'ADMIN', label: 'Quản trị' },
   ];
 
   return (
     <AdminLayout>
-      <div className="max-w-[1600px] mx-auto flex flex-col gap-8 pb-12">
-        {/* Hero Section */}
-        <section className="relative overflow-hidden rounded-[40px] bg-slate-950 p-8 md:p-12 text-white shadow-2xl">
-          <div className="absolute top-0 right-0 -mt-20 -mr-20 w-96 h-96 bg-cyan-500/20 blur-[120px] rounded-full" />
-          <div className="absolute bottom-0 left-0 -mb-20 -ml-20 w-72 h-72 bg-indigo-500/20 blur-[100px] rounded-full" />
-          
-          <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-8">
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="space-y-4"
-            >
-              <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 backdrop-blur-md rounded-full border border-white/10 text-cyan-400 text-xs font-black uppercase tracking-[0.2em]">
-                <Sparkles className="w-3 h-3" />
-                <span>Hệ thống quản trị Premium</span>
-              </div>
-              <h1 className="text-5xl md:text-6xl font-black tracking-tight leading-none">
-                Quản lý <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-indigo-400">Thành viên</span>
-              </h1>
-              <p className="text-slate-400 font-medium text-lg max-w-xl">
-                Nền tảng quản trị thông minh giúp bạn kiểm soát toàn diện hệ sinh thái người dùng, giáo viên và cộng tác viên.
+      <div className="mx-auto flex w-full max-w-[1560px] flex-col gap-5 pb-10">
+        <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm md:p-6">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            <div>
+              <h1 className="text-2xl font-black tracking-tight text-slate-900 md:text-3xl">Quản lý người dùng</h1>
+              <p className="mt-1 text-sm text-slate-600">
+                Bảng dữ liệu được tối ưu cho kiểm duyệt nhanh, căn cột chuẩn và thao tác theo từng dòng.
               </p>
-            </motion.div>
+            </div>
 
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.2 }}
-              className="grid grid-cols-2 gap-4 w-full lg:w-auto"
-            >
-              <QuickStat label="Tổng thành viên" value={totalElements} icon={<Users className="w-5 h-5" />} />
-              <QuickStat label="Hoạt động" value={stats.active} icon={<CheckCircle2 className="w-5 h-5" />} color="text-emerald-400" />
-            </motion.div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsImportModalOpen(true)}
+                className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:border-emerald-400 hover:bg-emerald-100"
+              >
+                <FileUp className="h-4 w-4" />
+                Import JSON
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsCreateFormOpen(prev => !prev)}
+                className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 transition hover:border-indigo-400 hover:bg-indigo-100"
+              >
+                <UserPlus className="h-4 w-4" />
+                {isCreateFormOpen ? 'Ẩn form tạo user' : 'Tạo user mới'}
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+            <StatCard label="Tổng" value={stats.total} />
+            <StatCard label="Đang hoạt động" value={stats.active} tone="emerald" />
+            <StatCard label="Giáo viên" value={stats.contributors} tone="cyan" />
+            <StatCard label="Quản trị" value={stats.admins} tone="rose" />
           </div>
         </section>
 
-        {/* Action Bar */}
-        <div className="flex flex-col md:flex-row items-center justify-between gap-6 bg-white/50 backdrop-blur-xl p-4 rounded-[32px] border border-white shadow-xl shadow-slate-200/50">
-          <div className="flex items-center gap-1 p-1 bg-slate-100/50 rounded-2xl w-full md:w-auto overflow-x-auto no-scrollbar">
+        <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
+          <form onSubmit={handleSearchSubmit} className="flex flex-col gap-3 xl:flex-row xl:items-center">
+            <label className="relative block flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={searchInput}
+                onChange={(event) => setSearchInput(event.target.value)}
+                placeholder="Tìm theo tên, email, số điện thoại, trường học..."
+                className="w-full rounded-xl border border-slate-200 py-2.5 pl-9 pr-3 text-sm text-slate-800 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+              />
+            </label>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="submit"
+                className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700"
+              >
+                Áp dụng
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchInput('');
+                  setSearchKeyword('');
+                  setActiveTab('ALL');
+                  setPage(0);
+                }}
+                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
+              >
+                Xóa lọc
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsFilterOpen(prev => !prev)}
+                className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-semibold transition ${
+                  isFilterOpen
+                    ? 'border-slate-900 bg-slate-900 text-white'
+                    : 'border-slate-200 bg-white text-slate-700 hover:border-slate-400'
+                }`}
+              >
+                <Filter className="h-4 w-4" />
+                {isFilterOpen ? 'Ẩn bộ lọc nhanh' : 'Hiện bộ lọc nhanh'}
+              </button>
+            </div>
+          </form>
+
+          {isFilterOpen && (
+            <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+              {['@gmail.com', '@edu.vn', 'Đã khóa', 'Quản trị', 'Giáo viên'].map((quick) => (
+                <button
+                  key={quick}
+                  type="button"
+                  onClick={() => {
+                    setSearchInput(quick);
+                    setSearchKeyword(quick);
+                    setPage(0);
+                  }}
+                  className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700"
+                >
+                  {quick}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-4 flex flex-wrap gap-2">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
+                type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`
-                  relative flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black transition-all shrink-0
-                  ${activeTab === tab.id ? tab.color : 'text-slate-500 hover:text-slate-900'}
-                `}
+                className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                  activeTab === tab.id
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'border border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300 hover:bg-white'
+                }`}
               >
-                {activeTab === tab.id && (
-                  <motion.div
-                    layoutId="premiumTab"
-                    className={`absolute inset-0 ${tab.bg} rounded-xl shadow-sm border border-current/5`}
-                    transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
-                  />
-                )}
-                <tab.icon className="w-4 h-4 relative z-10" />
-                <span className="relative z-10">{tab.label}</span>
+                {tab.label}
               </button>
             ))}
           </div>
+        </section>
 
-          <div className="flex items-center gap-3 w-full md:w-auto">
-             <div className="flex items-center gap-1 bg-slate-100/50 p-1 rounded-xl">
-                <button 
-                  className={`p-2 rounded-lg transition-all bg-white shadow-sm text-indigo-600`}
+        <UserTable
+          users={users}
+          isLoading={isLoading}
+          actionLoadingUserId={actionLoadingUserId}
+          spotlightUserId={spotlightUserId}
+          statusReasonByUserId={statusReasonByUserId}
+          setStatusReasonByUserId={setStatusReasonByUserId}
+          onToggleStatus={handleToggleUserStatus}
+          onChangeRole={handleChangeUserRole}
+          onDelete={handleDeleteUser}
+        />
+
+        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <p className="text-sm text-slate-600">
+              Hiển thị <span className="font-semibold text-slate-900">{currentStart}</span>-<span className="font-semibold text-slate-900">{currentEnd}</span> / <span className="font-semibold text-slate-900">{totalElements}</span> người dùng
+            </p>
+
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                disabled={page === 0 || isLoading}
+                onClick={() => setPage(prev => prev - 1)}
+                className="rounded-lg border border-slate-200 p-2 text-slate-600 transition hover:border-slate-400 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+
+              {visiblePages.map((pageNumber) => (
+                <button
+                  key={pageNumber}
+                  type="button"
+                  onClick={() => setPage(pageNumber)}
+                  className={`h-9 min-w-9 rounded-lg px-2 text-sm font-semibold transition ${
+                    page === pageNumber
+                      ? 'bg-slate-900 text-white'
+                      : 'border border-slate-200 text-slate-600 hover:border-slate-400 hover:text-slate-900'
+                  }`}
                 >
-                  <List className="w-4 h-4" />
+                  {pageNumber + 1}
                 </button>
-                <button 
-                  className={`p-2 rounded-lg transition-all text-slate-400 hover:text-slate-600`}
-                >
-                  <LayoutGrid className="w-4 h-4" />
-                </button>
-             </div>
-             <div className="h-8 w-px bg-slate-200 mx-1" />
-             <button 
-                onClick={() => setIsFilterOpen(!isFilterOpen)}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black transition-all ${isFilterOpen ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/20' : 'bg-white border border-slate-200 text-slate-700 hover:border-slate-900 shadow-sm'}`}
-             >
-                <Filter className="w-4 h-4" /> 
-                <span>Bộ lọc</span>
-             </button>
+              ))}
+
+              <button
+                type="button"
+                disabled={page + 1 >= totalPages || isLoading}
+                onClick={() => setPage(prev => prev + 1)}
+                className="rounded-lg border border-slate-200 p-2 text-slate-600 transition hover:border-slate-400 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
-          <div className="xl:col-span-8 space-y-8">
-            <AnimatePresence mode="wait">
-              {isFilterOpen && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  className="overflow-hidden"
-                >
-                  <UserFilters
-                    searchInput={searchInput}
-                    setSearchInput={setSearchInput}
-                    onSearch={handleSearchSubmit}
-                  />
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            <motion.div
-              layout
-              className="relative"
-            >
-              <UserTable
-                users={users}
-                isLoading={isLoading}
-                actionLoadingUserId={actionLoadingUserId}
-                spotlightUserId={spotlightUserId}
-                statusReasonByUserId={statusReasonByUserId}
-                setStatusReasonByUserId={setStatusReasonByUserId}
-                onToggleStatus={handleToggleUserStatus}
-                onChangeRole={handleChangeUserRole}
-              />
-
-              {/* Enhanced Pagination */}
-              <div className="flex flex-col md:flex-row items-center justify-between gap-4 mt-8 px-4">
-                <p className="text-sm text-slate-500 font-bold">
-                  Đang hiển thị <span className="text-slate-950">{(page * pageSize) + 1}</span> - <span className="text-slate-950">{Math.min((page + 1) * pageSize, totalElements)}</span> trong <span className="text-slate-950">{totalElements}</span>
-                </p>
-                <div className="flex items-center gap-2 p-1.5 bg-white rounded-2xl border border-slate-100 shadow-sm">
-                  <button
-                    disabled={page === 0 || isLoading}
-                    onClick={() => setPage(p => p - 1)}
-                    className="p-2.5 hover:bg-slate-50 disabled:opacity-30 rounded-xl transition-all text-slate-600 active:scale-90"
-                  >
-                    <ChevronLeft className="w-5 h-5" />
-                  </button>
-                  <div className="flex items-center px-2">
-                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => i).map((pageNum) => (
-                      <button
-                        key={pageNum}
-                        onClick={() => setPage(pageNum)}
-                        className={`w-10 h-10 rounded-xl text-sm font-black transition-all ${page === pageNum ? 'bg-slate-900 text-white shadow-xl shadow-slate-900/20' : 'text-slate-400 hover:text-slate-950'}`}
-                      >
-                        {pageNum + 1}
-                      </button>
-                    ))}
-                  </div>
-                  <button
-                    disabled={page + 1 >= totalPages || isLoading}
-                    onClick={() => setPage(p => p + 1)}
-                    className="p-2.5 hover:bg-slate-50 disabled:opacity-30 rounded-xl transition-all text-slate-600 active:scale-90"
-                  >
-                    <ChevronRight className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-
-          <aside className="xl:col-span-4 space-y-8 sticky top-8">
-            <PremiumSidebarCard 
-              title="Khởi tạo" 
-              subtitle="Tạo tài khoản mới"
-              icon={<UserPlus className="w-5 h-5 text-indigo-600" />}
-              gradient="from-indigo-600/10 to-cyan-600/10"
-            >
-              <CreateUserForm
-                createForm={createForm}
-                setCreateForm={setCreateForm}
-                isCreating={isCreating}
-                onCreate={handleCreateUser}
-              />
-            </PremiumSidebarCard>
-
-            <PremiumSidebarCard 
-              title="Nhập dữ liệu" 
-              subtitle="Import từ JSON"
-              icon={<FileUp className="w-5 h-5 text-emerald-600" />}
-              gradient="from-emerald-600/10 to-teal-600/10"
-            >
-              <ImportUserSection
-                importJsonInput={importJsonInput}
-                setImportJsonInput={setImportJsonInput}
-                skipExistingOnImport={skipExistingOnImport}
-                setSkipExistingOnImport={setSkipExistingOnImport}
-                isImporting={isImporting}
-                onImport={handleImport}
-                onGenerateSample={() => setImportJsonInput(JSON.stringify(adminImportSampleUsers, null, 2))}
-                onCopySample={() => {
-                   navigator.clipboard.writeText(JSON.stringify(adminImportSampleUsers, null, 2));
-                   toast.success('Đã copy mẫu.');
-                }}
-                lastImportResult={lastImportResult}
-              />
-            </PremiumSidebarCard>
-          </aside>
-        </div>
+        {isCreateFormOpen && (
+          <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+            <CreateUserForm
+              createForm={createForm}
+              setCreateForm={setCreateForm}
+              isCreating={isCreating}
+              onCreate={handleCreateUser}
+            />
+          </section>
+        )}
       </div>
+
+      {isImportModalOpen && (
+        <div className="fixed inset-0 z-[80] flex items-start justify-center overflow-y-auto p-4 md:p-8">
+          <button
+            type="button"
+            aria-label="Đóng modal import"
+            className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
+            onClick={() => setIsImportModalOpen(false)}
+          />
+
+          <div className="relative z-10 w-full max-w-3xl rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl md:p-6">
+            <div className="mb-4 flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">Import người dùng từ JSON</h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  Khu vực này được đặt trong modal để bảng người dùng luôn chiếm 100% chiều rộng.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsImportModalOpen(false)}
+                className="rounded-lg border border-slate-200 p-2 text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <ImportUserSection
+              importJsonInput={importJsonInput}
+              setImportJsonInput={setImportJsonInput}
+              skipExistingOnImport={skipExistingOnImport}
+              setSkipExistingOnImport={setSkipExistingOnImport}
+              isImporting={isImporting}
+              onImport={handleImport}
+              onGenerateSample={() => setImportJsonInput(JSON.stringify(adminImportSampleUsers, null, 2))}
+              onCopySample={() => {
+                void handleCopySample();
+              }}
+              lastImportResult={lastImportResult}
+            />
+          </div>
+        </div>
+      )}
     </AdminLayout>
   );
 };
 
-interface QuickStatProps {
+interface StatCardProps {
   label: string;
   value: number;
-  icon: React.ReactNode;
-  color?: string;
+  tone?: 'slate' | 'emerald' | 'cyan' | 'rose';
 }
 
-interface PremiumSidebarCardProps {
-  title: string;
-  subtitle: string;
-  icon: React.ReactNode;
-  children: React.ReactNode;
-  gradient: string;
-}
+const StatCard: React.FC<StatCardProps> = ({ label, value, tone = 'slate' }) => {
+  const toneClasses: Record<NonNullable<StatCardProps['tone']>, string> = {
+    slate: 'border-slate-200 bg-slate-50 text-slate-700',
+    emerald: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    cyan: 'border-cyan-200 bg-cyan-50 text-cyan-700',
+    rose: 'border-rose-200 bg-rose-50 text-rose-700',
+  };
 
-const QuickStat: React.FC<QuickStatProps> = ({ label, value, icon, color = "text-indigo-400" }) => (
-  <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-6 rounded-[32px] min-w-[180px] group hover:bg-white/10 transition-all cursor-default">
-    <div className={`w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center mb-4 ${color} group-hover:scale-110 transition-transform`}>
-      {icon}
+  return (
+    <div className={`rounded-xl border px-3 py-2.5 ${toneClasses[tone]}`}>
+      <p className="text-[11px] font-semibold uppercase tracking-wide">{label}</p>
+      <p className="mt-1 text-2xl font-black leading-none">{value}</p>
     </div>
-    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</p>
-    <h3 className="text-3xl font-black mt-1 leading-none">{value}</h3>
-  </div>
-);
-
-const PremiumSidebarCard: React.FC<PremiumSidebarCardProps> = ({ title, subtitle, icon, children, gradient }) => (
-  <motion.div
-    initial={{ opacity: 0, x: 20 }}
-    animate={{ opacity: 1, x: 0 }}
-    className={`bg-white rounded-[40px] p-8 border border-slate-100 shadow-2xl shadow-slate-200/50 relative overflow-hidden group`}
-  >
-    <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${gradient} blur-3xl rounded-full -mt-10 -mr-10 opacity-50 group-hover:opacity-100 transition-opacity`} />
-    
-    <div className="relative z-10">
-      <div className="flex items-center gap-4 mb-8">
-        <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center border border-slate-100 shadow-sm group-hover:scale-110 transition-transform">
-          {icon}
-        </div>
-        <div>
-          <h2 className="text-xl font-black text-slate-950 leading-none">{title}</h2>
-          <p className="text-xs text-slate-400 font-bold uppercase tracking-wider mt-1.5">{subtitle}</p>
-        </div>
-      </div>
-      {children}
-    </div>
-  </motion.div>
-);
+  );
+};
 
 export default AdminUsers;

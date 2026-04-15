@@ -26,91 +26,109 @@ const ImportUserSection: React.FC<ImportUserSectionProps> = ({
   lastImportResult,
 }) => {
   return (
-    <div className="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center">
-          <FileJson className="w-6 h-6 text-slate-600" />
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100">
+          <FileJson className="h-5 w-5 text-slate-600" />
         </div>
         <div>
-          <h2 className="text-xl font-bold text-slate-900 leading-none">Import dữ liệu</h2>
-          <p className="text-xs text-slate-500 mt-1">Đồng bộ nhanh danh sách người dùng qua JSON.</p>
+          <h3 className="text-base font-semibold text-slate-900">Dữ liệu JSON</h3>
+          <p className="text-xs text-slate-500">Nhập danh sách user để tạo hàng loạt.</p>
         </div>
       </div>
 
-      <div className="space-y-4">
-        <div className="flex gap-2">
-          <button
-            onClick={onGenerateSample}
-            className="flex-1 py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl border border-slate-200 transition-all flex items-center justify-center gap-2"
-          >
-            Tạo JSON mẫu
-          </button>
-          <button
-            onClick={onCopySample}
-            className="flex-1 py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl border border-slate-200 transition-all flex items-center justify-center gap-2"
-          >
-            <Copy className="w-3.5 h-3.5" /> Copy mẫu
-          </button>
-        </div>
-
-        <textarea
-          value={importJsonInput}
-          onChange={(e) => setImportJsonInput(e.target.value)}
-          rows={8}
-          className="w-full p-4 bg-slate-900 text-cyan-400 font-mono text-xs rounded-2xl border-none focus:ring-4 focus:ring-cyan-600/10 outline-none transition-all placeholder:text-slate-700"
-          placeholder={'[{"email":"teacher@example.com","fullName":"Teacher","password":"strong-pass-123"}]'}
-        />
-
-        <label className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl cursor-pointer group border border-transparent hover:border-slate-200 transition-all">
-          <input
-            type="checkbox"
-            checked={skipExistingOnImport}
-            onChange={(e) => setSkipExistingOnImport(e.target.checked)}
-            className="w-4 h-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-600/20"
-          />
-          <span className="text-xs font-medium text-slate-600 group-hover:text-slate-900">Bỏ qua tài khoản đã tồn tại email</span>
-        </label>
-
+      <div className="grid gap-2 sm:grid-cols-2">
         <button
-          onClick={onImport}
-          disabled={isImporting || !importJsonInput.trim()}
-          className="w-full py-4 bg-slate-900 hover:bg-black text-white font-bold rounded-2xl shadow-lg shadow-slate-900/20 transition-all active:scale-[0.98] disabled:opacity-50"
+          onClick={onGenerateSample}
+          type="button"
+          className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-100"
         >
-          {isImporting ? 'Đang xử lý...' : 'Xác nhận Import JSON'}
+          Tạo JSON mẫu
         </button>
-
-        {lastImportResult && (
-          <div className="mt-6 p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
-             <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-500">
-                <span>Kết quả gần nhất</span>
-                <span className="text-cyan-600">Tổng: {lastImportResult.total}</span>
-             </div>
-             <div className="grid grid-cols-3 gap-2">
-                <div className="bg-white p-2 rounded-xl border border-slate-200 text-center">
-                   <p className="text-[10px] text-slate-400 uppercase font-bold">Thành công</p>
-                   <p className="text-lg font-bold text-emerald-600">{lastImportResult.created}</p>
-                </div>
-                <div className="bg-white p-2 rounded-xl border border-slate-200 text-center">
-                   <p className="text-[10px] text-slate-400 uppercase font-bold">Bỏ qua</p>
-                   <p className="text-lg font-bold text-amber-600">{lastImportResult.skipped}</p>
-                </div>
-                <div className="bg-white p-2 rounded-xl border border-slate-200 text-center">
-                   <p className="text-[10px] text-slate-400 uppercase font-bold">Thất bại</p>
-                   <p className="text-lg font-bold text-rose-600">{lastImportResult.failed}</p>
-                </div>
-             </div>
-             {lastImportResult.errors.length > 0 && (
-               <ul className="max-h-32 overflow-y-auto space-y-1 mt-2 pr-1">
-                 {lastImportResult.errors.map((error) => (
-                   <li key={`${error.index}-${error.email}-${error.reason}`} className="text-[10px] text-rose-500 bg-rose-50 p-1.5 rounded-lg border border-rose-100">
-                     Line {error.index}: {error.email} - {error.reason}
-                   </li>
-                 ))}
-               </ul>
-             )}
-          </div>
-        )}
+        <button
+          onClick={onCopySample}
+          type="button"
+          className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-100"
+        >
+          <Copy className="h-3.5 w-3.5" />
+          Copy mẫu
+        </button>
       </div>
+
+      <textarea
+        value={importJsonInput}
+        onChange={(e) => setImportJsonInput(e.target.value)}
+        rows={12}
+        className="w-full rounded-2xl border border-slate-800 bg-slate-950 p-4 font-mono text-xs text-cyan-300 outline-none transition focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/30"
+        placeholder={'[{"email":"teacher@example.com","fullName":"Teacher","password":"strong-pass-123"}]'}
+      />
+
+      <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+        <input
+          type="checkbox"
+          checked={skipExistingOnImport}
+          onChange={(e) => setSkipExistingOnImport(e.target.checked)}
+          className="h-4 w-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-600/30"
+        />
+        Bỏ qua tài khoản đã tồn tại email
+      </label>
+
+      <button
+        onClick={onImport}
+        disabled={isImporting || !importJsonInput.trim()}
+        className="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {isImporting ? 'Đang xử lý...' : 'Xác nhận import'}
+      </button>
+
+      {lastImportResult && (
+        <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+          <div className="flex items-center justify-between text-xs text-slate-500">
+            <span className="font-semibold uppercase tracking-wide">Kết quả gần nhất</span>
+            <span className="font-semibold">Tổng: {lastImportResult.total}</span>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
+            <ResultMetric label="Thành công" value={lastImportResult.created} tone="emerald" />
+            <ResultMetric label="Bỏ qua" value={lastImportResult.skipped} tone="amber" />
+            <ResultMetric label="Thất bại" value={lastImportResult.failed} tone="rose" />
+          </div>
+
+          {lastImportResult.errors.length > 0 && (
+            <ul className="max-h-40 space-y-1 overflow-y-auto pr-1">
+              {lastImportResult.errors.map((error) => (
+                <li
+                  key={`${error.index}-${error.email}-${error.reason}`}
+                  className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-1.5 text-[11px] text-rose-700"
+                >
+                  Dòng {error.index}: {error.email} - {error.reason}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+interface ResultMetricProps {
+  label: string;
+  value: number;
+  tone: 'emerald' | 'amber' | 'rose';
+}
+
+const ResultMetric: React.FC<ResultMetricProps> = ({ label, value, tone }) => {
+  const toneClasses: Record<ResultMetricProps['tone'], string> = {
+    emerald: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    amber: 'border-amber-200 bg-amber-50 text-amber-700',
+    rose: 'border-rose-200 bg-rose-50 text-rose-700',
+  };
+
+  return (
+    <div className={`rounded-xl border px-2 py-1.5 text-center ${toneClasses[tone]}`}>
+      <p className="text-[10px] font-semibold uppercase tracking-wide">{label}</p>
+      <p className="mt-0.5 text-lg font-bold leading-none">{value}</p>
     </div>
   );
 };
