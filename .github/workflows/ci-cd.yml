@@ -21,7 +21,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NODE_VERSION: '22'
+  NODE_VERSION: '20'
 
 jobs:
   quality:
@@ -37,12 +37,31 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            exam-web/package-lock.json
+
+      - name: Detect project directory
+        id: project-dir
+        shell: bash
+        run: |
+          if [ -f package-lock.json ]; then
+            echo "dir=." >> "$GITHUB_OUTPUT"
+          elif [ -f exam-web/package-lock.json ]; then
+            echo "dir=exam-web" >> "$GITHUB_OUTPUT"
+          else
+            echo "Could not find package-lock.json in root or exam-web/" >&2
+            exit 1
+          fi
 
       - name: Install dependencies
+        working-directory: ${{ steps.project-dir.outputs.dir }}
         run: npm ci
 
       - name: Build
+        working-directory: ${{ steps.project-dir.outputs.dir }}
         run: npm run build
 
       - name: Test
+        working-directory: ${{ steps.project-dir.outputs.dir }}
         run: npm run test:run
