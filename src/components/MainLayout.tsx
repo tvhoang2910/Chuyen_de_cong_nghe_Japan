@@ -33,7 +33,13 @@ import axiosClient, {
   uploadCurrentUserAvatar,
   type UserProfile 
 } from '../api/axiosClient';
-import { fetchGamificationOverview, fetchStudyStats, type GamificationOverview } from '../api/studyClient';
+import {
+  fetchExamWrongDecks,
+  fetchGamificationOverview,
+  type AchievementView,
+  type GamificationOverview,
+  type Sm2ExamDeck,
+} from '../api/studyClient';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -136,7 +142,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, fallbackStreakDays, f
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [notificationItems, setNotificationItems] = useState<NotificationItem[]>([]);
   const [gamificationOverview, setGamificationOverview] = useState<GamificationOverview | null>(null);
-  const [headerStreakDays, setHeaderStreakDays] = useState<number | null>(null);
   const notificationRef = useRef<HTMLDivElement | null>(null);
 
   const dismissedIdsStorageKey = useMemo(() => {
@@ -216,6 +221,76 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, fallbackStreakDays, f
       timeLabel: new Date(entry.createdAt).toLocaleString('vi-VN'),
       onClick: () => navigate(entry.url || '/dashboard/gamification'),
     };
+  }, [navigate]);
+
+  const buildSyntheticUserNotifications = useCallback((
+    overview: GamificationOverview | null,
+    examDecks: Sm2ExamDeck[] | null,
+  ): NotificationItem[] => {
+    const nowMs = Date.now();
+    const syntheticItems: NotificationItem[] = [];
+
+    // 1. SM-2 notifications: one per deck with wrong questions
+    if (Array.isArray(examDecks)) {
+      examDecks.forEach((deck) => {
+        if (deck.wrongQuestionCount > 0) {
+          syntheticItems.push({
+            id: `synthetic-sm2-due-attempt-${deck.latestAttemptId}`,
+            title: 'Đến thời gian ôn tập SM-2',
+            description: `Bạn có ${deck.wrongQuestionCount} câu đến hạn cần ôn tập (lần thi ${deck.attemptNumber ?? '?'}, ${deck.examTitle}).`,
+            timeLabel: deck.latestSubmittedAt
+              ? new Date(deck.latestSubmittedAt).toLocaleString('vi-VN')
+              : 'Hôm nay',
+            onClick: () => navigate('/dashboard/spaced-repetition'),
+          });
+        }
+      });
+    }
+
+    // 2. Achievements unlocked in last 24h (no duplicates)
+    const fromNewlyUnlocked = Array.isArray(overview?.newlyUnlockedAchievements)
+      ? overview.newlyUnlockedAchievements
+      : [];
+    const fromRecentUnlocked = Array.isArray(overview?.recentUnlockedAchievements)
+      ? overview.recentUnlockedAchievements.filter((achievement) => {
+        if (!achievement.unlockedAt) return false;
+        const unlockedAtMs = new Date(achievement.unlockedAt).getTime();
+        return Number.isFinite(unlockedAtMs) && nowMs - unlockedAtMs <= 24 * 60 * 60 * 1000;
+      })
+      : [];
+    const mergedAchievements = new Map<string, AchievementView>();
+    [...fromNewlyUnlocked, ...fromRecentUnlocked].forEach((achievement) => {
+      const key = `${achievement.code}:${achievement.unlockedAt ?? ''}`;
+      if (!mergedAchievements.has(key)) {
+        mergedAchievements.set(key, achievement);
+      }
+    });
+    mergedAchievements.forEach((achievement) => {
+      const unlockedToken = achievement.unlockedAt ?? 'unknown-time';
+      syntheticItems.push({
+        id: `synthetic-achievement-${achievement.code}-${unlockedToken}`,
+        title: 'Bạn vừa mở khóa huy hiệu mới',
+        description: achievement.name,
+        timeLabel: achievement.unlockedAt
+          ? new Date(achievement.unlockedAt).toLocaleString('vi-VN')
+          : 'Mới đạt',
+        onClick: () => navigate('/dashboard/gamification'),
+      });
+    });
+
+    // 3. Streak notification (giữ nguyên logic cũ)
+    const todayToken = new Date().toISOString().slice(0, 10);
+    if (overview?.justQualifiedToday) {
+      syntheticItems.push({
+        id: `synthetic-streak-qualified-${todayToken}`,
+        title: 'Bạn vừa đạt streak hôm nay',
+        description: `Streak hiện tại: ${overview.streakDays} ngày liên tiếp.`,
+        timeLabel: 'Hôm nay',
+        onClick: () => navigate('/dashboard/gamification'),
+      });
+    }
+
+    return syntheticItems;
   }, [navigate]);
 
   const mergeUserNotifications = useCallback((baseItems: NotificationItem[]) => {
@@ -310,7 +385,17 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, fallbackStreakDays, f
           return;
         }
 
-        const feed = await fetchUserNotifications(0, 5);
+        const [feed, overview, examDecksResp] = await Promise.all([
+          fetchUserNotifications(0, 5),
+          fetchGamificationOverview().catch(() => null),
+          fetchExamWrongDecks().catch(() => null),
+        ]);
+
+        if (overview) {
+          setGamificationOverview(overview);
+        }
+
+        const examDecks = Array.isArray(examDecksResp?.decks) ? examDecksResp.decks : [];
         const items: NotificationItem[] = feed.content.map((row) => ({
           id: `user-notification-${row.id}-${row.createdAt}`,
           title: row.title,
@@ -327,9 +412,14 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, fallbackStreakDays, f
             navigate(row.actionUrl || '/dashboard/notifications');
           },
         }));
+        const syntheticItems = buildSyntheticUserNotifications(
+          overview,
+          examDecks,
+        );
 
         const dismissedIds = readDismissedIds();
-        const visibleItems = items.filter((item) => !dismissedIds.has(item.id));
+        const visibleItems = [...syntheticItems, ...items]
+          .filter((item) => !dismissedIds.has(item.id));
 
         if (isMounted) {
           setPendingReviewCount(0);
@@ -365,7 +455,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, fallbackStreakDays, f
       globalThis.clearInterval(intervalId);
       globalThis.removeEventListener(SUBSCRIPTION_REVIEW_UPDATED_EVENT, handleRefresh);
     };
-  }, [mergeUserNotifications, navigate, readDismissedIds, user?.role]);
+  }, [buildSyntheticUserNotifications, mergeUserNotifications, navigate, readDismissedIds, user?.role]);
 
   useEffect(() => {
     if (user?.role !== 'USER') {
@@ -397,6 +487,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, fallbackStreakDays, f
       const isGamificationNotification =
         normalizedTag === 'achievement-unlocked' ||
         normalizedTag === 'streak-qualified' ||
+        normalizedTag === 'sm2-due-reminder' ||
         normalizedUrl.includes('gamification');
       const isSubscriptionNotification =
         normalizedTag.includes('subscription') ||
@@ -412,7 +503,9 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, fallbackStreakDays, f
         title: payload.title?.trim() || (isSubscriptionNotification ? 'Thông báo Premium' : 'Thông báo học tập'),
         body: payload.body?.trim() || (isSubscriptionNotification
           ? 'Yêu cầu nâng cấp Premium của bạn có cập nhật mới.'
-          : 'Bạn có cập nhật mới trong gamification.'),
+          : normalizedTag === 'sm2-due-reminder'
+            ? 'Bạn có câu hỏi SM-2 đến hạn cần ôn tập.'
+            : 'Bạn có cập nhật mới trong gamification.'),
         url: normalizedUrl,
         tag: normalizedTag || (isSubscriptionNotification ? 'subscription' : 'gamification'),
         createdAt,
@@ -442,31 +535,24 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, fallbackStreakDays, f
   useEffect(() => {
     if (user?.role !== 'USER') {
       setGamificationOverview(null);
-      setHeaderStreakDays(null);
       return;
     }
 
     let isMounted = true;
     const loadHeaderMetrics = async () => {
-      const [overviewResult, studyStatsResult] = await Promise.allSettled([
+      const overviewResult = await Promise.allSettled([
         fetchGamificationOverview(),
-        fetchStudyStats(),
       ]);
 
       if (!isMounted) {
         return;
       }
 
-      if (overviewResult.status === 'fulfilled') {
-        setGamificationOverview(overviewResult.value);
+      const [overview] = overviewResult;
+      if (overview.status === 'fulfilled') {
+        setGamificationOverview(overview.value);
       } else {
         setGamificationOverview(null);
-      }
-
-      if (studyStatsResult.status === 'fulfilled') {
-        setHeaderStreakDays(studyStatsResult.value.streakDays);
-      } else {
-        setHeaderStreakDays(null);
       }
     };
 
@@ -703,7 +789,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, fallbackStreakDays, f
             <div className="hidden sm:flex items-center gap-3">
               <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 rounded-lg border border-emerald-100/50">
                 <Flame className="w-4 h-4 text-emerald-500" />
-                <span className="text-xs font-bold text-emerald-700">{fallbackStreakDays ?? headerStreakDays ?? gamificationOverview?.streakDays ?? 0} Days</span>
+                <span className="text-xs font-bold text-emerald-700">{gamificationOverview?.streakDays ?? fallbackStreakDays ?? 0} Days</span>
               </div>
               <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 rounded-lg border border-amber-100/50">
                 <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
