@@ -108,7 +108,7 @@ const SpacedRepetition: React.FC = () => {
                     <div>
                       <h3 className="text-lg font-bold text-slate-900">{deck.examTitle} - các câu sai</h3>
                       <p className="text-sm text-slate-500">
-                        Lần làm gần nhất: {new Date(deck.latestSubmittedAt).toLocaleString('vi-VN')} • {deck.wrongQuestionCount} câu sai
+                        Lần thi thứ {deck.attemptNumber ?? '?'} • {new Date(deck.latestSubmittedAt).toLocaleString('vi-VN')} • {deck.wrongQuestionCount} câu sai
                       </p>
                     </div>
                     <button
