@@ -326,3 +326,23 @@ export const submitQuestionReport = async (
   );
   return response.data;
 };
+
+export const uploadExamSource = async (
+  title: string,
+  file: File,
+): Promise<ExamSummary> => {
+  const formData = new FormData();
+  formData.append("title", title);
+  formData.append("file", file);
+
+  const response = await examClient.post<ExamSummary>(
+    "/exams/upload-source",
+    formData,
+    {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    },
+  );
+  return response.data;
+};
