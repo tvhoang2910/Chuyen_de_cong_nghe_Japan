@@ -14,8 +14,9 @@ const {
   fetchCurrentUserProfile,
   updateCurrentUserProfile,
   uploadCurrentUserAvatar,
+  fetchDueCards,
+  fetchExamWrongDecks,
   fetchGamificationOverview,
-  fetchStudyStats,
 } = vi.hoisted(() => ({
   axiosPost: vi.fn(),
   fetchUserNotifications: vi.fn(),
@@ -25,8 +26,9 @@ const {
   fetchCurrentUserProfile: vi.fn(),
   updateCurrentUserProfile: vi.fn(),
   uploadCurrentUserAvatar: vi.fn(),
+  fetchDueCards: vi.fn(),
+  fetchExamWrongDecks: vi.fn(),
   fetchGamificationOverview: vi.fn(),
-  fetchStudyStats: vi.fn(),
 }));
 
 vi.mock('../api/axiosClient', () => ({
@@ -44,8 +46,9 @@ vi.mock('../api/axiosClient', () => ({
 }));
 
 vi.mock('../api/studyClient', () => ({
+  fetchDueCards,
+  fetchExamWrongDecks,
   fetchGamificationOverview,
-  fetchStudyStats,
 }));
 
 vi.mock('react-hot-toast', () => ({
@@ -84,12 +87,18 @@ describe('MainLayout notification bell regression', () => {
       recentUnlockedAchievements: [],
     });
 
-    fetchStudyStats.mockResolvedValue({
-      totalAttempts: 15,
-      avgScorePercent: 82,
-      streakDays: 1,
-      totalStudyMinutes: 210,
-      dueCardsCount: 3,
+    fetchDueCards.mockResolvedValue({
+      generatedAt: '2026-04-14T10:40:08.421635Z',
+      dueCount: 0,
+      limit: 1,
+      cards: [],
+    });
+
+    fetchExamWrongDecks.mockResolvedValue({
+      generatedAt: '2026-04-14T10:40:08.421635Z',
+      deckCount: 0,
+      totalWrongQuestions: 0,
+      decks: [],
     });
 
     fetchUserNotifications.mockResolvedValue({

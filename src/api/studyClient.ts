@@ -175,6 +175,7 @@ export type Sm2ExamDeck = {
   examTitle: string;
   latestAttemptId: number;
   latestSubmittedAt: string;
+  attemptNumber?: number;
   wrongQuestionCount: number;
   questions: Sm2DeckQuestion[];
 };
