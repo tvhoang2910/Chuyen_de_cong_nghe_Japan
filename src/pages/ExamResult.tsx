@@ -12,9 +12,7 @@ import { fetchAttemptResult, type AttemptResult } from "../api/examClient";
 import {
   createComment,
   fetchCommentsByExam,
-  pinComment,
   type CommentNode,
-  voteComment,
 } from "../api/commentClient";
 import { resolveCommentSubmitErrorMessage } from "../api/commentHelpers";
 import {
@@ -122,26 +120,6 @@ const ExamResult: React.FC = () => {
       console.error(error);
       const errorMessage = resolveCommentSubmitErrorMessage(error);
       toast.error(errorMessage);
-    }
-  };
-
-  const handleVote = async (commentId: number, voteType: "UP" | "DOWN") => {
-    try {
-      await voteComment(commentId, voteType);
-      await loadComments();
-    } catch (error) {
-      console.error(error);
-      toast.error("Không thể cập nhật lượt thích.");
-    }
-  };
-
-  const handleTogglePin = async (commentId: number, pinned: boolean) => {
-    try {
-      await pinComment(commentId, pinned);
-      await loadComments();
-    } catch (error) {
-      console.error(error);
-      toast.error("Không thể cập nhật trạng thái ghim.");
     }
   };
 
@@ -376,8 +354,6 @@ const ExamResult: React.FC = () => {
                   onSubmitReply={(content, parentId) =>
                     handleCommentSubmit(content, parentId)
                   }
-                  onVote={handleVote}
-                  onTogglePin={handleTogglePin}
                 />
               ))
             )}
