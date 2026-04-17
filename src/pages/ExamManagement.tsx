@@ -1,11 +1,12 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { Pencil, Trash2, Eye, Plus, Save, Megaphone, Archive, FilePlus2, Upload, Crown, Lock } from 'lucide-react';
+import { Pencil, Trash2, Eye, Plus, Save, Megaphone, Archive, FilePlus2, Upload, Crown, Lock, CloudUpload, FileText, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { AxiosError } from 'axios';
 import MainLayout from '../components/MainLayout';
 import AdminLayout from '../components/AdminLayout';
 import { ExamDifficultyBadge, type DifficultyLevel } from '../components/ExamDifficultyBadge';
+import { fetchEventSource } from '@microsoft/fetch-event-source'; 
 import {
   createGlobalTag,
   createExam,
@@ -13,6 +14,7 @@ import {
   fetchManagedExamDetail,
   fetchManagedExams,
   fetchGlobalTags,
+  uploadExamSource,
   type CreateExamPayload,
   type ExamDetail,
   type ExamQuestion,
@@ -34,7 +36,7 @@ type ExamManagementProps = {
   mode: RoleMode;
 };
 
-type PanelMode = 'none' | 'create' | 'edit' | 'view' | 'import';
+type PanelMode = 'none' | 'create' | 'edit' | 'view' | 'import'| 'upload-source';
 
 const emptyQuestion = (): ExamQuestion => ({
   content: '',
@@ -110,6 +112,11 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
   const [selectedTags, setSelectedTags] = useState<TagOption[]>([]);
   const [availableTags, setAvailableTags] = useState<TagOption[]>([]);
   const [isTagLoading, setIsTagLoading] = useState(false);
+  const [uploadTitle, setUploadTitle] = useState('');
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isUploadingSource, setIsUploadingSource] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   /** Filter for question difficulty in the question card list */
   const [difficultyFilter, setDifficultyFilter] = useState<DifficultyFilter>('');
@@ -122,6 +129,7 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
       return [...prev, tag];
     });
   };
+
 
   const handleCreateOrSelectTag = async (rawValue: string) => {
     const candidate = rawValue.trim();
@@ -214,6 +222,79 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
   }, [panelMode]);
 
   React.useEffect(() => {
+    const token = localStorage.getItem("access_token");
+    
+    // Nếu chưa đăng nhập thì không kết nối
+    if (!token) {
+      console.warn("Chưa có Token, tạm hoãn kết nối SSE.");
+      return;
+    }
+
+    // Đóng vai trò là công tắc để ngắt kết nối khi chuyển trang
+    const ctrl = new AbortController();
+
+    const connectSSE = async () => {
+      try {
+        // Dùng thư viện của Microsoft để gửi được Header Authorization
+        // Đường dẫn này nối từ examApiBaseUrl (giống các API khác trong examClient.ts)
+        const sseUrl = `${import.meta.env.VITE_EXAM_API_BASE_URL || "http://localhost:8082/api/v1/exam"}/sse/events`;
+
+        await fetchEventSource(sseUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+          signal: ctrl.signal,
+          async onopen(response) {
+            if (response.ok) {
+              console.log("Đã kết nối SSE thành công!");
+            } else {
+              console.error("Lỗi khi kết nối SSE:", response.statusText);
+            }
+          },
+          onmessage(msg) {
+            // Lắng nghe đúng sự kiện tên là "exam" (Khớp với emitter.send().name("exam") ở backend)
+            if (msg.event === 'exam') {
+              try {
+                const data = JSON.parse(msg.data);
+                console.log("SSE Nhận được data:", data);
+
+                // --- BẮT SÓNG THÀNH CÔNG ---
+                if (data.eventType === "AI_EXTRACTION_SUCCESS") {
+                  toast.success(data.message || "Đề thi đã được AI bóc tách xong!");
+                  void loadManagedExams();
+                } 
+                // --- BẮT SÓNG LỖI ---
+                else if (data.eventType === "AI_EXTRACTION_FAILED") {
+                  toast.error(data.message || "Lỗi khi AI bóc tách đề thi.");
+                }
+              } catch (err) {
+                console.error("Lỗi parse SSE JSON:", err);
+              }
+            }
+          },
+          onclose() {
+            console.log("SSE đã đóng kết nối.");
+          },
+          onerror(err) {
+            console.error("SSE Error:", err);
+            // Throw error để thư viện tự động retry, hoặc return để ngắt luôn
+          }
+        });
+      } catch (err) {
+        console.error("Lỗi khi thiết lập SSE:", err);
+      }
+    };
+
+    void connectSSE();
+
+    // Dọn dẹp kết nối khi người dùng rời khỏi trang
+    return () => {
+      ctrl.abort();
+    };
+  }, [loadManagedExams]);
+
+  React.useEffect(() => {
     if (panelMode !== 'create' && panelMode !== 'edit') {
       return;
     }
@@ -255,6 +336,12 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
   const openImport = () => {
     setImportJsonText('');
     setPanelMode('import');
+  };
+
+  const openUploadSource = () => {
+    setUploadTitle('');
+    setUploadFile(null);
+    setPanelMode('upload-source');
   };
 
   const openEdit = async (examId: number) => {
@@ -544,6 +631,54 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
       toast.error('Không thể copy tự động. Vui lòng copy thủ công từ khung mẫu.');
     }
   };
+  
+  const validateAndSetUploadFile = (file: File) => {
+    if (file.size > 50 * 1024 * 1024) { // Giới hạn 50MB
+      toast.error('File quá lớn, vui lòng chọn file dưới 50MB.');
+      return;
+    }
+    setUploadFile(file);
+  };
+
+  const handleSourceFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      validateAndSetUploadFile(e.target.files[0]);
+    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleSourceDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      validateAndSetUploadFile(e.dataTransfer.files[0]);
+    }
+  };
+
+  const submitUploadSource = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!uploadTitle.trim()) {
+      toast.error('Vui lòng nhập tiêu đề đề thi.');
+      return;
+    }
+    if (!uploadFile) {
+      toast.error('Vui lòng chọn hoặc kéo thả file.');
+      return;
+    }
+
+    try {
+      setIsUploadingSource(true);
+      await uploadExamSource(uploadTitle, uploadFile);
+      toast.success('Đã tải file lên thành công! File đang được đưa vào hàng đợi xử lý.');
+      setPanelMode('none');
+      await loadManagedExams();
+    } catch (error) {
+      const axiosError = error as AxiosError<{ message?: string }>;
+      toast.error(axiosError.response?.data?.message || 'Không thể upload file.');
+    } finally {
+      setIsUploadingSource(false);
+    }
+  };
 
   const submitForm = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -642,6 +777,14 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
           <h1 className="text-3xl font-bold text-slate-900 tracking-tight">{pageTitle}</h1>
           <p className="text-slate-500 mt-1">Đầy đủ chức năng thêm, sửa, xóa, xem và publish/archive đề thi.</p>
         </div>
+        <button
+          type="button"
+          onClick={openUploadSource}
+          className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 font-semibold text-white hover:bg-violet-700 shadow-sm"
+        >
+          <CloudUpload className="w-4 h-4" />
+          Upload File
+        </button>
         <button
           type="button"
           onClick={openCreate}
@@ -817,6 +960,127 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
                     )}
                   </div>
                 </section>
+              ) : panelMode === 'upload-source' ? (
+                <section className="h-full flex flex-col bg-slate-50/50">
+                  <div className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-4 shadow-sm z-10">
+                    <div className="flex items-center gap-2">
+                      <div className="bg-violet-100 p-2 rounded-lg text-violet-600">
+                        <CloudUpload className="w-5 h-5" />
+                      </div>
+                      <h2 className="text-xl font-bold text-slate-900">Upload File Đề Thi</h2>
+                    </div>
+                    <button
+                      type="button"
+                      className="rounded-lg bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-200 transition-colors"
+                      onClick={() => setPanelMode('none')}
+                    >
+                      Đóng
+                    </button>
+                  </div>
+
+                  <form onSubmit={submitUploadSource} className="flex-1 overflow-y-auto p-6 space-y-6 max-w-3xl mx-auto w-full">
+                    <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5">
+                      <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-1.5">
+                          Tiêu đề đề thi <span className="text-rose-500">*</span>
+                        </label>
+                        <input
+                          value={uploadTitle}
+                          onChange={(e) => setUploadTitle(e.target.value)}
+                          className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-shadow outline-none"
+                          placeholder="VD: Đề thi thử THPT Quốc Gia môn Toán 2026"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-bold text-slate-700 mb-1.5">
+                          File đính kèm (PDF, Word, Ảnh) <span className="text-rose-500">*</span>
+                        </label>
+                        
+                        <div
+                          onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                          onDragLeave={() => setIsDragging(false)}
+                          onDrop={handleSourceDrop}
+                          onClick={() => fileInputRef.current?.click()}
+                          className={`relative flex flex-col items-center justify-center w-full p-10 mt-2 border-2 border-dashed rounded-2xl cursor-pointer transition-all duration-200 ${
+                            isDragging 
+                              ? 'border-violet-500 bg-violet-50 scale-[1.02]' 
+                              : uploadFile 
+                                ? 'border-emerald-400 bg-emerald-50/50' 
+                                : 'border-slate-300 bg-slate-50 hover:bg-slate-100'
+                          }`}
+                        >
+                          <input 
+                            type="file" 
+                            ref={fileInputRef}
+                            className="hidden" 
+                            onChange={handleSourceFileSelect}
+                            accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+                          />
+                          
+                          {uploadFile ? (
+                            <div className="flex flex-col items-center text-center">
+                              <div className="bg-emerald-100 text-emerald-600 p-3 rounded-full mb-3">
+                                <FileText className="w-8 h-8" />
+                              </div>
+                              <p className="text-sm font-semibold text-slate-800 break-all px-4">{uploadFile.name}</p>
+                              <p className="text-xs text-slate-500 mt-1">
+                                {(uploadFile.size / 1024 / 1024).toFixed(2)} MB
+                              </p>
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); setUploadFile(null); }}
+                                className="mt-4 flex items-center gap-1 text-xs font-semibold text-rose-600 hover:text-rose-700 bg-white px-3 py-1.5 rounded-lg border border-rose-200 shadow-sm"
+                              >
+                                <X className="w-3 h-3" /> Bỏ chọn file
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center text-center">
+                              <div className="bg-white text-slate-400 p-3 rounded-full mb-3 shadow-sm border border-slate-100">
+                                <CloudUpload className="w-8 h-8" />
+                              </div>
+                              <p className="text-sm font-semibold text-slate-700">
+                                Kéo thả file vào đây hoặc <span className="text-violet-600">tải lên từ máy</span>
+                              </p>
+                              <p className="text-xs text-slate-500 mt-2">
+                                Hỗ trợ PDF, Word, Ảnh (Tối đa 50MB)
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setPanelMode('none')}
+                        className="px-5 py-2.5 rounded-xl font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition-colors"
+                      >
+                        Hủy
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isUploadingSource || !uploadTitle.trim() || !uploadFile}
+                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-violet-600 px-6 py-2.5 font-bold text-white shadow-sm shadow-violet-200 hover:bg-violet-700 disabled:bg-violet-400 transition-all"
+                      >
+                        {isUploadingSource ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            Đang upload...
+                          </>
+                        ) : (
+                          <>
+                            <CloudUpload className="w-4 h-4" /> Bắt đầu Upload
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                </section>
+
               ) : panelMode === 'import' ? (
                 <section className="h-full flex flex-col">
                   <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
