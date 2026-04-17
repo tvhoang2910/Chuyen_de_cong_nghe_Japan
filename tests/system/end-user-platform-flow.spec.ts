@@ -97,22 +97,6 @@ const requestJson = async <T>(
   return { status: response.status(), body };
 };
 
-const requestNoAuthJson = async <T>(
-  request: APIRequestContext,
-  url: string,
-): Promise<{ status: number; body: T | null }> => {
-  const response = await request.get(url, {
-    headers: { Accept: 'application/json' },
-    failOnStatusCode: false,
-    timeout: 20_000,
-  });
-  const text = await response.text();
-  return {
-    status: response.status(),
-    body: text ? (JSON.parse(text) as T) : null,
-  };
-};
-
 const getJwtUserId = (token: string): number | null => {
   const segments = token.split('.');
   if (segments.length < 2) {
@@ -202,21 +186,13 @@ const resolveFlowActor = async (request: APIRequestContext): Promise<FlowActor> 
 };
 
 const ensurePublishedExam = async (request: APIRequestContext, adminToken: string): Promise<PublicExam> => {
-  const publicExamsResponse = await requestNoAuthJson<PublicExam[]>(request, `${ctx.examBaseUrl}/exams/public`);
-  expect(publicExamsResponse.status).toBe(200);
-
-  const nonPremiumExam = (publicExamsResponse.body ?? []).find((exam) => !exam.premium);
-  if (nonPremiumExam) {
-    return nonPremiumExam;
-  }
-
   const timestamp = Date.now();
   const createExamPayload = {
     title: `E2E Published Exam ${timestamp}`,
     description: 'End-user platform flow E2E exam',
     durationMinutes: 25,
     passingScore: 50,
-    maxAttempts: 5,
+    maxAttempts: 100,
     premium: false,
     teaserQuestionCount: 2,
     tagIds: [],
