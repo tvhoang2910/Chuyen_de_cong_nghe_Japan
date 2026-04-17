@@ -106,9 +106,9 @@ const AdminUsers: React.FC = () => {
         search: searchKeyword,
         role: roleFilter,
       });
-      setUsers(response.content);
-      setTotalPages(response.totalPages);
-      setTotalElements(response.totalElements);
+      setUsers(Array.isArray(response.content) ? response.content : []);
+      setTotalPages(Number.isFinite(response.totalPages) ? response.totalPages : 0);
+      setTotalElements(Number.isFinite(response.totalElements) ? response.totalElements : 0);
     } catch (error) {
       if (axios.isAxiosError(error) && error.response?.status === 403) {
         toast.error('Bạn không có quyền truy cập trang Admin.');

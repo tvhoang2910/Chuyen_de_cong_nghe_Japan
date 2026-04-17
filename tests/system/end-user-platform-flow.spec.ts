@@ -162,7 +162,7 @@ const resolveFlowActor = async (request: APIRequestContext): Promise<FlowActor> 
       email: ctx.userIdentity.email,
       fullName: 'System Flow User',
       password: FLOW_FALLBACK_PASSWORD,
-      role: 'USER',
+      role: 'CONTRIBUTOR',
     },
     failOnStatusCode: false,
     timeout: 20_000,
@@ -174,10 +174,30 @@ const resolveFlowActor = async (request: APIRequestContext): Promise<FlowActor> 
     );
   }
 
-  // Fallback to signed USER token for deterministic end-user flow when bootstrap admin credentials are unavailable.
+  const fallbackLoginResponse = await request.post(`${ctx.authBaseUrl}/login`, {
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    data: {
+      email: ctx.userIdentity.email,
+      password: FLOW_FALLBACK_PASSWORD,
+    },
+    failOnStatusCode: false,
+    timeout: 20_000,
+  });
+
+  const fallbackLoginText = await fallbackLoginResponse.text();
+  const fallbackLoginBody = fallbackLoginText
+    ? (JSON.parse(fallbackLoginText) as AuthTokenResponse)
+    : null;
+
+  if (fallbackLoginResponse.status() !== 200 || !fallbackLoginBody?.accessToken) {
+    throw new Error(
+      `Fallback contributor login failed. status=${fallbackLoginResponse.status()} body=${fallbackLoginText}`,
+    );
+  }
+
   return {
-    token: ctx.userToken,
-    userId: ctx.userIdentity.userId,
+    token: fallbackLoginBody.accessToken,
+    userId: getJwtUserId(fallbackLoginBody.accessToken) ?? ctx.userIdentity.userId,
   };
 };
 
@@ -271,7 +291,7 @@ test.describe.serial('End-user full platform journey (real services)', () => {
 
   test('user can complete exam flow then access study and community modules', async ({ request }) => {
     const flowActor = await resolveFlowActor(request);
-    const selectedExam = await ensurePublishedExam(request, ctx.adminToken);
+    const selectedExam = await ensurePublishedExam(request, flowActor.token);
 
     const attemptViewRes = await requestJson<AttemptViewExam>(
       request,

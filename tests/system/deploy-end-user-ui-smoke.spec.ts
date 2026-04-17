@@ -150,17 +150,69 @@ const uploadAvatarAndAssertProxyUrl = async (request: APIRequestContext, user: D
   expect(avatarUrl).not.toContain('minio:9000');
 };
 
-const ensureBillExistsForUser = async (request: APIRequestContext, user: DemoUser): Promise<number> => {
-  const plansRes = await request.get(`${ctx.authBaseUrl}/subscriptions/plans`, {
-    headers: authHeaders(user.token),
+const ensurePremiumPlansAvailable = async (
+  request: APIRequestContext,
+  userToken: string,
+): Promise<PremiumPlanSummary[]> => {
+  const loadPlans = async (): Promise<{ status: number; text: string; plans: PremiumPlanSummary[] }> => {
+    const response = await request.get(`${ctx.authBaseUrl}/subscriptions/plans`, {
+      headers: authHeaders(userToken),
+      failOnStatusCode: false,
+      timeout: 20_000,
+    });
+
+    const responseText = await response.text();
+    const responsePlans = responseText ? (JSON.parse(responseText) as PremiumPlanSummary[]) : [];
+    return {
+      status: response.status(),
+      text: responseText,
+      plans: Array.isArray(responsePlans) ? responsePlans : [],
+    };
+  };
+
+  const initial = await loadPlans();
+  if (initial.status !== 200) {
+    throw new Error(`Cannot load premium plans. status=${initial.status} body=${initial.text}`);
+  }
+  if (initial.plans.length > 0) {
+    return initial.plans;
+  }
+
+  const adminToken = await loginAndGetToken(request, ctx.adminLoginEmail, ctx.adminLoginPassword);
+  const seedName = `E2E Premium Plan ${Date.now()}`;
+  const createPlanRes = await request.post(`${ctx.authBaseUrl}/subscriptions/plans`, {
+    headers: authJsonHeaders(adminToken),
+    data: {
+      name: seedName,
+      price: 99000,
+      durationDays: 30,
+      lifetime: false,
+      description: 'Auto-seeded by Playwright system test',
+      active: true,
+    },
     failOnStatusCode: false,
     timeout: 20_000,
   });
-  const plansText = await plansRes.text();
-  const plans = plansText ? (JSON.parse(plansText) as PremiumPlanSummary[]) : [];
-  if (plansRes.status() !== 200 || !Array.isArray(plans) || plans.length === 0) {
-    throw new Error(`Cannot load premium plans. status=${plansRes.status()} body=${plansText}`);
+
+  if (createPlanRes.status() !== 201) {
+    const createText = await createPlanRes.text();
+    throw new Error(
+      `Cannot seed premium plan for E2E. status=${createPlanRes.status()} body=${createText}`,
+    );
   }
+
+  const afterSeed = await loadPlans();
+  if (afterSeed.status !== 200 || afterSeed.plans.length === 0) {
+    throw new Error(
+      `Premium plans are still unavailable after auto-seed. status=${afterSeed.status} body=${afterSeed.text}`,
+    );
+  }
+
+  return afterSeed.plans;
+};
+
+const ensureBillExistsForUser = async (request: APIRequestContext, user: DemoUser): Promise<number> => {
+  const plans = await ensurePremiumPlansAvailable(request, user.token);
 
   const myRequestsBeforeRes = await request.get(`${ctx.authBaseUrl}/subscriptions/my-requests`, {
     headers: authHeaders(user.token),

@@ -282,10 +282,11 @@ test.describe('Spaced repetition list page', () => {
       },
     ];
 
+    let refreshClicked = false;
     let callCount = 0;
     await page.route('**/api/v1/study/spaced-repetition/me/exam-decks', async (route: Route) => {
-      const body = responses[Math.min(callCount, responses.length - 1)];
       callCount += 1;
+      const body = refreshClicked ? responses[1] : responses[0];
 
       await route.fulfill({
         status: 200,
@@ -297,6 +298,7 @@ test.describe('Spaced repetition list page', () => {
     await page.goto('/dashboard/spaced-repetition');
     await expect(page.getByRole('heading', { name: /Exam First - các câu sai/i })).toBeVisible();
 
+    refreshClicked = true;
     await page.getByRole('button', { name: 'Làm mới' }).click();
 
     await expect(page.getByRole('heading', { name: /Exam Refreshed - các câu sai/i })).toBeVisible();
