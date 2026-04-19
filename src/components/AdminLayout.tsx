@@ -17,7 +17,8 @@ import {
   Gem,
   BookOpen,
   Flag,
-  Trophy
+  Trophy,
+  Upload
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axiosClient, { 
@@ -240,6 +241,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     { label: 'Dashboard', icon: LayoutDashboard, path: '/admin/dashboard' },
     { label: 'Quản lý Users', icon: Users, path: '/admin/users' },
     { label: 'Quản lý đề thi', icon: BookOpen, path: '/admin/exams' },
+    { label: 'Duyệt upload', icon: Upload, path: '/admin/upload-queue' },
     { label: 'Kho thành tựu', icon: Trophy, path: '/admin/achievements' },
     { label: 'Báo cáo câu hỏi', icon: Flag, path: '/admin/reports' },
     { label: 'Quản lý gói Premium', icon: Gem, path: '/admin/premium-plans' },

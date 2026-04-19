@@ -19,7 +19,9 @@ import {
   ClipboardCheck,
   Gem,
   Flag,
-  Settings2
+  Settings2,
+  Upload,
+  FileUp
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axiosClient, { 
@@ -499,12 +501,16 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, fallbackStreakDays, f
     { label: 'Duyệt thanh toán', icon: ClipboardCheck, path: '/contributor/subscription-reviews' },
     { label: 'Báo cáo câu hỏi', icon: Flag, path: '/contributor/reports' },
     { label: 'Đề thi của tôi', icon: BookOpen, path: '/contributor/exams' },
+    { label: 'Upload đề', icon: Upload, path: '/upload-exam' },
+    { label: 'Đề đã upload', icon: FileUp, path: '/my-uploads' },
     { label: 'Thống kê', icon: Zap, path: '/contributor/analytics' },
   ] : [
     { label: 'Tổng quan', icon: LayoutDashboard, path: '/dashboard' },
     { label: 'Nâng cấp Premium', icon: Banknote, path: '/dashboard/subscription-payments' },
     { label: 'Cài đặt thông báo', icon: Settings2, path: '/dashboard/notifications' },
     { label: 'Kho đề công khai', icon: BookOpen, path: '/dashboard/exams' },
+    { label: 'Upload đề', icon: Upload, path: '/upload-exam' },
+    { label: 'Đề đã upload', icon: FileUp, path: '/my-uploads' },
     { label: 'Học tập (SM-2)', icon: Zap, path: '/dashboard/spaced-repetition' },
     { label: 'Gamification', icon: Flame, path: '/dashboard/gamification' },
   ];

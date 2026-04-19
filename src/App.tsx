@@ -39,6 +39,9 @@ const SubscriptionReviewQueue = lazy(() => import('./pages/SubscriptionReviewQue
 const PremiumPlanManagement = lazy(() => import('./pages/PremiumPlanManagement'));
 const AdminReports = lazy(() => import('./pages/AdminReports'));
 const CommentsPage = lazy(() => import('./pages/CommentsPage'));
+const UserExamUpload = lazy(() => import('./pages/UserExamUpload'));
+const MyExamUploads = lazy(() => import('./pages/MyExamUploads'));
+const AdminUploadQueue = lazy(() => import('./pages/AdminUploadQueue'));
 
 const RouteLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-600 font-semibold italic animate-pulse">
@@ -507,6 +510,60 @@ function App() {
               }
             />
             <Route path="/admin" element={<Navigate to="/admin/users" />} />
+
+            {/* Exam Upload (shared) */}
+            <Route
+              path="/upload-exam"
+              element={
+                <ProtectedRoute
+                  isAuthenticated={effectiveIsAuthenticated}
+                  userRole={effectiveRole}
+                  defaultPath={defaultAuthenticatedPath}
+                  allowedRoles={['USER', 'CONTRIBUTOR', 'ADMIN']}
+                >
+                  <UserExamUpload />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/my-uploads"
+              element={
+                <ProtectedRoute
+                  isAuthenticated={effectiveIsAuthenticated}
+                  userRole={effectiveRole}
+                  defaultPath={defaultAuthenticatedPath}
+                  allowedRoles={['USER', 'CONTRIBUTOR', 'ADMIN']}
+                >
+                  <MyExamUploads />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/upload-queue"
+              element={
+                <ProtectedRoute
+                  isAuthenticated={effectiveIsAuthenticated}
+                  userRole={effectiveRole}
+                  defaultPath={defaultAuthenticatedPath}
+                  allowedRoles={['ADMIN', 'CONTRIBUTOR']}
+                >
+                  <AdminUploadQueue />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/contributor/upload-queue"
+              element={
+                <ProtectedRoute
+                  isAuthenticated={effectiveIsAuthenticated}
+                  userRole={effectiveRole}
+                  defaultPath={defaultAuthenticatedPath}
+                  allowedRoles={['CONTRIBUTOR', 'ADMIN']}
+                >
+                  <AdminUploadQueue />
+                </ProtectedRoute>
+              }
+            />
 
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/" />} />

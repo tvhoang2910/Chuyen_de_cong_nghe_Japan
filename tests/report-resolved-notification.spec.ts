@@ -62,6 +62,34 @@ async function mockContributorShellApis(page: Page): Promise<void> {
       body: '{}',
     });
   });
+
+  await page.route('**/api/v1/auth/notifications**', async (route: Route) => {
+    const method = route.request().method();
+
+    if (method === 'PATCH') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ updatedCount: 0 }),
+      });
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        content: [],
+        number: 0,
+        size: 5,
+        totalElements: 0,
+        totalPages: 0,
+        first: true,
+        last: true,
+        unreadCount: 0,
+      }),
+    });
+  });
 }
 
 test.describe('Report resolved notification flow', () => {
