@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Crown, Lock } from "lucide-react";
+import { Crown, Lock, Search, X } from "lucide-react";
 import toast from "react-hot-toast";
 import MainLayout from "../components/MainLayout";
 import { fetchPublicExams, type ExamSummary } from "../api/examClient";
@@ -16,10 +16,38 @@ type PublicExamRow = ExamSummary & {
   rating: ExamRatingSummary | null;
 };
 
+type TagStat = {
+  name: string;
+  count: number;
+};
+
+const normalizeForSearch = (value: string): string =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .toLowerCase()
+    .trim();
+
+const normalizeTags = (raw: string): string[] => {
+  const deduplicated = new Set(
+    raw
+      .split(",")
+      .map((tag) => tag.trim())
+      .filter(Boolean),
+  );
+  return Array.from(deduplicated);
+};
+
 const PublicExams: React.FC = () => {
   const [exams, setExams] = useState<ExamSummary[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [sortMode, setSortMode] = useState<SortMode>("rating-desc");
+  const [keywordInput, setKeywordInput] = useState("");
+  const [tagsInput, setTagsInput] = useState("");
+  const [searchKeyword, setSearchKeyword] = useState("");
+  const [searchTags, setSearchTags] = useState<string[]>([]);
   const [ratingsByExamId, setRatingsByExamId] = useState<
     Record<number, ExamRatingSummary>
   >({});
@@ -28,6 +56,7 @@ const PublicExams: React.FC = () => {
     try {
       setIsLoading(true);
       const data = await fetchPublicExams();
+
       setExams(data);
 
       if (data.length > 0) {
@@ -50,21 +79,95 @@ const PublicExams: React.FC = () => {
         setRatingsByExamId({});
       }
     } catch {
-      toast.error("Không tải được danh sách đề thi công khai.");
+      toast.error("Không tải được dữ liệu kho đề.");
+      setExams([]);
+      setRatingsByExamId({});
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSearchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const normalizedKeyword = keywordInput.trim();
+    const normalizedTags = normalizeTags(tagsInput);
+    setSearchKeyword(normalizedKeyword);
+    setSearchTags(normalizedTags);
+  };
+
+  const handleResetFilters = () => {
+    setKeywordInput("");
+    setTagsInput("");
+    setSearchKeyword("");
+    setSearchTags([]);
+  };
+
+  const handleQuickTagToggle = (tagName: string) => {
+    setSearchTags((current) => {
+      const normalizedCurrent = current.map(normalizeForSearch);
+      const normalizedTag = normalizeForSearch(tagName);
+      let next: string[];
+
+      if (normalizedCurrent.includes(normalizedTag)) {
+        next = current.filter((tag) => normalizeForSearch(tag) !== normalizedTag);
+      } else {
+        next = [...current, tagName];
+      }
+
+      setTagsInput(next.join(", "));
+      return next;
+    });
   };
 
   useEffect(() => {
     void loadPublicExams();
   }, []);
 
+  const allTags = useMemo<TagStat[]>(() => {
+    const counter = new Map<string, TagStat>();
+    exams.forEach((exam) => {
+      exam.tags.forEach((tag) => {
+        const normalized = normalizeForSearch(tag.name);
+        const existing = counter.get(normalized);
+        if (existing) {
+          existing.count += 1;
+          return;
+        }
+        counter.set(normalized, { name: tag.name, count: 1 });
+      });
+    });
+
+    return Array.from(counter.values()).sort((left, right) => {
+      if (right.count !== left.count) {
+        return right.count - left.count;
+      }
+      return left.name.localeCompare(right.name, "vi");
+    });
+  }, [exams]);
+
   const visibleExams = useMemo<PublicExamRow[]>(() => {
+    const normalizedKeyword = normalizeForSearch(searchKeyword);
+    const normalizedFilterTags = searchTags.map(normalizeForSearch);
+
     const rows = exams.map((exam) => ({
       ...exam,
       rating: ratingsByExamId[exam.id] ?? null,
-    }));
+    })).filter((exam) => {
+      const searchableText = normalizeForSearch(
+        [exam.title, exam.description ?? "", ...exam.tags.map((tag) => tag.name)].join(" "),
+      );
+
+      const matchesKeyword =
+        !normalizedKeyword || searchableText.includes(normalizedKeyword);
+
+      const matchesTags =
+        normalizedFilterTags.length === 0 ||
+        normalizedFilterTags.every((filterTag) =>
+          exam.tags.some((tag) => normalizeForSearch(tag.name).includes(filterTag)),
+        );
+
+      return matchesKeyword && matchesTags;
+    });
 
     const sorted = [...rows].sort((left, right) => {
       if (sortMode === "newest-desc") {
@@ -86,7 +189,7 @@ const PublicExams: React.FC = () => {
     });
 
     return sorted;
-  }, [exams, ratingsByExamId, sortMode]);
+  }, [exams, ratingsByExamId, sortMode, searchKeyword, searchTags]);
 
   return (
     <MainLayout>
@@ -96,12 +199,97 @@ const PublicExams: React.FC = () => {
             Kho đề thi công khai
           </h1>
           <p className="text-slate-500 mt-1">
-            Người dùng có thể xem các đề đã được public bởi contributor/admin.
+            Người dùng có thể tìm kiếm và xem các đề đã được công khai bởi contributor/admin.
           </p>
         </div>
 
         <div className="grid grid-cols-1 gap-6">
           <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <form
+              onSubmit={handleSearchSubmit}
+              className="mb-4 grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto]"
+            >
+              <label className="relative block">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  value={keywordInput}
+                  onChange={(event) => setKeywordInput(event.target.value)}
+                  placeholder="Tìm theo từ khóa (ví dụ: toán 12)"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-3 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                />
+              </label>
+
+              <input
+                value={tagsInput}
+                onChange={(event) => setTagsInput(event.target.value)}
+                placeholder="Lọc tags, ngăn cách dấu phẩy (toán, hình học)"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              />
+
+              <button
+                type="submit"
+                className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
+              >
+                Tìm kiếm
+              </button>
+
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="inline-flex items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+              >
+                <X className="h-4 w-4" />
+                Xóa lọc
+              </button>
+            </form>
+
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Tags phổ biến:
+              </span>
+              {allTags.map((tag) => {
+                const isSelected = searchTags
+                  .map(normalizeForSearch)
+                  .includes(normalizeForSearch(tag.name));
+
+                return (
+                  <button
+                    key={tag.name}
+                    type="button"
+                    onClick={() => handleQuickTagToggle(tag.name)}
+                    className={`rounded-full px-2.5 py-1 text-xs font-semibold transition ${
+                      isSelected
+                        ? "border border-blue-200 bg-blue-50 text-blue-700"
+                        : "border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    #{tag.name} ({tag.count})
+                  </button>
+                );
+              })}
+            </div>
+
+            {(searchKeyword || searchTags.length > 0) && (
+              <div className="mb-4 flex flex-wrap items-center gap-2">
+                <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Bộ lọc đang áp dụng:
+                </span>
+                {searchKeyword && (
+                  <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                    Từ khóa: {searchKeyword}
+                  </span>
+                )}
+                {searchTags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700"
+                  >
+                    #{tag}
+                  </span>
+                ))}
+              </div>
+            )}
+
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <h2 className="text-xl font-bold text-slate-900">Danh sách đề</h2>
               <div className="flex flex-wrap items-center gap-3">
