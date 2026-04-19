@@ -88,6 +88,43 @@ const examUploadClient = axios.create({
   },
 });
 
+const shouldRewriteStorageUrl = (): boolean => {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  return window.location.protocol === "https:";
+};
+
+const isInternalMinioHost = (hostname: string): boolean => {
+  const normalized = hostname.toLowerCase();
+  return (
+    normalized === "minio" ||
+    normalized === "localhost" ||
+    normalized === "127.0.0.1"
+  );
+};
+
+export const toBrowserSafeStorageUrl = (
+  rawUrl: string,
+  forceRewrite?: boolean,
+): string => {
+  const shouldRewrite = forceRewrite ?? shouldRewriteStorageUrl();
+  if (!shouldRewrite) {
+    return rawUrl;
+  }
+
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.protocol !== "http:" || !isInternalMinioHost(parsed.hostname)) {
+      return rawUrl;
+    }
+
+    return `/minio${parsed.pathname}${parsed.search}`;
+  } catch {
+    return rawUrl;
+  }
+};
+
 examUploadClient.interceptors.request.use((config) => {
   const token = localStorage.getItem("access_token");
   if (token) {
@@ -103,14 +140,20 @@ export const initiateUpload = async (
     "/uploads/initiate",
     payload,
   );
-  return response.data;
+  return {
+    ...response.data,
+    pages: response.data.pages.map((page) => ({
+      ...page,
+      url: toBrowserSafeStorageUrl(page.url),
+    })),
+  };
 };
 
 export const uploadPageToStorage = async (
   presignedUrl: string,
   file: File,
 ): Promise<void> => {
-  const response = await fetch(presignedUrl, {
+  const response = await fetch(toBrowserSafeStorageUrl(presignedUrl), {
     method: "PUT",
     body: file,
     headers: {
@@ -159,7 +202,10 @@ export const fetchUploadDetail = async (
   const response = await examUploadClient.get<ExamUploadResponse>(
     `/uploads/${uploadId}`,
   );
-  return response.data;
+  return {
+    ...response.data,
+    viewUrls: response.data.viewUrls?.map((url) => toBrowserSafeStorageUrl(url)),
+  };
 };
 
 export const fetchUploadHistory = async (

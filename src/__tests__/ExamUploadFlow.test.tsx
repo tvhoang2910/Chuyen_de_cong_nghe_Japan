@@ -311,4 +311,106 @@ describe('AdminUploadQueue', () => {
     expect(screen.queryByTestId('extracting-overlay')).not.toBeInTheDocument();
     expect(fetchPendingQueue).toHaveBeenCalledTimes(2);
   });
+
+  it('closes extracting overlay when polling detects EXTRACTED without SSE', async () => {
+    fetchUploadDetail
+      .mockResolvedValueOnce({
+        id: 7,
+        uploaderId: 9,
+        uploaderRole: 'USER',
+        title: 'Đề Vật Lý 12',
+        pageCount: 1,
+        status: 'PENDING_APPROVAL',
+        createdAt: '2026-04-17T00:00:00Z',
+        modifiedAt: '2026-04-17T00:00:00Z',
+        viewUrls: ['https://minio.local/p/0.png'],
+      })
+      .mockResolvedValueOnce({
+        id: 7,
+        uploaderId: 9,
+        uploaderRole: 'USER',
+        title: 'Đề Vật Lý 12',
+        pageCount: 1,
+        status: 'EXTRACTED',
+        createdAt: '2026-04-17T00:00:00Z',
+        modifiedAt: '2026-04-17T00:00:00Z',
+        extractedExamId: 99,
+        viewUrls: ['https://minio.local/p/0.png'],
+      });
+
+    render(
+      <MemoryRouter>
+        <AdminUploadQueue />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Đề Vật Lý 12')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('upload-row-7'));
+    await waitFor(() => {
+      expect(screen.getByTestId('approve-btn')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('approve-btn'));
+    await waitFor(() => expect(approveUpload).toHaveBeenCalledWith(7));
+    expect(screen.getByTestId('extracting-overlay')).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('extracting-overlay')).not.toBeInTheDocument();
+    }, { timeout: 7000 });
+    expect(fetchUploadDetail).toHaveBeenCalledTimes(2);
+  });
+
+  it('closes extracting overlay when polling detects EXTRACT_FAILED without SSE', async () => {
+    fetchUploadDetail
+      .mockResolvedValueOnce({
+        id: 7,
+        uploaderId: 9,
+        uploaderRole: 'USER',
+        title: 'Đề Vật Lý 12',
+        pageCount: 1,
+        status: 'PENDING_APPROVAL',
+        createdAt: '2026-04-17T00:00:00Z',
+        modifiedAt: '2026-04-17T00:00:00Z',
+        viewUrls: ['https://minio.local/p/0.png'],
+      })
+      .mockResolvedValueOnce({
+        id: 7,
+        uploaderId: 9,
+        uploaderRole: 'USER',
+        title: 'Đề Vật Lý 12',
+        pageCount: 1,
+        status: 'EXTRACT_FAILED',
+        extractionError: 'AI returned 0 questions',
+        createdAt: '2026-04-17T00:00:00Z',
+        modifiedAt: '2026-04-17T00:00:00Z',
+        viewUrls: ['https://minio.local/p/0.png'],
+      });
+
+    render(
+      <MemoryRouter>
+        <AdminUploadQueue />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Đề Vật Lý 12')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('upload-row-7'));
+    await waitFor(() => {
+      expect(screen.getByTestId('approve-btn')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('approve-btn'));
+    await waitFor(() => expect(approveUpload).toHaveBeenCalledWith(7));
+    expect(screen.getByTestId('extracting-overlay')).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('extracting-overlay')).not.toBeInTheDocument();
+    }, { timeout: 7000 });
+    expect(fetchUploadDetail).toHaveBeenCalledTimes(2);
+  });
 });

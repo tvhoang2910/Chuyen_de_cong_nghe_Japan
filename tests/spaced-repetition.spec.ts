@@ -268,7 +268,7 @@ test.describe('Spaced repetition list page', () => {
 
     await page.goto('/dashboard/spaced-repetition');
 
-    await expect(page.getByRole('heading', { name: /Ôn tập thông minh từ study_service/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Ôn tập thông minh/i })).toBeVisible();
     await expect(page.getByRole('heading', { name: /Exam Geography - các câu sai/i })).toBeVisible();
 
     const dueCard = page.getByText('Câu đến hạn').locator('xpath=..');

@@ -701,7 +701,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, fallbackStreakDays, f
               </div>
               <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 rounded-lg border border-amber-100/50">
                 <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
-                <span className="text-xs font-bold text-amber-700">{fallbackPoints ?? gamificationOverview?.points ?? 0} Pts</span>
+                <span className="text-xs font-bold text-amber-700">{gamificationOverview?.points ?? fallbackPoints ?? 0} Pts</span>
               </div>
             </div>
             <div ref={notificationRef} className="relative">

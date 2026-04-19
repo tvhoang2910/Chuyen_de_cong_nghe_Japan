@@ -26,6 +26,8 @@ import {
 import { useExamEventsSSE } from "../hooks/useExamEventsSSE";
 
 const PAGE_SIZE = 10;
+const EXTRACTION_POLL_INTERVAL_MS = 4000;
+const EXTRACTION_POLL_TIMEOUT_MS = 5 * 60 * 1000;
 
 const rejectSchema = z.object({
   reason: z
@@ -61,6 +63,11 @@ const AdminUploadQueue: React.FC = () => {
   const extractingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
+  const extractionPollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
+    null,
+  );
+  const extractionPollingInFlightRef = useRef(false);
+  const extractionStartedAtRef = useRef<number | null>(null);
 
   const accessToken =
     typeof window === "undefined"
@@ -120,6 +127,12 @@ const AdminUploadQueue: React.FC = () => {
       clearTimeout(extractingTimeoutRef.current);
       extractingTimeoutRef.current = null;
     }
+    if (extractionPollIntervalRef.current) {
+      clearInterval(extractionPollIntervalRef.current);
+      extractionPollIntervalRef.current = null;
+    }
+    extractionPollingInFlightRef.current = false;
+    extractionStartedAtRef.current = null;
     reset();
   }, [reset]);
 
@@ -180,10 +193,76 @@ const AdminUploadQueue: React.FC = () => {
     };
   }, [extractingUploadId, subscribe, closeDetail, loadQueue, page]);
 
+  // Polling fallback: prevents infinite loading if SSE is delayed/missing.
+  useEffect(() => {
+    if (extractingUploadId === null) {
+      return undefined;
+    }
+
+    extractionStartedAtRef.current = Date.now();
+
+    const pollExtractionStatus = async () => {
+      if (extractionPollingInFlightRef.current) {
+        return;
+      }
+      extractionPollingInFlightRef.current = true;
+
+      try {
+        const detail = await fetchUploadDetail(extractingUploadId);
+        setSelectedDetail((previous) =>
+          previous && previous.id === detail.id ? detail : previous,
+        );
+
+        if (detail.status === "EXTRACTED") {
+          toast.success("Đã trích xuất xong.");
+          setExtractingUploadId(null);
+          closeDetail();
+          void loadQueue(page);
+          return;
+        }
+
+        if (detail.status === "EXTRACT_FAILED") {
+          toast.error(detail.extractionError ?? "Trích xuất thất bại.");
+          setExtractingUploadId(null);
+          closeDetail();
+          void loadQueue(page);
+          return;
+        }
+
+        const startedAt = extractionStartedAtRef.current;
+        if (startedAt && Date.now() - startedAt > EXTRACTION_POLL_TIMEOUT_MS) {
+          toast.error("Trích xuất đang mất lâu hơn bình thường. Vui lòng kiểm tra lại hàng đợi.");
+          setExtractingUploadId(null);
+          closeDetail();
+          void loadQueue(page);
+        }
+      } catch {
+        // Ignore transient poll failures; user can still receive SSE resolution.
+      } finally {
+        extractionPollingInFlightRef.current = false;
+      }
+    };
+
+    extractionPollIntervalRef.current = setInterval(() => {
+      void pollExtractionStatus();
+    }, EXTRACTION_POLL_INTERVAL_MS);
+
+    return () => {
+      if (extractionPollIntervalRef.current) {
+        clearInterval(extractionPollIntervalRef.current);
+        extractionPollIntervalRef.current = null;
+      }
+      extractionPollingInFlightRef.current = false;
+    };
+  }, [extractingUploadId, closeDetail, loadQueue, page]);
+
   useEffect(() => {
     return () => {
       if (extractingTimeoutRef.current) {
         clearTimeout(extractingTimeoutRef.current);
+      }
+      if (extractionPollIntervalRef.current) {
+        clearInterval(extractionPollIntervalRef.current);
       }
     };
   }, []);

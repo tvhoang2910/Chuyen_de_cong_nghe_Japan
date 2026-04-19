@@ -59,7 +59,7 @@ const SpacedRepetition: React.FC = () => {
                 <Brain className="h-4 w-4" />
                 Học tập SM-2
               </div>
-              <h1 className="mt-3 text-2xl font-bold">Ôn tập thông minh từ study_service</h1>
+              <h1 className="mt-3 text-2xl font-bold">Ôn tập thông minh</h1>
               <p className="mt-1 text-blue-100">Deck theo đề thi, bấm nút Luyện tập để mở trang câu hỏi riêng cho mỗi đề.</p>
             </div>
             <button
