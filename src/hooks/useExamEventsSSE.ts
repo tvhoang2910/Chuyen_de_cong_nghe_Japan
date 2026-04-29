@@ -20,6 +20,7 @@ export interface ExamSseEvent {
   eventType: ExamSseEventType;
   activeAttemptCount?: number;
   totalSubmissionsToday?: number;
+  examId?: number;
   examTitle?: string;
   userId?: number;
   uploadRequestId?: number;

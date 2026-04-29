@@ -105,6 +105,15 @@ const importSampleExam = {
 
 const importSampleJsonText = JSON.stringify(importSampleExam, null, 2);
 
+const ALLOWED_UPLOAD_MIME_TYPES = [
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+] as const;
+const ALLOWED_UPLOAD_ACCEPT = '.pdf,.jpg,.jpeg,.png,.webp';
+const ALLOWED_UPLOAD_LABEL = 'PDF, PNG, JPG, WEBP';
+
 const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
   const [exams, setExams] = useState<ExamSummary[]>([]);
   const [selectedExam, setSelectedExam] = useState<ExamDetail | null>(null);
@@ -714,6 +723,11 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
       toast.error('File quá lớn, vui lòng chọn file dưới 50MB.');
       return;
     }
+    const allowedTypes = ALLOWED_UPLOAD_MIME_TYPES as readonly string[];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error(`Định dạng không hỗ trợ: ${file.name}.`);
+      return;
+    }
     setUploadFile(file);
   };
 
@@ -1104,7 +1118,7 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
 
                       <div>
                         <label className="block text-sm font-bold text-slate-700 mb-1.5">
-                          File đính kèm (PDF, Word, Ảnh) <span className="text-rose-500">*</span>
+                          File đính kèm ({ALLOWED_UPLOAD_LABEL}) <span className="text-rose-500">*</span>
                         </label>
                         
                         <div
@@ -1134,7 +1148,7 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
                             ref={fileInputRef}
                             className="hidden" 
                             onChange={handleSourceFileSelect}
-                            accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+                            accept={ALLOWED_UPLOAD_ACCEPT}
                           />
                           
                           {uploadFile ? (
@@ -1163,7 +1177,7 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
                                 Kéo thả file vào đây hoặc <span className="text-violet-600">tải lên từ máy</span>
                               </p>
                               <p className="text-xs text-slate-500 mt-2">
-                                Hỗ trợ PDF, Word, Ảnh (Tối đa 50MB)
+                                Hỗ trợ {ALLOWED_UPLOAD_LABEL} (Tối đa 50MB)
                               </p>
                             </div>
                           )}

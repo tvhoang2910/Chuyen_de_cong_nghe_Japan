@@ -11,6 +11,7 @@ import {
   fetchExamRatingSummaries,
   type ExamRatingSummary,
 } from '../api/examRatingClient';
+import { searchExams } from '../api/searchClient';
 import PublicExams from '../pages/PublicExams';
 
 vi.mock('../api/examClient', async () => {
@@ -32,6 +33,17 @@ vi.mock('../api/examRatingClient', async () => {
   return {
     ...actual,
     fetchExamRatingSummaries: vi.fn(),
+  };
+});
+
+vi.mock('../api/searchClient', async () => {
+  const actual = await vi.importActual<typeof import('../api/searchClient')>(
+    '../api/searchClient',
+  );
+
+  return {
+    ...actual,
+    searchExams: vi.fn(),
   };
 });
 
@@ -117,6 +129,7 @@ describe('PublicExams', () => {
     vi.clearAllMocks();
     vi.mocked(fetchPublicExams).mockResolvedValue(mockExams);
     vi.mocked(fetchExamRatingSummaries).mockResolvedValue(mockRatings);
+    vi.mocked(searchExams).mockResolvedValue([]);
   });
 
   it('shows all exams by default', async () => {
@@ -129,6 +142,15 @@ describe('PublicExams', () => {
   });
 
   it('filters exams by keyword after submitting search form', async () => {
+    vi.mocked(searchExams).mockResolvedValueOnce([
+      {
+        id: 1,
+        title: 'Đề thi Công nghệ & Tin học',
+        status: 'PUBLISHED',
+        tags: ['IT', 'Công nghệ'],
+      },
+    ]);
+
     renderPage();
 
     expect(await screen.findByText('Đề thi Công nghệ & Tin học')).toBeInTheDocument();
@@ -139,6 +161,10 @@ describe('PublicExams', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Tìm kiếm' }));
 
     await waitFor(() => {
+      expect(searchExams).toHaveBeenCalledWith({
+        keyword: 'công nghệ',
+        tags: [],
+      });
       expect(screen.getByText('Đề thi Công nghệ & Tin học')).toBeInTheDocument();
       expect(screen.queryByText('Đề thi Toán 12')).not.toBeInTheDocument();
       expect(screen.queryByText('Đề thi Vật lý')).not.toBeInTheDocument();
@@ -147,6 +173,15 @@ describe('PublicExams', () => {
   });
 
   it('filters exams by clicking popular tag chip', async () => {
+    vi.mocked(searchExams).mockResolvedValueOnce([
+      {
+        id: 1,
+        title: 'Đề thi Công nghệ & Tin học',
+        status: 'PUBLISHED',
+        tags: ['IT', 'Công nghệ'],
+      },
+    ]);
+
     renderPage();
 
     expect(await screen.findByText('Đề thi Công nghệ & Tin học')).toBeInTheDocument();
@@ -154,6 +189,10 @@ describe('PublicExams', () => {
     fireEvent.click(screen.getByRole('button', { name: /#IT \(1\)/i }));
 
     await waitFor(() => {
+      expect(searchExams).toHaveBeenCalledWith({
+        keyword: '',
+        tags: ['IT'],
+      });
       expect(screen.getByText('Đề thi Công nghệ & Tin học')).toBeInTheDocument();
       expect(screen.queryByText('Đề thi Toán 12')).not.toBeInTheDocument();
       expect(screen.queryByText('Đề thi Vật lý')).not.toBeInTheDocument();

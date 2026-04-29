@@ -8,6 +8,7 @@ import {
   fetchExamRatingSummaries,
   type ExamRatingSummary,
 } from "../api/examRatingClient";
+import { searchExams } from "../api/searchClient";
 import ExamRatingStars from "../components/ExamRatingStars";
 
 type SortMode = "rating-desc" | "newest-desc";
@@ -51,6 +52,11 @@ const PublicExams: React.FC = () => {
   const [ratingsByExamId, setRatingsByExamId] = useState<
     Record<number, ExamRatingSummary>
   >({});
+  const [searchResultIds, setSearchResultIds] = useState<Set<number> | null>(
+    null,
+  );
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchFailed, setSearchFailed] = useState(false);
 
   const loadPublicExams = async () => {
     try {
@@ -123,6 +129,44 @@ const PublicExams: React.FC = () => {
     void loadPublicExams();
   }, []);
 
+  useEffect(() => {
+    const hasFilters =
+      searchKeyword.trim().length > 0 || searchTags.length > 0;
+
+    if (!hasFilters) {
+      setSearchResultIds(null);
+      setSearchFailed(false);
+      setIsSearching(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsSearching(true);
+
+    searchExams({ keyword: searchKeyword, tags: searchTags })
+      .then((results) => {
+        if (cancelled) return;
+        setSearchResultIds(new Set(results.map((item) => item.id)));
+        setSearchFailed(false);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setSearchFailed(true);
+        setSearchResultIds(null);
+        toast.error(
+          "Không thể tìm kiếm trên search service. Tạm dùng bộ lọc cục bộ.",
+        );
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setIsSearching(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [searchKeyword, searchTags]);
+
   const allTags = useMemo<TagStat[]>(() => {
     const counter = new Map<string, TagStat>();
     exams.forEach((exam) => {
@@ -148,28 +192,39 @@ const PublicExams: React.FC = () => {
   const visibleExams = useMemo<PublicExamRow[]>(() => {
     const normalizedKeyword = normalizeForSearch(searchKeyword);
     const normalizedFilterTags = searchTags.map(normalizeForSearch);
+    const hasFilters =
+      searchKeyword.trim().length > 0 || searchTags.length > 0;
 
     const rows = exams.map((exam) => ({
       ...exam,
       rating: ratingsByExamId[exam.id] ?? null,
-    })).filter((exam) => {
-      const searchableText = normalizeForSearch(
-        [exam.title, exam.description ?? "", ...exam.tags.map((tag) => tag.name)].join(" "),
-      );
+    }));
 
-      const matchesKeyword =
-        !normalizedKeyword || searchableText.includes(normalizedKeyword);
-
-      const matchesTags =
-        normalizedFilterTags.length === 0 ||
-        normalizedFilterTags.every((filterTag) =>
-          exam.tags.some((tag) => normalizeForSearch(tag.name).includes(filterTag)),
+    let filtered = rows;
+    if (searchResultIds) {
+      filtered = rows.filter((exam) => searchResultIds.has(exam.id));
+    } else if (hasFilters && searchFailed) {
+      filtered = rows.filter((exam) => {
+        const searchableText = normalizeForSearch(
+          [exam.title, exam.description ?? "", ...exam.tags.map((tag) => tag.name)].join(" "),
         );
 
-      return matchesKeyword && matchesTags;
-    });
+        const matchesKeyword =
+          !normalizedKeyword || searchableText.includes(normalizedKeyword);
 
-    const sorted = [...rows].sort((left, right) => {
+        const matchesTags =
+          normalizedFilterTags.length === 0 ||
+          normalizedFilterTags.every((filterTag) =>
+            exam.tags.some((tag) => normalizeForSearch(tag.name).includes(filterTag)),
+          );
+
+        return matchesKeyword && matchesTags;
+      });
+    } else if (hasFilters) {
+      filtered = [];
+    }
+
+    const sorted = [...filtered].sort((left, right) => {
       if (sortMode === "newest-desc") {
         return (
           new Date(right.createdAt).getTime() -
@@ -189,7 +244,15 @@ const PublicExams: React.FC = () => {
     });
 
     return sorted;
-  }, [exams, ratingsByExamId, sortMode, searchKeyword, searchTags]);
+  }, [
+    exams,
+    ratingsByExamId,
+    sortMode,
+    searchKeyword,
+    searchTags,
+    searchResultIds,
+    searchFailed,
+  ]);
 
   return (
     <MainLayout>
@@ -268,6 +331,17 @@ const PublicExams: React.FC = () => {
                 );
               })}
             </div>
+
+            {isSearching && (
+              <p className="text-xs font-semibold text-slate-500">
+                Đang tìm kiếm trên hệ thống...
+              </p>
+            )}
+            {searchFailed && (searchKeyword || searchTags.length > 0) && (
+              <p className="text-xs font-semibold text-amber-600">
+                Search service đang bận, kết quả đang lọc cục bộ.
+              </p>
+            )}
 
             {(searchKeyword || searchTags.length > 0) && (
               <div className="mb-4 flex flex-wrap items-center gap-2">
