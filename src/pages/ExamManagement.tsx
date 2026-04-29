@@ -25,6 +25,7 @@ import {
   updateExamStatus,
 } from '../api/examClient';
 import { getCurrentSessionRole } from '../api/axiosClient';
+import { formatOnlineExamStatus } from '../utils/statusLabels';
 
 /** Question shape that may carry a difficulty field from the backend */
 export type QuestionWithDifficulty = ExamQuestion & { difficulty?: DifficultyLevel };
@@ -37,6 +38,12 @@ type ExamManagementProps = {
 };
 
 type PanelMode = 'none' | 'create' | 'edit' | 'view' | 'import'| 'upload-source';
+
+type FormErrors = {
+  title?: string;
+  maxAttempts?: string;
+  teaserQuestionCount?: string;
+};
 
 const emptyQuestion = (): ExamQuestion => ({
   content: '',
@@ -108,14 +115,18 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
   const [panelMode, setPanelMode] = useState<PanelMode>('none');
   const [importJsonText, setImportJsonText] = useState('');
   const [isImporting, setIsImporting] = useState(false);
+  const [importParseError, setImportParseError] = useState<string | null>(null);
+  const [importErrors, setImportErrors] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
   const [selectedTags, setSelectedTags] = useState<TagOption[]>([]);
   const [availableTags, setAvailableTags] = useState<TagOption[]>([]);
   const [isTagLoading, setIsTagLoading] = useState(false);
+  const [formErrors, setFormErrors] = useState<FormErrors>({});
   const [uploadTitle, setUploadTitle] = useState('');
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploadingSource, setIsUploadingSource] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   /** Filter for question difficulty in the question card list */
@@ -220,6 +231,23 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
       globalThis.removeEventListener('keydown', onEscape);
     };
   }, [panelMode]);
+
+  React.useEffect(() => {
+    if (confirmDeleteId === null) {
+      return;
+    }
+
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setConfirmDeleteId(null);
+      }
+    };
+
+    globalThis.addEventListener('keydown', onEscape);
+    return () => {
+      globalThis.removeEventListener('keydown', onEscape);
+    };
+  }, [confirmDeleteId]);
 
   React.useEffect(() => {
     const token = localStorage.getItem("access_token");
@@ -330,11 +358,14 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
     setForm(emptyPayload());
     setSelectedTags([]);
     setTagInput('');
+    setFormErrors({});
     setPanelMode('create');
   };
 
   const openImport = () => {
     setImportJsonText('');
+    setImportParseError(null);
+    setImportErrors([]);
     setPanelMode('import');
   };
 
@@ -373,6 +404,7 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
       });
       setSelectedTags(detail.tags || []);
       setTagInput('');
+      setFormErrors({});
 
       requestAnimationFrame(() => {
         formSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -481,6 +513,44 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
     return null;
   };
 
+  const buildFieldErrors = (payload: CreateExamPayload): FormErrors => {
+    const errors: FormErrors = {};
+    if (!payload.title.trim()) {
+      errors.title = 'Tiêu đề đề thi không được để trống.';
+    }
+    if (!payload.maxAttempts || payload.maxAttempts < 1) {
+      errors.maxAttempts = 'Số lần làm tối đa phải lớn hơn hoặc bằng 1.';
+    }
+    if (!payload.teaserQuestionCount || payload.teaserQuestionCount < 1 || payload.teaserQuestionCount > 2) {
+      errors.teaserQuestionCount = 'Số câu teaser phải từ 1 đến 2.';
+    }
+    return errors;
+  };
+
+  const describeImportParseError = (raw: string, error: unknown): string => {
+    const fallback = 'JSON không hợp lệ.';
+    if (!(error instanceof Error)) {
+      return fallback;
+    }
+
+    const message = error.message || fallback;
+    const positionMatch = message.match(/position\s+(\d+)/i);
+    if (!positionMatch) {
+      return `JSON không hợp lệ: ${message}`;
+    }
+
+    const position = Number(positionMatch[1]);
+    if (!Number.isFinite(position)) {
+      return `JSON không hợp lệ: ${message}`;
+    }
+
+    const textUntilError = raw.slice(0, position);
+    const lines = textUntilError.split(/\r?\n/);
+    const line = lines.length;
+    const column = (lines[lines.length - 1] || '').length + 1;
+    return `JSON không hợp lệ tại dòng ${line}, cột ${column}.`;
+  };
+
   const normalizeImportedExam = (raw: unknown): CreateExamPayload => {
     const source = (raw ?? {}) as Record<string, unknown>;
     const questionRows = Array.isArray(source.questions) ? source.questions : [];
@@ -551,6 +621,8 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
     try {
       const text = await file.text();
       setImportJsonText(text);
+      setImportParseError(null);
+      setImportErrors([]);
     } catch {
       toast.error('Không đọc được file JSON.');
     } finally {
@@ -560,6 +632,8 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
 
   const submitImportJson = async (event: React.FormEvent) => {
     event.preventDefault();
+    setImportParseError(null);
+    setImportErrors([]);
 
     if (!importJsonText.trim()) {
       toast.error('Vui lòng chọn file hoặc dán JSON.');
@@ -569,8 +643,10 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
     let parsed: unknown;
     try {
       parsed = JSON.parse(importJsonText);
-    } catch {
-      toast.error('JSON không hợp lệ.');
+    } catch (error) {
+      const detailedError = describeImportParseError(importJsonText, error);
+      setImportParseError(detailedError);
+      toast.error(detailedError);
       return;
     }
 
@@ -604,7 +680,8 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
       }
 
       if (errors.length > 0) {
-        toast.error(errors[0]);
+        setImportErrors(errors);
+        toast.error(`Có ${errors.length} đề import thất bại. Vui lòng xem danh sách lỗi.`);
       }
 
       await loadManagedExams();
@@ -682,6 +759,15 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
 
   const submitForm = async (event: React.FormEvent) => {
     event.preventDefault();
+
+    const nextFieldErrors = buildFieldErrors(form);
+    setFormErrors(nextFieldErrors);
+    const firstFieldError = Object.values(nextFieldErrors).find(Boolean);
+    if (firstFieldError) {
+      toast.error(firstFieldError);
+      return;
+    }
+
     const validationMessage = validatePayload(form);
     if (validationMessage) {
       toast.error(validationMessage);
@@ -719,6 +805,7 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
       setSelectedExam(saved);
       setEditingId(null);
       setForm(emptyPayload());
+      setFormErrors({});
       setPanelMode('none');
       await loadManagedExams();
     } catch (error) {
@@ -729,13 +816,15 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
     }
   };
 
+  const requestDelete = (examId: number) => {
+    setConfirmDeleteId(examId);
+  };
+
   const handleDelete = async (examId: number) => {
-    if (!globalThis.confirm('Bạn chắc chắn muốn xóa đề thi này?')) {
-      return;
-    }
     try {
       await deleteExam(examId);
       toast.success('Đã xóa đề thi.');
+      setConfirmDeleteId(null);
       if (editingId === examId) {
         setEditingId(null);
         setForm(emptyPayload());
@@ -769,6 +858,14 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
   };
 
   const containerClass = 'space-y-6';
+  const primaryActionButtonClass = 'inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700 shadow-sm';
+  const panelTitleId = panelMode === 'view'
+    ? 'exam-management-view-title'
+    : panelMode === 'upload-source'
+      ? 'exam-management-upload-title'
+      : panelMode === 'import'
+        ? 'exam-management-import-title'
+        : 'exam-management-form-title';
 
   return (
     <div className={containerClass}>
@@ -780,7 +877,7 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
         <button
           type="button"
           onClick={openUploadSource}
-          className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 font-semibold text-white hover:bg-violet-700 shadow-sm"
+          className={primaryActionButtonClass}
         >
           <CloudUpload className="w-4 h-4" />
           Upload File
@@ -788,7 +885,7 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
         <button
           type="button"
           onClick={openCreate}
-          className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700"
+          className={primaryActionButtonClass}
         >
           <FilePlus2 className="w-4 h-4" />
           Tạo đề thi
@@ -796,7 +893,7 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
         <button
           type="button"
           onClick={openImport}
-          className="inline-flex items-center gap-2 rounded-xl bg-cyan-600 px-4 py-2 font-semibold text-white hover:bg-cyan-700"
+          className={primaryActionButtonClass}
         >
           <Upload className="w-4 h-4" />
           Import JSON
@@ -813,7 +910,16 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
           <div className="space-y-3 max-h-[560px] overflow-y-auto pr-1">
             {isLoading && <p className="text-slate-500">Đang tải...</p>}
             {!isLoading && exams.length === 0 && (
-              <p className="rounded-xl bg-slate-50 p-4 text-slate-500">Chưa có đề thi nào.</p>
+              <div className="rounded-xl bg-slate-50 p-5 text-slate-500">
+                <p>Chưa có đề thi nào.</p>
+                <button
+                  type="button"
+                  onClick={openCreate}
+                  className="mt-3 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                >
+                  <FilePlus2 className="w-4 h-4" /> Tạo đề thi đầu tiên
+                </button>
+              </div>
             )}
             {!isLoading && exams.map((exam) => (
               <div key={exam.id} className="rounded-2xl border border-slate-200 p-4">
@@ -841,7 +947,7 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
                     exam.status === 'PUBLISHED' ? 'bg-emerald-100 text-emerald-700' :
                     exam.status === 'ARCHIVED' ? 'bg-amber-100 text-amber-700' :
                     'bg-slate-100 text-slate-700'
-                  }`}>{exam.status}</span>
+                  }`}>{formatOnlineExamStatus(exam.status)}</span>
                 </div>
 
                 <div className="mt-4 flex flex-wrap gap-2">
@@ -854,7 +960,7 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
                     </button>
                   )}
                   {exam.status !== 'ARCHIVED' && (
-                    <button type="button" onClick={() => void handleDelete(exam.id)} className="rounded-lg bg-rose-100 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-200">
+                    <button type="button" onClick={() => requestDelete(exam.id)} className="rounded-lg bg-rose-100 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-200">
                       <Trash2 className="w-3.5 h-3.5 inline mr-1" />Xóa
                     </button>
                   )}
@@ -894,6 +1000,9 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
               <motion.div
                 className="h-full rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden origin-top"
                 onClick={(event) => event.stopPropagation()}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby={panelTitleId}
                 initial={{ opacity: 0, scale: 0.96, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.98, y: 12 }}
@@ -902,7 +1011,7 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
               {panelMode === 'view' ? (
                 <section ref={detailSectionRef} className="h-full flex flex-col">
                   <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-                    <h2 className="text-xl font-bold text-slate-900">Chi tiết đề thi</h2>
+                    <h2 id="exam-management-view-title" className="text-xl font-bold text-slate-900">Chi tiết đề thi</h2>
                     <button
                       type="button"
                       className="rounded-lg bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-200"
@@ -920,7 +1029,7 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
                           <h3 className="text-lg font-bold text-slate-900">{selectedExam.title}</h3>
                           <p className="text-slate-600 mt-1">{selectedExam.description || 'Không có mô tả'}</p>
                           <p className="text-sm text-slate-500 mt-2">
-                            Trạng thái: {selectedExam.status} • {selectedExam.totalQuestions} câu hỏi • Tối đa {selectedExam.maxAttempts} lượt
+                            Trạng thái: {formatOnlineExamStatus(selectedExam.status)} • {selectedExam.totalQuestions} câu hỏi • Tối đa {selectedExam.maxAttempts} lượt
                           </p>
                           {selectedExam.premium && (
                             <p className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-amber-700">
@@ -967,7 +1076,7 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
                       <div className="bg-violet-100 p-2 rounded-lg text-violet-600">
                         <CloudUpload className="w-5 h-5" />
                       </div>
-                      <h2 className="text-xl font-bold text-slate-900">Upload File Đề Thi</h2>
+                      <h2 id="exam-management-upload-title" className="text-xl font-bold text-slate-900">Upload File Đề Thi</h2>
                     </div>
                     <button
                       type="button"
@@ -1003,6 +1112,15 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
                           onDragLeave={() => setIsDragging(false)}
                           onDrop={handleSourceDrop}
                           onClick={() => fileInputRef.current?.click()}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault();
+                              fileInputRef.current?.click();
+                            }
+                          }}
+                          role="button"
+                          tabIndex={0}
+                          aria-label="Chọn file đề thi để tải lên"
                           className={`relative flex flex-col items-center justify-center w-full p-10 mt-2 border-2 border-dashed rounded-2xl cursor-pointer transition-all duration-200 ${
                             isDragging 
                               ? 'border-violet-500 bg-violet-50 scale-[1.02]' 
@@ -1084,7 +1202,7 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
               ) : panelMode === 'import' ? (
                 <section className="h-full flex flex-col">
                   <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-                    <h2 className="text-xl font-bold text-slate-900">Import đề thi từ JSON</h2>
+                    <h2 id="exam-management-import-title" className="text-xl font-bold text-slate-900">Import đề thi từ JSON</h2>
                     <button
                       type="button"
                       className="rounded-lg bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-200"
@@ -1141,9 +1259,18 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
                       <span className="mb-1 block text-sm font-semibold text-slate-700">Hoặc dán JSON trực tiếp</span>
                       <textarea
                         value={importJsonText}
-                        onChange={(event) => setImportJsonText(event.target.value)}
+                        onChange={(event) => {
+                          setImportJsonText(event.target.value);
+                          if (importParseError) {
+                            setImportParseError(null);
+                          }
+                        }}
                         rows={16}
-                        className="w-full rounded-xl border border-slate-300 px-3 py-2 font-mono text-xs"
+                        className={`w-full rounded-xl border px-3 py-2 font-mono text-xs ${
+                          importParseError ? 'border-rose-400 bg-rose-50/50' : 'border-slate-300'
+                        }`}
+                        aria-invalid={Boolean(importParseError)}
+                        aria-describedby={importParseError ? 'exam-import-json-error' : undefined}
                         placeholder={`{
   "title": "Đề thi mẫu",
   "description": "Mô tả",
@@ -1161,7 +1288,23 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
   ]
 }`}
                       />
+                      {importParseError && (
+                        <p id="exam-import-json-error" className="mt-2 text-xs font-semibold text-rose-600">
+                          {importParseError}
+                        </p>
+                      )}
                     </label>
+
+                    {importErrors.length > 0 && (
+                      <div className="rounded-xl border border-rose-200 bg-rose-50 p-4">
+                        <p className="text-sm font-semibold text-rose-700">Danh sách lỗi import ({importErrors.length})</p>
+                        <ul className="mt-2 max-h-36 list-disc space-y-1 overflow-auto pl-5 text-xs text-rose-700">
+                          {importErrors.map((error, index) => (
+                            <li key={`import-error-${index}`}>{error}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
 
                     <div className="sticky bottom-0 bg-white pt-2 flex flex-wrap gap-2">
                       <button
@@ -1177,7 +1320,7 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
               ) : (
                 <section ref={formSectionRef} className="h-full flex flex-col">
                   <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-                    <h2 className="text-xl font-bold text-slate-900">
+                    <h2 id="exam-management-form-title" className="text-xl font-bold text-slate-900">
                       {panelMode === 'edit' ? 'Cập nhật đề thi' : 'Tạo đề thi mới'}
                     </h2>
                     <button
@@ -1194,10 +1337,20 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
                       <label className="block text-sm font-semibold text-slate-700 mb-1">Tiêu đề</label>
                       <input
                         value={form.title}
-                        onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))}
-                        className="w-full rounded-xl border border-slate-300 px-3 py-2"
+                        onChange={(event) => {
+                          setForm((prev) => ({ ...prev, title: event.target.value }));
+                          if (formErrors.title) {
+                            setFormErrors((prev) => ({ ...prev, title: undefined }));
+                          }
+                        }}
+                        className={`w-full rounded-xl border px-3 py-2 ${formErrors.title ? 'border-rose-400 bg-rose-50/50' : 'border-slate-300'}`}
+                        aria-invalid={Boolean(formErrors.title)}
+                        aria-describedby={formErrors.title ? 'exam-form-title-error' : undefined}
                         placeholder="VD: Đề thi Java Core"
                       />
+                      {formErrors.title && (
+                        <p id="exam-form-title-error" className="mt-1 text-xs font-semibold text-rose-600">{formErrors.title}</p>
+                      )}
                     </div>
                     <div>
                       <label className="block text-sm font-semibold text-slate-700 mb-1">Từ khóa (Tags)</label>
@@ -1275,10 +1428,20 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
                         <input
                           type="number"
                           value={form.maxAttempts}
-                          onChange={(event) => setForm((prev) => ({ ...prev, maxAttempts: Number(event.target.value || 1) }))}
-                          className="w-full rounded-xl border border-slate-300 px-3 py-2"
+                          onChange={(event) => {
+                            setForm((prev) => ({ ...prev, maxAttempts: Number(event.target.value || 1) }));
+                            if (formErrors.maxAttempts) {
+                              setFormErrors((prev) => ({ ...prev, maxAttempts: undefined }));
+                            }
+                          }}
+                          className={`w-full rounded-xl border px-3 py-2 ${formErrors.maxAttempts ? 'border-rose-400 bg-rose-50/50' : 'border-slate-300'}`}
+                          aria-invalid={Boolean(formErrors.maxAttempts)}
+                          aria-describedby={formErrors.maxAttempts ? 'exam-form-max-attempts-error' : undefined}
                           min={1}
                         />
+                        {formErrors.maxAttempts && (
+                          <p id="exam-form-max-attempts-error" className="mt-1 text-xs font-semibold text-rose-600">{formErrors.maxAttempts}</p>
+                        )}
                       </div>
                     </div>
 
@@ -1303,15 +1466,25 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
                           type="number"
                           value={form.teaserQuestionCount}
                           onChange={(event) =>
-                            setForm((prev) => ({
-                              ...prev,
-                              teaserQuestionCount: Number(event.target.value || 2),
-                            }))
+                            {
+                              setForm((prev) => ({
+                                ...prev,
+                                teaserQuestionCount: Number(event.target.value || 2),
+                              }));
+                              if (formErrors.teaserQuestionCount) {
+                                setFormErrors((prev) => ({ ...prev, teaserQuestionCount: undefined }));
+                              }
+                            }
                           }
-                          className="w-full rounded-xl border border-slate-300 px-3 py-2"
+                          className={`w-full rounded-xl border px-3 py-2 ${formErrors.teaserQuestionCount ? 'border-rose-400 bg-rose-50/50' : 'border-slate-300'}`}
+                          aria-invalid={Boolean(formErrors.teaserQuestionCount)}
+                          aria-describedby={formErrors.teaserQuestionCount ? 'exam-form-teaser-error' : undefined}
                           min={1}
                           max={2}
                         />
+                        {formErrors.teaserQuestionCount && (
+                          <p id="exam-form-teaser-error" className="mt-1 text-xs font-semibold text-rose-600">{formErrors.teaserQuestionCount}</p>
+                        )}
                       </div>
                     </div>
 
@@ -1411,6 +1584,52 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
               )}
               </motion.div>
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {confirmDeleteId !== null && (
+          <motion.div
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setConfirmDeleteId(null)}
+          >
+            <motion.div
+              className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="exam-delete-confirm-title"
+              onClick={(event) => event.stopPropagation()}
+              initial={{ opacity: 0, y: 8, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 8, scale: 0.98 }}
+            >
+              <h2 id="exam-delete-confirm-title" className="text-lg font-bold text-slate-900">Xác nhận xóa đề thi</h2>
+              <p className="mt-2 text-sm text-slate-600">Hành động này không thể hoàn tác. Bạn có chắc chắn muốn xóa đề thi đã chọn?</p>
+              <div className="mt-5 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setConfirmDeleteId(null)}
+                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirmDeleteId !== null) {
+                      void handleDelete(confirmDeleteId);
+                    }
+                  }}
+                  className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700"
+                >
+                  Xóa đề thi
+                </button>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

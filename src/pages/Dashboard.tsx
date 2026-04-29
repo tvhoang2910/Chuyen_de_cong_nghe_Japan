@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { Suspense, useEffect, useRef, useState } from 'react';
 import { Zap, ChartLine, Clock } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
@@ -6,10 +6,19 @@ import { useNavigate } from 'react-router-dom';
 import { fetchCurrentUserProfile, type UserProfile } from '../api/axiosClient';
 import { fetchMyAttemptHistory, type AttemptSummary } from '../api/examClient';
 import { fetchWeaknessRadar, fetchScoreHistory, fetchStudyStats, type RadarPoint, type ScorePoint, type StudyStats } from '../api/studyClient';
-import { WeaknessRadarChart } from '../components/analytics/WeaknessRadarChart';
-import { ScoreHistoryChart } from '../components/analytics/ScoreHistoryChart';
 import { StudyStatsCards } from '../components/analytics/StudyStatsCards';
 import MainLayout from '../components/MainLayout';
+import { formatAttemptStatus } from '../utils/statusLabels';
+
+const WeaknessRadarChart = React.lazy(async () => {
+  const module = await import('../components/analytics/WeaknessRadarChart');
+  return { default: module.WeaknessRadarChart };
+});
+
+const ScoreHistoryChart = React.lazy(async () => {
+  const module = await import('../components/analytics/ScoreHistoryChart');
+  return { default: module.ScoreHistoryChart };
+});
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -183,7 +192,13 @@ const Dashboard: React.FC = () => {
               </div>
             </div>
             <div className="flex-1 min-h-[280px] w-full">
-              <WeaknessRadarChart points={radarPoints} />
+              <Suspense
+                fallback={
+                  <div className="h-[280px] animate-pulse rounded-2xl bg-slate-100" />
+                }
+              >
+                <WeaknessRadarChart points={radarPoints} />
+              </Suspense>
             </div>
           </div>
         </div>
@@ -196,7 +211,13 @@ const Dashboard: React.FC = () => {
               <ChartLine className="w-4 h-4 text-slate-400" />
             </div>
           </div>
-          <ScoreHistoryChart points={scorePoints} />
+          <Suspense
+            fallback={
+              <div className="h-[240px] animate-pulse rounded-2xl bg-slate-100" />
+            }
+          >
+            <ScoreHistoryChart points={scorePoints} />
+          </Suspense>
         </div>
 
         {/* Recent Activity */}
@@ -246,7 +267,7 @@ const Dashboard: React.FC = () => {
                     </span>
                   </div>
                   <h3 className="font-bold text-slate-900 mb-2 truncate group-hover:text-blue-600 transition-colors" title={attempt.examTitle}>{attempt.examTitle}</h3>
-                  <p className="text-xs font-semibold text-slate-500">Trạng thái: {attempt.status}</p>
+                  <p className="text-xs font-semibold text-slate-500">Trạng thái: {formatAttemptStatus(attempt.status)}</p>
                   <div className="flex items-center justify-between mt-6">
                      <span className="text-sm font-bold text-slate-400">
                       Điểm: <span className="text-slate-900">{typeof attempt.scoreRaw === 'number' && typeof attempt.scoreMax === 'number' ? `${attempt.scoreRaw}/${attempt.scoreMax}` : '--'}</span>

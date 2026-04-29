@@ -6,6 +6,7 @@ import CommentTree from "../components/CommentTree";
 import type { CommentNode } from "../api/commentClient";
 import { createComment, fetchCommentsByExam } from "../api/commentClient";
 import { resolveCommentSubmitErrorMessage } from "../api/commentHelpers";
+import { fetchCurrentUserProfile } from "../api/axiosClient";
 
 const CommentsPage = () => {
   const { examId } = useParams<{ examId: string }>();
@@ -14,7 +15,7 @@ const CommentsPage = () => {
   const [comments, setComments] = useState<CommentNode[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [replyTargetId, setReplyTargetId] = useState<number | null>(null);
-  const [userId, setUserId] = useState("1");
+  const [userId, setUserId] = useState<number | null>(null);
 
   const loadComments = useCallback(async () => {
     setIsLoading(true);
@@ -33,9 +34,27 @@ const CommentsPage = () => {
     void loadComments();
   }, [loadComments]);
 
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        const profile = await fetchCurrentUserProfile();
+        setUserId(profile.id);
+      } catch {
+        setUserId(null);
+      }
+    };
+
+    void loadProfile();
+  }, []);
+
   const handleSubmit = async (content: string, parentId: number | null) => {
+    if (!userId) {
+      toast.error("Không xác định được người dùng hiện tại.");
+      return;
+    }
+
     const payload = {
-      userId: Number(userId),
+      userId,
       targetId: examIdNumber,
       parentId,
       content,
@@ -82,13 +101,11 @@ const CommentsPage = () => {
             </p>
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
               <label className="space-y-2 text-sm text-slate-700">
-                User ID
+                User ID (tự nhận diện)
                 <input
                   type="number"
-                  value={userId}
-                  onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                    setUserId(event.target.value)
-                  }
+                  value={userId ?? ""}
+                  readOnly
                   className="w-full rounded-3xl border border-slate-200 bg-white px-4 py-3 text-slate-900 shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 />
               </label>

@@ -11,7 +11,9 @@ class FakeEventSource {
 
   private readonly listeners = new Map<string, Set<(event: MessageEvent) => void>>();
 
-  constructor(_url: string, _init?: EventSourceInit) {
+  constructor(url: string, init?: EventSourceInit) {
+    void url;
+    void init;
     FakeEventSource.instances.push(this);
   }
 

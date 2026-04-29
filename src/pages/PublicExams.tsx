@@ -313,7 +313,18 @@ const PublicExams: React.FC = () => {
             </div>
 
             <div className="space-y-3 max-h-[600px] overflow-y-auto">
-              {isLoading && <p className="text-slate-500">Đang tải...</p>}
+              {isLoading && (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((item) => (
+                    <div key={item} className="rounded-2xl border border-slate-200 bg-white p-4">
+                      <div className="h-4 w-1/3 animate-pulse rounded bg-slate-200" />
+                      <div className="mt-3 h-3 w-5/6 animate-pulse rounded bg-slate-100" />
+                      <div className="mt-2 h-3 w-2/3 animate-pulse rounded bg-slate-100" />
+                      <div className="mt-4 h-7 w-24 animate-pulse rounded bg-slate-200" />
+                    </div>
+                  ))}
+                </div>
+              )}
               {!isLoading && visibleExams.length === 0 && (
                 <p className="rounded-xl bg-slate-50 p-4 text-slate-500">
                   Hiện chưa có đề thi công khai.

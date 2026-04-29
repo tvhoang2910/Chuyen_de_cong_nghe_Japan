@@ -1,16 +1,18 @@
 import React from 'react';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 
 const {
   fetchMyUploads,
+  fetchUploadDetail,
   fetchUploadHistory,
   subscribe,
   unsubscribe,
 } = vi.hoisted(() => ({
   fetchMyUploads: vi.fn(),
+  fetchUploadDetail: vi.fn(),
   fetchUploadHistory: vi.fn(),
   subscribe: vi.fn(),
   unsubscribe: vi.fn(),
@@ -21,6 +23,7 @@ vi.mock('../api/examUploadClient', async () => {
   return {
     ...actual,
     fetchMyUploads,
+    fetchUploadDetail,
     fetchUploadHistory,
   };
 });
@@ -54,6 +57,16 @@ describe('MyExamUploads', () => {
     localStorage.clear();
     localStorage.setItem('access_token', 'token');
     fetchUploadHistory.mockResolvedValue([]);
+    fetchUploadDetail.mockResolvedValue({
+      id: 0,
+      uploaderId: 10,
+      uploaderRole: 'USER',
+      title: 'fallback',
+      pageCount: 1,
+      status: 'EXTRACTING',
+      createdAt: '2026-04-17T00:00:00Z',
+      modifiedAt: '2026-04-17T00:00:00Z',
+    });
     subscribe.mockImplementation(() => unsubscribe);
   });
 
@@ -168,6 +181,16 @@ describe('MyExamUploads', () => {
       totalElements: 1,
       totalPages: 1,
     });
+    fetchUploadDetail.mockResolvedValue({
+      id: 4,
+      uploaderId: 10,
+      uploaderRole: 'USER',
+      title: 'Extracting exam',
+      pageCount: 3,
+      status: 'EXTRACTING',
+      createdAt: '2026-04-17T00:00:00Z',
+      modifiedAt: '2026-04-17T00:00:00Z',
+    });
 
     render(
       <MemoryRouter>
@@ -184,7 +207,9 @@ describe('MyExamUploads', () => {
       vi.advanceTimersByTime(8000);
       await Promise.resolve();
     });
-    expect(fetchMyUploads).toHaveBeenCalledTimes(2);
+    expect(fetchMyUploads).toHaveBeenCalledTimes(1);
+    expect(fetchUploadDetail).toHaveBeenCalledTimes(1);
+    expect(fetchUploadDetail).toHaveBeenCalledWith(4);
   });
 
   it('does not poll when all uploads are in terminal states', async () => {
@@ -226,5 +251,6 @@ describe('MyExamUploads', () => {
     });
 
     expect(fetchMyUploads).toHaveBeenCalledTimes(1);
+    expect(fetchUploadDetail).not.toHaveBeenCalled();
   });
 });

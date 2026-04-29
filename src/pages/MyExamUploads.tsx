@@ -13,6 +13,7 @@ import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
 import MainLayout from "../components/MainLayout";
 import {
+  fetchUploadDetail,
   fetchMyUploads,
   fetchUploadHistory,
   type ExamUploadHistoryResponse,
@@ -106,13 +107,36 @@ const MyExamUploads: React.FC = () => {
 
   // Polling fallback while any upload is still being extracted.
   useEffect(() => {
-    const hasExtracting = items.some((u) => u.status === "EXTRACTING");
-    if (!hasExtracting) {
+    const extractingIds = items
+      .filter((upload) => upload.status === "EXTRACTING")
+      .map((upload) => upload.id);
+
+    if (extractingIds.length === 0) {
       return undefined;
     }
+
+    const pollExtractingRows = async () => {
+      if (document.visibilityState === "hidden") {
+        return;
+      }
+
+      try {
+        const details = await Promise.all(
+          extractingIds.map((uploadId) => fetchUploadDetail(uploadId)),
+        );
+        const detailById = new Map(details.map((detail) => [detail.id, detail]));
+        setItems((previousItems) =>
+          previousItems.map((item) => detailById.get(item.id) ?? item),
+        );
+      } catch {
+        void load(page);
+      }
+    };
+
     const intervalId = window.setInterval(() => {
-      void load(page);
+      void pollExtractingRows();
     }, 8000);
+
     return () => {
       window.clearInterval(intervalId);
     };

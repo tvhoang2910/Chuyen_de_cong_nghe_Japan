@@ -20,6 +20,8 @@ import {
   submitExamRating,
   type ExamRatingSummary,
 } from "../api/examRatingClient";
+import { fetchCurrentUserProfile } from "../api/axiosClient";
+import { formatAttemptStatus } from "../utils/statusLabels";
 
 const ExamResult: React.FC = () => {
   const params = useParams();
@@ -40,8 +42,7 @@ const ExamResult: React.FC = () => {
   const [isLoadingRating, setIsLoadingRating] = useState(false);
   const [isSavingRating, setIsSavingRating] = useState(false);
   const [selectedRating, setSelectedRating] = useState(0);
-
-  const userId = 1;
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
 
   const loadComments = useCallback(async () => {
     if (!result?.examId) return;
@@ -103,9 +104,13 @@ const ExamResult: React.FC = () => {
     parentId: number | null = null,
   ) => {
     if (!result?.examId) return;
+    if (!currentUserId) {
+      toast.error("Không xác định được người dùng hiện tại.");
+      return;
+    }
 
     const payload = {
-      userId,
+      userId: currentUserId,
       targetId: result.examId,
       parentId,
       content,
@@ -133,8 +138,21 @@ const ExamResult: React.FC = () => {
     const load = async () => {
       try {
         setLoading(true);
-        const data = await fetchAttemptResult(attemptId);
-        setResult(data);
+        const [attemptResult, profileResult] = await Promise.allSettled([
+          fetchAttemptResult(attemptId),
+          fetchCurrentUserProfile(),
+        ]);
+
+        if (attemptResult.status === "rejected") {
+          throw attemptResult.reason;
+        }
+
+        setResult(attemptResult.value);
+        if (profileResult.status === "fulfilled") {
+          setCurrentUserId(profileResult.value.id);
+        } else {
+          setCurrentUserId(null);
+        }
       } catch {
         toast.error("Không tải được kết quả bài thi.");
       } finally {
@@ -188,7 +206,7 @@ const ExamResult: React.FC = () => {
             {result.passed ? "Đạt" : "Chưa đạt"} (mốc đỗ: {result.passingScore})
           </p>
           <p className="text-xs text-slate-500 mt-1">
-            Trạng thái: {result.status}
+            Trạng thái: {formatAttemptStatus(result.status)}
           </p>
           <Link
             to="/dashboard/exams"

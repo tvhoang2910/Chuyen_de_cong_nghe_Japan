@@ -156,6 +156,23 @@ const SubscriptionPayments: React.FC = () => {
     };
   }, [billPreviewUrl]);
 
+  useEffect(() => {
+    if (!billPreviewTarget) {
+      return;
+    }
+
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        handleCloseBillPreview();
+      }
+    };
+
+    globalThis.addEventListener('keydown', onEscape);
+    return () => {
+      globalThis.removeEventListener('keydown', onEscape);
+    };
+  }, [billPreviewTarget, handleCloseBillPreview]);
+
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (hasActivePremium) {
@@ -390,10 +407,15 @@ const SubscriptionPayments: React.FC = () => {
               aria-label="Đóng xem bill"
               onClick={handleCloseBillPreview}
             />
-            <div className="relative w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div
+              className="relative w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-2xl"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="subscription-payments-bill-preview-title"
+            >
               <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
                 <div>
-                  <h3 className="text-base font-black text-slate-900">Bill chuyển khoản</h3>
+                  <h3 id="subscription-payments-bill-preview-title" className="text-base font-black text-slate-900">Bill chuyển khoản</h3>
                   <p className="text-xs text-slate-500">{billPreviewTarget.label}</p>
                 </div>
                 <button

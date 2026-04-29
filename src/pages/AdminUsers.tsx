@@ -91,7 +91,7 @@ const AdminUsers: React.FC = () => {
     const maxVisible = 5;
     const half = Math.floor(maxVisible / 2);
     let start = Math.max(0, page - half);
-    let end = Math.min(totalPages - 1, start + maxVisible - 1);
+    const end = Math.min(totalPages - 1, start + maxVisible - 1);
     start = Math.max(0, end - maxVisible + 1);
 
     return Array.from({ length: end - start + 1 }, (_, index) => start + index);

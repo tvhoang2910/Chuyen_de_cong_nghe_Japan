@@ -38,7 +38,7 @@ const ExamStart: React.FC = () => {
   );
   const [isLoadingRating, setIsLoadingRating] = useState(false);
   const [replyTargetId, setReplyTargetId] = useState<number | null>(null);
-  const userId = profile?.id ?? 1;
+  const userId = profile?.id ?? null;
 
   const loadComments = useCallback(async (examIdNumber: number) => {
     setIsLoadingComments(true);
@@ -70,6 +70,11 @@ const ExamStart: React.FC = () => {
     content: string,
     parentId: number | null = null,
   ) => {
+    if (!userId) {
+      toast.error("Không xác định được người dùng hiện tại.");
+      return;
+    }
+
     const payload = {
       userId,
       targetId: examId,
