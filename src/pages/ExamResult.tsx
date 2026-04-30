@@ -6,8 +6,8 @@ import MainLayout from "../components/MainLayout";
 import CommentForm from "../components/CommentForm";
 import CommentTree from "../components/CommentTree";
 import ReportModal from "../components/ReportModal";
-import ExamRatingStars from "../components/ExamRatingStars";
-import { ExamDifficultyBadge } from "../components/ExamDifficultyBadge";
+import ExamRatingStars from '../components/ExamRatingStars';
+{/* import { ExamDifficultyBadge } from "../components/ExamDifficultyBadge"; */}
 import { fetchAttemptResult, type AttemptResult } from "../api/examClient";
 import {
   createComment,
@@ -293,7 +293,7 @@ const ExamResult: React.FC = () => {
                 <h2 className="font-semibold text-slate-900">
                   Câu {idx + 1}: {question.content}
                 </h2>
-                <ExamDifficultyBadge difficulty={question.difficulty} size="sm" />
+               {/* <ExamDifficultyBadge difficulty={question.difficulty} size="sm" /> */}
               </div>
               <p className="text-sm mt-2 text-slate-700">
                 Điểm: {question.earnedScore}/{question.maxScore} •{" "}

@@ -904,6 +904,7 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
           <FilePlus2 className="w-4 h-4" />
           Tạo đề thi
         </button>
+        {/*
         <button
           type="button"
           onClick={openImport}
@@ -912,6 +913,7 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
           <Upload className="w-4 h-4" />
           Import JSON
         </button>
+        */}
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">

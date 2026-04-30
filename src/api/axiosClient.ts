@@ -77,7 +77,6 @@ export type FetchAdminUsersParams = {
 export type CreateAdminUserPayload = {
   email: string;
   fullName: string;
-  password: string;
   role?: AppRole;
 };
 

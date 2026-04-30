@@ -19,6 +19,7 @@ const VerifyRegisterEmail = lazy(() => import('./pages/VerifyRegisterEmail'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const ForgotPasswordVerifyOtp = lazy(() => import('./pages/ForgotPasswordVerifyOtp'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+const ActivateAccount = lazy(() => import('./pages/ActivateAccount'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const OAuth2Success = lazy(() => import('./pages/OAuth2Success'));
 const AdminUsers = lazy(() => import('./pages/AdminUsers'));
@@ -179,6 +180,7 @@ function App() {
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/forgot-password/verify" element={<ForgotPasswordVerifyOtp />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/activate" element={<ActivateAccount />} />
             <Route path="/oauth2/success" element={<OAuth2Success />} />
 
             {/* User/Contributor Routes */}

@@ -1,20 +1,16 @@
 import React from 'react';
-import { UserPlus, Mail, Lock, Shield, User } from 'lucide-react';
+import { UserPlus, Mail, Shield, User } from 'lucide-react';
 import { type AppRole } from '../../api/axiosClient';
 
 interface CreateUserFormProps {
   createForm: {
     fullName: string;
     email: string;
-    password: string;
-    confirmPassword: string;
     role: AppRole;
   };
   setCreateForm: React.Dispatch<React.SetStateAction<{
     fullName: string;
     email: string;
-    password: string;
-    confirmPassword: string;
     role: AppRole;
   }>>;
   isCreating: boolean;
@@ -69,37 +65,7 @@ const CreateUserForm: React.FC<CreateUserFormProps> = ({
               value={createForm.email}
               onChange={handleChange}
               placeholder="email@example.com"
-              className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border-2 border-transparent rounded-[20px] focus:bg-white focus:border-cyan-600 focus:ring-0 outline-none transition-all font-medium text-slate-700 placeholder:text-slate-300"
-            />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Mật khẩu bảo mật</label>
-          <div className="relative group">
-            <Lock className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 group-focus-within:text-cyan-600 transition-colors" />
-            <input
-              name="password"
-              type="password"
-              value={createForm.password}
-              onChange={handleChange}
-              placeholder="Ít nhất 8 ký tự..."
-              className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border-2 border-transparent rounded-[20px] focus:bg-white focus:border-cyan-600 focus:ring-0 outline-none transition-all font-medium text-slate-700 placeholder:text-slate-300"
-            />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Nhập lại mật khẩu</label>
-          <div className="relative group">
-            <Lock className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 group-focus-within:text-cyan-600 transition-colors" />
-            <input
-              id="admin-create-confirm-password"
-              name="confirmPassword"
-              type="password"
-              value={createForm.confirmPassword}
-              onChange={handleChange}
-              placeholder="Nhập lại mật khẩu..."
+              required
               className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border-2 border-transparent rounded-[20px] focus:bg-white focus:border-cyan-600 focus:ring-0 outline-none transition-all font-medium text-slate-700 placeholder:text-slate-300"
             />
           </div>
@@ -120,6 +86,12 @@ const CreateUserForm: React.FC<CreateUserFormProps> = ({
               <option value="ADMIN">Quản trị (ADMIN)</option>
             </select>
           </div>
+        </div>
+
+        <div className="rounded-xl bg-blue-50 border border-blue-200 p-4">
+          <p className="text-xs text-blue-700 font-semibold">
+            💡 Hệ thống sẽ tự động gửi email kích hoạt cho người dùng. Họ sẽ tự đặt mật khẩu của riêng mình.
+          </p>
         </div>
 
         <button

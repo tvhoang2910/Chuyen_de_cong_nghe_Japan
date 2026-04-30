@@ -2,7 +2,6 @@ import axios, { type AxiosError } from 'axios';
 import {
   ChevronLeft,
   ChevronRight,
-  FileUp,
   Filter,
   Search,
   UserPlus,
@@ -68,8 +67,6 @@ const AdminUsers: React.FC = () => {
   const [createForm, setCreateForm] = useState({
     fullName: '',
     email: '',
-    password: '',
-    confirmPassword: '',
     role: 'CONTRIBUTOR' as AppRole,
   });
 
@@ -154,12 +151,8 @@ const AdminUsers: React.FC = () => {
 
   const handleCreateUser = async (event: React.SyntheticEvent) => {
     event.preventDefault();
-    if (!createForm.fullName.trim() || !createForm.email.trim() || createForm.password.length < 8) {
+    if (!createForm.fullName.trim() || !createForm.email.trim()) {
       toast.error('Vui lòng nhập đủ thông tin hợp lệ để tạo user.');
-      return;
-    }
-    if (createForm.password !== createForm.confirmPassword) {
-      toast.error('Mật khẩu xác nhận không khớp.');
       return;
     }
 
@@ -168,11 +161,10 @@ const AdminUsers: React.FC = () => {
       const created = await createAdminUser({
         fullName: createForm.fullName.trim(),
         email: createForm.email.trim(),
-        password: createForm.password,
         role: createForm.role,
       });
-      toast.success('Tạo user thành công.');
-      setCreateForm({ fullName: '', email: '', password: '', confirmPassword: '', role: 'CONTRIBUTOR' });
+      toast.success('Tạo user thành công. Email kích hoạt đã được gửi.');
+      setCreateForm({ fullName: '', email: '', role: 'CONTRIBUTOR' });
       setPage(0);
       void loadUsers();
       setSpotlightUserId(created.id);
@@ -275,6 +267,7 @@ const AdminUsers: React.FC = () => {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              {/*
               <button
                 type="button"
                 onClick={() => setIsImportModalOpen(true)}
@@ -283,6 +276,7 @@ const AdminUsers: React.FC = () => {
                 <FileUp className="h-4 w-4" />
                 Import JSON
               </button>
+              */}
               <button
                 type="button"
                 onClick={() => setIsCreateFormOpen(prev => !prev)}
