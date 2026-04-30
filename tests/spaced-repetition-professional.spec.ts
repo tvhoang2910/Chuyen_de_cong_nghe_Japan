@@ -297,7 +297,7 @@ test.describe('Professional coverage for spaced repetition', () => {
     await page.getByRole('button', { name: 'Quay lại danh sách deck' }).click();
 
     await expect(page).toHaveURL(/\/dashboard\/spaced-repetition$/);
-    await expect(page.getByRole('heading', { name: /Ôn tập thông minh từ study_service/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Ôn tập thông minh/i })).toBeVisible();
   });
 
   test('shows warning block when attempt-view has no options for question', async ({ page }) => {

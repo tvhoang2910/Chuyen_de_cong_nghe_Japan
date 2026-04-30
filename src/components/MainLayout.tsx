@@ -19,7 +19,9 @@ import {
   ClipboardCheck,
   Gem,
   Flag,
-  Settings2
+  Settings2,
+  Upload,
+  FileUp
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axiosClient, { 
@@ -36,24 +38,19 @@ import axiosClient, {
 import {
   fetchExamWrongDecks,
   fetchGamificationOverview,
-  type AchievementView,
   type GamificationOverview,
-  type Sm2ExamDeck,
 } from '../api/studyClient';
+import {
+  buildSyntheticUserNotifications,
+  TWENTY_FOUR_HOURS_MS,
+  type NotificationItem,
+} from '../utils/notificationBuilder';
 
 interface MainLayoutProps {
   children: React.ReactNode;
   fallbackStreakDays?: number;
   fallbackPoints?: number;
 }
-
-type NotificationItem = {
-  id: string;
-  title: string;
-  description: string;
-  timeLabel: string;
-  onClick: () => void | Promise<void>;
-};
 
 type DismissedNotificationEntry = {
   id: string;
@@ -69,7 +66,7 @@ type InAppPushNotificationEntry = {
   createdAt: number;
 };
 
-const DISMISSED_NOTIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
+const DISMISSED_NOTIFICATION_TTL_MS = TWENTY_FOUR_HOURS_MS;
 const IN_APP_PUSH_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const PUSH_MESSAGE_TYPE = 'EXAM_BANK_PUSH_RECEIVED';
 
@@ -223,74 +220,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, fallbackStreakDays, f
     };
   }, [navigate]);
 
-  const buildSyntheticUserNotifications = useCallback((
+  const buildNotifications = useCallback((
     overview: GamificationOverview | null,
-    examDecks: Sm2ExamDeck[] | null,
+    examDecks: import('../api/studyClient').Sm2ExamDeck[] | null,
   ): NotificationItem[] => {
-    const nowMs = Date.now();
-    const syntheticItems: NotificationItem[] = [];
-
-    // 1. SM-2 notifications: one per deck with wrong questions
-    if (Array.isArray(examDecks)) {
-      examDecks.forEach((deck) => {
-        if (deck.wrongQuestionCount > 0) {
-          syntheticItems.push({
-            id: `synthetic-sm2-due-attempt-${deck.latestAttemptId}`,
-            title: 'Đến thời gian ôn tập SM-2',
-            description: `Bạn có ${deck.wrongQuestionCount} câu đến hạn cần ôn tập (lần thi ${deck.attemptNumber ?? '?'}, ${deck.examTitle}).`,
-            timeLabel: deck.latestSubmittedAt
-              ? new Date(deck.latestSubmittedAt).toLocaleString('vi-VN')
-              : 'Hôm nay',
-            onClick: () => navigate('/dashboard/spaced-repetition'),
-          });
-        }
-      });
-    }
-
-    // 2. Achievements unlocked in last 24h (no duplicates)
-    const fromNewlyUnlocked = Array.isArray(overview?.newlyUnlockedAchievements)
-      ? overview.newlyUnlockedAchievements
-      : [];
-    const fromRecentUnlocked = Array.isArray(overview?.recentUnlockedAchievements)
-      ? overview.recentUnlockedAchievements.filter((achievement) => {
-        if (!achievement.unlockedAt) return false;
-        const unlockedAtMs = new Date(achievement.unlockedAt).getTime();
-        return Number.isFinite(unlockedAtMs) && nowMs - unlockedAtMs <= 24 * 60 * 60 * 1000;
-      })
-      : [];
-    const mergedAchievements = new Map<string, AchievementView>();
-    [...fromNewlyUnlocked, ...fromRecentUnlocked].forEach((achievement) => {
-      const key = `${achievement.code}:${achievement.unlockedAt ?? ''}`;
-      if (!mergedAchievements.has(key)) {
-        mergedAchievements.set(key, achievement);
-      }
-    });
-    mergedAchievements.forEach((achievement) => {
-      const unlockedToken = achievement.unlockedAt ?? 'unknown-time';
-      syntheticItems.push({
-        id: `synthetic-achievement-${achievement.code}-${unlockedToken}`,
-        title: 'Bạn vừa mở khóa huy hiệu mới',
-        description: achievement.name,
-        timeLabel: achievement.unlockedAt
-          ? new Date(achievement.unlockedAt).toLocaleString('vi-VN')
-          : 'Mới đạt',
-        onClick: () => navigate('/dashboard/gamification'),
-      });
-    });
-
-    // 3. Streak notification (giữ nguyên logic cũ)
-    const todayToken = new Date().toISOString().slice(0, 10);
-    if (overview?.justQualifiedToday) {
-      syntheticItems.push({
-        id: `synthetic-streak-qualified-${todayToken}`,
-        title: 'Bạn vừa đạt streak hôm nay',
-        description: `Streak hiện tại: ${overview.streakDays} ngày liên tiếp.`,
-        timeLabel: 'Hôm nay',
-        onClick: () => navigate('/dashboard/gamification'),
-      });
-    }
-
-    return syntheticItems;
+    return buildSyntheticUserNotifications(overview, examDecks, navigate);
   }, [navigate]);
 
   const mergeUserNotifications = useCallback((baseItems: NotificationItem[]) => {
@@ -412,7 +346,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, fallbackStreakDays, f
             navigate(row.actionUrl || '/dashboard/notifications');
           },
         }));
-        const syntheticItems = buildSyntheticUserNotifications(
+        const syntheticItems = buildNotifications(
           overview,
           examDecks,
         );
@@ -455,7 +389,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, fallbackStreakDays, f
       globalThis.clearInterval(intervalId);
       globalThis.removeEventListener(SUBSCRIPTION_REVIEW_UPDATED_EVENT, handleRefresh);
     };
-  }, [buildSyntheticUserNotifications, mergeUserNotifications, navigate, readDismissedIds, user?.role]);
+  }, [buildNotifications, mergeUserNotifications, navigate, readDismissedIds, user?.role]);
 
   useEffect(() => {
     if (user?.role !== 'USER') {
@@ -533,36 +467,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, fallbackStreakDays, f
   }, [mapPushEntryToNotification, persistPushEntries, readDismissedIds, readPushEntries, user?.role]);
 
   useEffect(() => {
-    if (user?.role !== 'USER') {
-      setGamificationOverview(null);
-      return;
-    }
-
-    let isMounted = true;
-    const loadHeaderMetrics = async () => {
-      const overviewResult = await Promise.allSettled([
-        fetchGamificationOverview(),
-      ]);
-
-      if (!isMounted) {
-        return;
-      }
-
-      const [overview] = overviewResult;
-      if (overview.status === 'fulfilled') {
-        setGamificationOverview(overview.value);
-      } else {
-        setGamificationOverview(null);
-      }
-    };
-
-    void loadHeaderMetrics();
-    return () => {
-      isMounted = false;
-    };
-  }, [user?.role]);
-
-  useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
         setIsNotificationOpen(false);
@@ -597,12 +501,16 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, fallbackStreakDays, f
     { label: 'Duyệt thanh toán', icon: ClipboardCheck, path: '/contributor/subscription-reviews' },
     { label: 'Báo cáo câu hỏi', icon: Flag, path: '/contributor/reports' },
     { label: 'Đề thi của tôi', icon: BookOpen, path: '/contributor/exams' },
+    { label: 'Upload đề', icon: Upload, path: '/upload-exam' },
+    { label: 'Đề đã upload', icon: FileUp, path: '/my-uploads' },
     { label: 'Thống kê', icon: Zap, path: '/contributor/analytics' },
   ] : [
     { label: 'Tổng quan', icon: LayoutDashboard, path: '/dashboard' },
     { label: 'Nâng cấp Premium', icon: Banknote, path: '/dashboard/subscription-payments' },
     { label: 'Cài đặt thông báo', icon: Settings2, path: '/dashboard/notifications' },
     { label: 'Kho đề công khai', icon: BookOpen, path: '/dashboard/exams' },
+    { label: 'Upload đề', icon: Upload, path: '/upload-exam' },
+    { label: 'Đề đã upload', icon: FileUp, path: '/my-uploads' },
     { label: 'Học tập (SM-2)', icon: Zap, path: '/dashboard/spaced-repetition' },
     { label: 'Gamification', icon: Flame, path: '/dashboard/gamification' },
   ];
@@ -793,7 +701,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, fallbackStreakDays, f
               </div>
               <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 rounded-lg border border-amber-100/50">
                 <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
-                <span className="text-xs font-bold text-amber-700">{fallbackPoints ?? gamificationOverview?.points ?? 0} Pts</span>
+                <span className="text-xs font-bold text-amber-700">{gamificationOverview?.points ?? fallbackPoints ?? 0} Pts</span>
               </div>
             </div>
             <div ref={notificationRef} className="relative">

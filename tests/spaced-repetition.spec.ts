@@ -179,6 +179,34 @@ async function mockUserShellApis(page: Page): Promise<void> {
       body: '{}',
     });
   });
+
+  await page.route('**/api/v1/auth/notifications**', async (route: Route) => {
+    const method = route.request().method();
+
+    if (method === 'PATCH') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ updatedCount: 0 }),
+      });
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        content: [],
+        number: 0,
+        size: 5,
+        totalElements: 0,
+        totalPages: 0,
+        first: true,
+        last: true,
+        unreadCount: 0,
+      }),
+    });
+  });
 }
 
 async function mockAttemptViewApi(page: Page, responseBody = ATTEMPT_VIEW_RESPONSE): Promise<void> {
@@ -240,7 +268,7 @@ test.describe('Spaced repetition list page', () => {
 
     await page.goto('/dashboard/spaced-repetition');
 
-    await expect(page.getByRole('heading', { name: /Ôn tập thông minh từ study_service/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Ôn tập thông minh/i })).toBeVisible();
     await expect(page.getByRole('heading', { name: /Exam Geography - các câu sai/i })).toBeVisible();
 
     const dueCard = page.getByText('Câu đến hạn').locator('xpath=..');
@@ -282,10 +310,11 @@ test.describe('Spaced repetition list page', () => {
       },
     ];
 
+    let refreshClicked = false;
     let callCount = 0;
     await page.route('**/api/v1/study/spaced-repetition/me/exam-decks', async (route: Route) => {
-      const body = responses[Math.min(callCount, responses.length - 1)];
       callCount += 1;
+      const body = refreshClicked ? responses[1] : responses[0];
 
       await route.fulfill({
         status: 200,
@@ -297,6 +326,7 @@ test.describe('Spaced repetition list page', () => {
     await page.goto('/dashboard/spaced-repetition');
     await expect(page.getByRole('heading', { name: /Exam First - các câu sai/i })).toBeVisible();
 
+    refreshClicked = true;
     await page.getByRole('button', { name: 'Làm mới' }).click();
 
     await expect(page.getByRole('heading', { name: /Exam Refreshed - các câu sai/i })).toBeVisible();

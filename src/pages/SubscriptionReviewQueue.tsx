@@ -20,6 +20,7 @@ import {
   type SubscriptionApprovalAudit,
   type UserSubscriptionQueueItem,
 } from '../api/axiosClient';
+import { formatSubscriptionStatus } from '../utils/statusLabels';
 
 type SubscriptionReviewQueueProps = {
   mode: 'admin' | 'contributor';
@@ -205,7 +206,7 @@ const SubscriptionReviewQueue: React.FC<SubscriptionReviewQueueProps> = ({ mode 
     setHistoryFilters(historyFilterDraft);
   };
 
-  const handleCloseBillPreview = () => {
+  const handleCloseBillPreview = useCallback(() => {
     setBillPreviewTarget(null);
     setIsBillPreviewLoading(false);
     setBillPreviewUrl((current) => {
@@ -214,7 +215,7 @@ const SubscriptionReviewQueue: React.FC<SubscriptionReviewQueueProps> = ({ mode 
       }
       return null;
     });
-  };
+  }, []);
 
   const handleOpenBillPreview = async (subscriptionId: number, label: string) => {
     setBillPreviewTarget({ id: subscriptionId, label });
@@ -249,10 +250,32 @@ const SubscriptionReviewQueue: React.FC<SubscriptionReviewQueueProps> = ({ mode 
     setCancelReason('');
   };
 
-  const handleCloseCancelModal = () => {
+  const handleCloseCancelModal = useCallback(() => {
     setCancelTarget(null);
     setCancelReason('');
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!billPreviewTarget && !cancelTarget) {
+      return;
+    }
+
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        if (billPreviewTarget) {
+          handleCloseBillPreview();
+        }
+        if (cancelTarget) {
+          handleCloseCancelModal();
+        }
+      }
+    };
+
+    globalThis.addEventListener('keydown', onEscape);
+    return () => {
+      globalThis.removeEventListener('keydown', onEscape);
+    };
+  }, [billPreviewTarget, cancelTarget, handleCloseBillPreview, handleCloseCancelModal]);
 
   useEffect(() => {
     return () => {
@@ -349,9 +372,9 @@ const SubscriptionReviewQueue: React.FC<SubscriptionReviewQueueProps> = ({ mode 
                 onChange={(event) => setStatusFilter(event.target.value as SubscriptionStatus)}
                 className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-cyan-500 focus:outline-none"
               >
-                <option value="PENDING_REVIEW">PENDING_REVIEW</option>
-                <option value="APPROVED">APPROVED</option>
-                <option value="REJECTED">REJECTED</option>
+                <option value="PENDING_REVIEW">{formatSubscriptionStatus('PENDING_REVIEW')}</option>
+                <option value="APPROVED">{formatSubscriptionStatus('APPROVED')}</option>
+                <option value="REJECTED">{formatSubscriptionStatus('REJECTED')}</option>
               </select>
             </div>
             <div className="space-y-3">
@@ -392,7 +415,7 @@ const SubscriptionReviewQueue: React.FC<SubscriptionReviewQueueProps> = ({ mode 
                     <p className="text-sm text-slate-500">{selected.userFullName} • {selected.userEmail}</p>
                   </div>
                   <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700">
-                    <ShieldCheck className="h-3.5 w-3.5" /> {selected.status}
+                    <ShieldCheck className="h-3.5 w-3.5" /> {formatSubscriptionStatus(selected.status)}
                   </span>
                 </div>
 
@@ -509,11 +532,11 @@ const SubscriptionReviewQueue: React.FC<SubscriptionReviewQueueProps> = ({ mode 
                 className="rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-cyan-500 focus:outline-none"
               >
                 <option value="">Tất cả trạng thái</option>
-                <option value="PENDING_REVIEW">PENDING_REVIEW</option>
-                <option value="APPROVED">APPROVED</option>
-                <option value="REJECTED">REJECTED</option>
-                <option value="EXPIRED">EXPIRED</option>
-                <option value="CANCELLED">CANCELLED</option>
+                <option value="PENDING_REVIEW">{formatSubscriptionStatus('PENDING_REVIEW')}</option>
+                <option value="APPROVED">{formatSubscriptionStatus('APPROVED')}</option>
+                <option value="REJECTED">{formatSubscriptionStatus('REJECTED')}</option>
+                <option value="EXPIRED">{formatSubscriptionStatus('EXPIRED')}</option>
+                <option value="CANCELLED">{formatSubscriptionStatus('CANCELLED')}</option>
               </select>
               <input
                 type="date"
@@ -597,7 +620,7 @@ const SubscriptionReviewQueue: React.FC<SubscriptionReviewQueueProps> = ({ mode 
                           <td className="px-4 py-3 font-semibold">{formatMoney(item.purchasedPrice)}</td>
                           <td className="px-4 py-3">
                             <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${statusBadgeClass(item.status)}`}>
-                              {item.status}
+                              {formatSubscriptionStatus(item.status)}
                             </span>
                           </td>
                           <td className="px-4 py-3 text-xs text-slate-500">
@@ -666,17 +689,23 @@ const SubscriptionReviewQueue: React.FC<SubscriptionReviewQueueProps> = ({ mode 
       </div>
 
       {billPreviewTarget && (
-        <div className="fixed inset-0 z-[125] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[125] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm" onClick={handleCloseBillPreview}>
           <button
             type="button"
             className="absolute inset-0"
             aria-label="Đóng xem bill"
             onClick={handleCloseBillPreview}
           />
-          <div className="relative w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+          <div
+            className="relative w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="subscription-review-bill-preview-title"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
               <div>
-                <h3 className="text-base font-black text-slate-900">Bill chuyển khoản</h3>
+                <h3 id="subscription-review-bill-preview-title" className="text-base font-black text-slate-900">Bill chuyển khoản</h3>
                 <p className="text-xs text-slate-500">{billPreviewTarget.label}</p>
               </div>
               <button
@@ -710,11 +739,17 @@ const SubscriptionReviewQueue: React.FC<SubscriptionReviewQueueProps> = ({ mode 
       )}
 
       {cancelTarget && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm" onClick={handleCloseCancelModal}>
+          <div
+            className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="subscription-cancel-title"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h3 className="text-lg font-black text-slate-900">Xác nhận hủy subscription</h3>
+                <h3 id="subscription-cancel-title" className="text-lg font-black text-slate-900">Xác nhận hủy subscription</h3>
                 <p className="mt-1 text-sm text-slate-500">
                   #{cancelTarget.id} - {cancelTarget.userFullName} - {cancelTarget.planName}
                 </p>

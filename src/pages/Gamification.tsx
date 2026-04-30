@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
   Award,
@@ -208,54 +208,79 @@ const Gamification: React.FC = () => {
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
   const [expandedBadges, setExpandedBadges] = useState<Record<string, boolean>>({});
 
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const [overviewRes, achievementsRes, calendarRes, leaderboardRes] = await Promise.allSettled([
-          fetchGamificationOverview(),
-          fetchGamificationAchievements(),
-          fetchGamificationCalendar(selectedMonth),
-          fetchGamificationLeaderboard(10),
-        ]);
+  const loadData = useCallback(async (options?: { showLoading?: boolean; silentErrors?: boolean }) => {
+    const showLoading = options?.showLoading ?? false;
+    const silentErrors = options?.silentErrors ?? false;
 
-        if (overviewRes.status === 'fulfilled') {
-          setOverview(overviewRes.value);
-          if (overviewRes.value.justQualifiedToday) {
-            setShowCongrats(true);
-          }
-        } else {
-          toast.error('Không thể tải tổng quan gamification.');
+    if (showLoading) {
+      setIsLoading(true);
+    }
+
+    try {
+      const [overviewRes, achievementsRes, calendarRes, leaderboardRes] = await Promise.allSettled([
+        fetchGamificationOverview(),
+        fetchGamificationAchievements(),
+        fetchGamificationCalendar(selectedMonth),
+        fetchGamificationLeaderboard(10),
+      ]);
+
+      if (overviewRes.status === 'fulfilled') {
+        setOverview(overviewRes.value);
+        if (overviewRes.value.justQualifiedToday) {
+          setShowCongrats(true);
         }
+      } else if (!silentErrors) {
+        toast.error('Không thể tải tổng quan gamification.');
+      }
 
-        if (achievementsRes.status === 'fulfilled') {
-          setAchievements(achievementsRes.value.map(normalizeAchievementView));
-        } else {
-          setAchievements([]);
+      if (achievementsRes.status === 'fulfilled') {
+        setAchievements(achievementsRes.value.map(normalizeAchievementView));
+      } else {
+        setAchievements([]);
+        if (!silentErrors) {
           toast.error('Không thể tải kho thành tựu.');
         }
+      }
 
-        if (calendarRes.status === 'fulfilled') {
-          setCalendar(calendarRes.value);
-        } else {
-          setCalendar(null);
+      if (calendarRes.status === 'fulfilled') {
+        setCalendar(calendarRes.value);
+      } else {
+        setCalendar(null);
+        if (!silentErrors) {
           toast.error('Không thể tải lịch streak.');
         }
+      }
 
-        if (leaderboardRes.status === 'fulfilled') {
-          setLeaderboard(leaderboardRes.value);
-        } else {
-          setLeaderboard([]);
-        }
+      if (leaderboardRes.status === 'fulfilled') {
+        setLeaderboard(leaderboardRes.value);
+      } else {
+        setLeaderboard([]);
+      }
 
-      } catch {
+    } catch {
+      if (!silentErrors) {
         toast.error('Không thể tải dữ liệu gamification.');
-      } finally {
+      }
+    } finally {
+      if (showLoading) {
         setIsLoading(false);
       }
-    };
-
-    void loadData();
+    }
   }, [selectedMonth]);
+
+  useEffect(() => {
+    void loadData({ showLoading: true });
+  }, [loadData]);
+
+  useEffect(() => {
+    const intervalId = globalThis.setInterval(() => {
+      void loadData({ silentErrors: true });
+    }, 30000);
+
+    return () => {
+      globalThis.clearInterval(intervalId);
+    };
+  }, [loadData]);
 
   const calendarDate = useMemo(() => {
     const [year, month] = selectedMonth.split('-').map((v) => Number(v));

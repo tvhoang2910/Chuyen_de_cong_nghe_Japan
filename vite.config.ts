@@ -24,6 +24,11 @@ export default defineConfig({
  target: 'http://localhost:8082',
  changeOrigin: true,
  },
+ // Search service — dev uses relative path /api/v1/search via Vite proxy to localhost:8086
+ '/api/v1/search': {
+ target: 'http://localhost:8086',
+ changeOrigin: true,
+ },
  // Analytics: Nginx rewrites /api/v1/analytics/ -> /api/v1/exam/analytics/ (deploy).
  // Vite mirrors this: proxy to exam service with the same rewrite.
  '/api/v1/analytics': {

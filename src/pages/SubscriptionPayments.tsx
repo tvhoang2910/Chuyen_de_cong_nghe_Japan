@@ -31,6 +31,24 @@ const statusLabel: Record<SubscriptionStatus, string> = {
 
 const MAX_BILL_SIZE_BYTES = 20 * 1024 * 1024;
 
+const isApprovedAndActiveSubscription = (
+  request: UserSubscriptionQueueItem,
+  nowEpochMs: number,
+): boolean => {
+  if (request.status !== 'APPROVED') {
+    return false;
+  }
+
+  const endTime = Date.parse(request.endDate);
+  if (Number.isNaN(endTime)) {
+    return false;
+  }
+
+  const startTime = Date.parse(request.startDate);
+  const effectiveStart = Number.isNaN(startTime) ? Number.NEGATIVE_INFINITY : startTime;
+  return effectiveStart <= nowEpochMs && endTime > nowEpochMs;
+};
+
 const SubscriptionPayments: React.FC = () => {
   const [plans, setPlans] = useState<PremiumPlanSummary[]>([]);
   const [requests, setRequests] = useState<UserSubscriptionQueueItem[]>([]);
@@ -49,6 +67,30 @@ const SubscriptionPayments: React.FC = () => {
     () => plans.find((plan) => plan.id === selectedPlanId) ?? null,
     [plans, selectedPlanId],
   );
+
+  const hasPendingRequest = useMemo(
+    () => requests.some((request) => request.status === 'PENDING_REVIEW'),
+    [requests],
+  );
+
+  const hasActivePremium = useMemo(() => {
+    const nowEpochMs = Date.now();
+    return requests.some((request) => isApprovedAndActiveSubscription(request, nowEpochMs));
+  }, [requests]);
+
+  const purchaseBlockMessage = useMemo(() => {
+    if (hasActivePremium) {
+      return 'Tài khoản đang có Premium hiệu lực. Bạn chưa thể mua thêm gói mới.';
+    }
+
+    if (hasPendingRequest) {
+      return 'Bạn đang có yêu cầu Premium chờ duyệt. Vui lòng đợi kết quả trước khi gửi yêu cầu khác.';
+    }
+
+    return null;
+  }, [hasActivePremium, hasPendingRequest]);
+
+  const isPurchaseBlocked = Boolean(purchaseBlockMessage);
 
   const loadData = useCallback(async () => {
     try {
@@ -114,8 +156,33 @@ const SubscriptionPayments: React.FC = () => {
     };
   }, [billPreviewUrl]);
 
+  useEffect(() => {
+    if (!billPreviewTarget) {
+      return;
+    }
+
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        handleCloseBillPreview();
+      }
+    };
+
+    globalThis.addEventListener('keydown', onEscape);
+    return () => {
+      globalThis.removeEventListener('keydown', onEscape);
+    };
+  }, [billPreviewTarget, handleCloseBillPreview]);
+
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (hasActivePremium) {
+      toast.error('Tài khoản đã có Premium hiệu lực. Bạn không cần mua thêm gói mới.');
+      return;
+    }
+    if (hasPendingRequest) {
+      toast.error('Bạn đang có yêu cầu Premium chờ duyệt. Vui lòng đợi kết quả trước khi gửi yêu cầu mới.');
+      return;
+    }
     if (!selectedPlanId) {
       toast.error('Vui lòng chọn gói Premium.');
       return;
@@ -181,12 +248,13 @@ const SubscriptionPayments: React.FC = () => {
                     <button
                       key={plan.id}
                       type="button"
+                      disabled={isPurchaseBlocked}
                       onClick={() => setSelectedPlanId(plan.id)}
                       className={`rounded-2xl border p-4 text-left transition-all ${
                         active
                           ? 'border-cyan-500 bg-cyan-50 shadow-sm shadow-cyan-500/20'
                           : 'border-slate-200 bg-white hover:border-cyan-300'
-                      }`}
+                      } ${isPurchaseBlocked ? 'cursor-not-allowed opacity-60' : ''}`}
                     >
                       <p className="text-lg font-bold text-slate-900">{plan.name}</p>
                       <p className="mt-1 text-sm text-slate-500">{plan.description || 'Gói nâng cao cho trải nghiệm học tập.'}</p>
@@ -203,6 +271,14 @@ const SubscriptionPayments: React.FC = () => {
 
           <form onSubmit={handleSubmit} className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="mb-4 text-xl font-bold text-slate-900">Gửi bill thanh toán</h2>
+            {purchaseBlockMessage && (
+              <div
+                role="status"
+                className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800"
+              >
+                {purchaseBlockMessage}
+              </div>
+            )}
             <div className="space-y-4">
               <div className="rounded-2xl border border-dashed border-cyan-300 bg-cyan-50 p-4 text-sm text-cyan-900">
                 <p className="font-semibold">Thông tin chuyển khoản mẫu</p>
@@ -216,6 +292,7 @@ const SubscriptionPayments: React.FC = () => {
                 <select
                   value={paymentMethod}
                   onChange={(event) => setPaymentMethod(event.target.value)}
+                  disabled={isPurchaseBlocked}
                   className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-cyan-500 focus:outline-none"
                 >
                   <option value="bank_transfer">Chuyển khoản ngân hàng</option>
@@ -229,6 +306,7 @@ const SubscriptionPayments: React.FC = () => {
                 <input
                   value={transactionRef}
                   onChange={(event) => setTransactionRef(event.target.value)}
+                  disabled={isPurchaseBlocked}
                   className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-cyan-500 focus:outline-none"
                   placeholder="VD: FT260319123456"
                 />
@@ -239,6 +317,7 @@ const SubscriptionPayments: React.FC = () => {
                 <input
                   value={promoCode}
                   onChange={(event) => setPromoCode(event.target.value)}
+                  disabled={isPurchaseBlocked}
                   className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-cyan-500 focus:outline-none"
                   placeholder="VD: PREMIUM10"
                 />
@@ -251,6 +330,7 @@ const SubscriptionPayments: React.FC = () => {
                 <input
                   type="file"
                   accept="image/*"
+                  disabled={isPurchaseBlocked}
                   onChange={(event) => setBillFile(event.target.files?.[0] || null)}
                   className="block w-full text-sm"
                 />
@@ -259,11 +339,17 @@ const SubscriptionPayments: React.FC = () => {
 
               <button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || isPurchaseBlocked}
                 className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-cyan-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-cyan-700 disabled:cursor-not-allowed disabled:bg-cyan-300"
               >
                 <UploadCloud className="h-4 w-4" />
-                {isSubmitting ? 'Đang gửi...' : 'Gửi yêu cầu nâng cấp'}
+                {isSubmitting
+                  ? 'Đang gửi...'
+                  : hasActivePremium
+                    ? 'Đang có Premium hiệu lực'
+                    : hasPendingRequest
+                      ? 'Đang chờ duyệt yêu cầu trước'
+                      : 'Gửi yêu cầu nâng cấp'}
               </button>
             </div>
           </form>
@@ -321,10 +407,15 @@ const SubscriptionPayments: React.FC = () => {
               aria-label="Đóng xem bill"
               onClick={handleCloseBillPreview}
             />
-            <div className="relative w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div
+              className="relative w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-2xl"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="subscription-payments-bill-preview-title"
+            >
               <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
                 <div>
-                  <h3 className="text-base font-black text-slate-900">Bill chuyển khoản</h3>
+                  <h3 id="subscription-payments-bill-preview-title" className="text-base font-black text-slate-900">Bill chuyển khoản</h3>
                   <p className="text-xs text-slate-500">{billPreviewTarget.label}</p>
                 </div>
                 <button

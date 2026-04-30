@@ -7,6 +7,7 @@
 
 const DEFAULT_AUTH_API = "/api/v1/auth";
 const DEFAULT_EXAM_API = "/api/v1/exam";
+const DEFAULT_SEARCH_API = "/api/v1/search";
 const DEFAULT_STUDY_API = "/api/v1/study";
 const DEFAULT_COMMUNITY_API = "/api/v1/community";
 const DEFAULT_ANALYTICS_API = "/api/v1/analytics";
@@ -18,6 +19,10 @@ export const authApiBaseUrl =
 // examApiBaseUrl is used by examClient.ts and reportClient.ts (exam service)
 export const examApiBaseUrl =
  import.meta.env.VITE_EXAM_API_BASE_URL || DEFAULT_EXAM_API;
+
+// searchApiBaseUrl is used by searchClient.ts (search service)
+export const searchApiBaseUrl =
+ import.meta.env.VITE_SEARCH_API_BASE_URL || DEFAULT_SEARCH_API;
 
 // studyApiBaseUrl is used by studyClient.ts (study service)
 export const studyApiBaseUrl =

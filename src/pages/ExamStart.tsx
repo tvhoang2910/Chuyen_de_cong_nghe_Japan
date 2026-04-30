@@ -5,6 +5,7 @@ import MainLayout from "../components/MainLayout";
 import PremiumUpsellModal from "../components/PremiumUpsellModal";
 import CommentForm from "../components/CommentForm";
 import CommentTree from "../components/CommentTree";
+import ExamRatingStars from "../components/ExamRatingStars";
 import type { CommentNode } from "../api/commentClient";
 import { createComment, fetchCommentsByExam } from "../api/commentClient";
 import { resolveCommentSubmitErrorMessage } from "../api/commentHelpers";
@@ -15,6 +16,10 @@ import {
   type AttemptSummary,
   type ExamSummary,
 } from "../api/examClient";
+import {
+  fetchExamRatingSummary,
+  type ExamRatingSummary,
+} from "../api/examRatingClient";
 
 const ExamStart: React.FC = () => {
   const params = useParams();
@@ -28,8 +33,12 @@ const ExamStart: React.FC = () => {
   const [showPremiumModal, setShowPremiumModal] = useState(false);
   const [comments, setComments] = useState<CommentNode[]>([]);
   const [isLoadingComments, setIsLoadingComments] = useState(false);
+  const [ratingSummary, setRatingSummary] = useState<ExamRatingSummary | null>(
+    null,
+  );
+  const [isLoadingRating, setIsLoadingRating] = useState(false);
   const [replyTargetId, setReplyTargetId] = useState<number | null>(null);
-  const userId = profile?.id ?? 1;
+  const userId = profile?.id ?? null;
 
   const loadComments = useCallback(async (examIdNumber: number) => {
     setIsLoadingComments(true);
@@ -44,10 +53,28 @@ const ExamStart: React.FC = () => {
     }
   }, []);
 
+  const loadRating = useCallback(async (examIdNumber: number) => {
+    setIsLoadingRating(true);
+    try {
+      const data = await fetchExamRatingSummary(examIdNumber);
+      setRatingSummary(data);
+    } catch (error) {
+      console.error(error);
+      setRatingSummary(null);
+    } finally {
+      setIsLoadingRating(false);
+    }
+  }, []);
+
   const handleCommentSubmit = async (
     content: string,
     parentId: number | null = null,
   ) => {
+    if (!userId) {
+      toast.error("Không xác định được người dùng hiện tại.");
+      return;
+    }
+
     const payload = {
       userId,
       targetId: examId,
@@ -89,6 +116,7 @@ const ExamStart: React.FC = () => {
           attempts.filter((attempt) => attempt.examId === examId),
         );
         void loadComments(examId);
+        void loadRating(examId);
       } catch {
         toast.error("Không thể tải thông tin đề thi.");
         navigate("/dashboard/exams");
@@ -98,7 +126,7 @@ const ExamStart: React.FC = () => {
     };
 
     void load();
-  }, [examId, navigate, loadComments]);
+  }, [examId, navigate, loadComments, loadRating]);
 
   const stats = useMemo(() => {
     const totalAttempts = examAttempts.length;
@@ -120,11 +148,17 @@ const ExamStart: React.FC = () => {
     };
   }, [examAttempts]);
 
-  const isPremiumLocked = useMemo(() => {
-    if (!exam?.premium) {
-      return false;
-    }
+  const hasSubmittedAttempt = useMemo(
+    () =>
+      examAttempts.some(
+        (attempt) =>
+          attempt.status === "SUBMITTED" || attempt.status === "AUTO_SUBMITTED",
+      ),
+    [examAttempts],
+  );
 
+  const isPremiumLocked = useMemo(() => {
+    if (!exam?.premium) return false;
     return !profile?.premium;
   }, [exam?.premium, profile?.premium]);
 
@@ -191,6 +225,44 @@ const ExamStart: React.FC = () => {
               <p className="mt-1 text-xl font-bold text-slate-900">
                 {exam.passingScore}
               </p>
+            </div>
+          </div>
+
+          <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-amber-900">
+                  Đánh giá đề thi
+                </p>
+                <p className="text-sm text-amber-800">
+                  {isLoadingRating
+                    ? "Đang tải đánh giá..."
+                    : ratingSummary
+                      ? `${ratingSummary.ratingCount} lượt đánh giá`
+                      : "Chưa có đánh giá"}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <ExamRatingStars
+                  value={ratingSummary?.averageRating ?? 0}
+                  size="md"
+                  showValue
+                  valueLabel={
+                    ratingSummary
+                      ? `${ratingSummary.averageRating.toFixed(1)}/5`
+                      : "0.0/5"
+                  }
+                  countLabel={
+                    ratingSummary
+                      ? `(${ratingSummary.ratingCount} lượt)`
+                      : "(0 lượt)"
+                  }
+                />
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-2xl border border-dashed border-amber-200 bg-white/70 p-4 text-sm text-amber-900">
+              Đánh giá sao sẽ được mở ở trang kết quả sau khi bạn nộp bài.
             </div>
           </div>
         </div>
@@ -273,12 +345,20 @@ const ExamStart: React.FC = () => {
             </div>
           </div>
 
+          {!hasSubmittedAttempt && (
+            <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+              Bạn chỉ có thể bình luận sau khi nộp bài.
+            </div>
+          )}
+
+          {hasSubmittedAttempt && (
             <div className="mt-6 rounded-3xl bg-slate-50 p-5 border border-slate-200">
               <CommentForm
                 submitLabel="Gửi comment"
                 onSubmit={(content) => handleCommentSubmit(content, null)}
               />
             </div>
+          )}
 
           <div className="mt-6 space-y-4">
             {isLoadingComments ? (
@@ -296,7 +376,7 @@ const ExamStart: React.FC = () => {
                   comment={comment}
                   depth={0}
                   activeReplyTargetId={replyTargetId}
-                  canReply={true}
+                  canReply={hasSubmittedAttempt}
                   onReply={(commentId) => setReplyTargetId(commentId)}
                   onCancelReply={() => setReplyTargetId(null)}
                   onSubmitReply={(content, parentId) =>
