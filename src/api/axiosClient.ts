@@ -1,6 +1,5 @@
 import axios, { AxiosError } from "axios";
 import type { InternalAxiosRequestConfig } from "axios";
-import { authApiBaseUrl } from "../config/env";
 
 type AuthPayload = {
   accessToken: string;
@@ -19,7 +18,7 @@ type AuthTokenApiResponse = {
   refreshExpiresIn?: number;
 };
 
-export type AppRole = "USER" | "CONTRIBUTOR" | "ADMIN";
+export type AppRole = "USER" | "CONTRIBUTOR" | "ADMIN" | "AUDIT";
 
 export type UserProfile = {
   id: number;
@@ -360,15 +359,17 @@ const cacheCurrentUserDisplayName = (profile: UserProfile) => {
   localStorage.removeItem(USER_FULL_NAME_STORAGE_KEY);
 };
 
+const DEFAULT_AUTH_BASE = "/api/v1/auth";
+
 const axiosClient = axios.create({
-  baseURL: authApiBaseUrl,
+  baseURL: DEFAULT_AUTH_BASE,
   headers: {
     "Content-Type": "application/json",
   },
 });
 
 const refreshClient = axios.create({
-  baseURL: authApiBaseUrl,
+  baseURL: DEFAULT_AUTH_BASE,
   headers: {
     "Content-Type": "application/json",
   },
@@ -384,7 +385,9 @@ type CacheEntry<T> = {
 const DEFAULT_GET_CACHE_TTL_MS = Number(
   import.meta.env.VITE_GET_CACHE_TTL_MS ?? 5000,
 );
-const MAX_GET_CACHE_ENTRIES = Number(import.meta.env.VITE_GET_CACHE_MAX_ENTRIES ?? 200);
+const MAX_GET_CACHE_ENTRIES = Number(
+  import.meta.env.VITE_GET_CACHE_MAX_ENTRIES ?? 200,
+);
 const responseCache = new Map<string, CacheEntry<unknown>>();
 const inflightGetRequests = new Map<string, Promise<unknown>>();
 
@@ -482,9 +485,11 @@ const withCachedGet = async <T>(
   return request;
 };
 
-export const exchangeOAuth2Code = async (code: string): Promise<AuthPayload> => {
+export const exchangeOAuth2Code = async (
+  code: string,
+): Promise<AuthPayload> => {
   const response = await axiosClient.post<AuthTokenApiResponse>(
-    '/oauth2/exchange',
+    "/oauth2/exchange",
     { code },
     { _skipAuthRecovery: true } as RetryableRequestConfig,
   );
@@ -541,7 +546,10 @@ export const notifySubscriptionReviewUpdated = () => {
 
 export const getCurrentSessionRole = (): AppRole | null => {
   const role = localStorage.getItem("user_role");
-  return role === "USER" || role === "CONTRIBUTOR" || role === "ADMIN"
+  return role === "USER" ||
+    role === "CONTRIBUTOR" ||
+    role === "ADMIN" ||
+    role === "AUDIT"
     ? role
     : null;
 };
@@ -678,7 +686,8 @@ export const fetchManagedPremiumPlans = async (params?: {
   active?: boolean;
 }): Promise<PremiumPlanSummary[]> => {
   const search = params?.search?.trim() ?? "";
-  const active = typeof params?.active === "boolean" ? String(params.active) : "";
+  const active =
+    typeof params?.active === "boolean" ? String(params.active) : "";
   const query = new URLSearchParams();
   if (search) {
     query.set("search", search);
@@ -911,18 +920,19 @@ export const fetchSubscriptionBillImage = async (
   return response.data;
 };
 
-export const fetchNotificationPreferences = async (): Promise<NotificationPreference> => {
-  return withCachedGet<NotificationPreference>(
-    "notification:center:preferences",
-    async () => {
-      const response = await axiosClient.get<NotificationPreference>(
-        "/notifications/preferences",
-      );
-      return response.data;
-    },
-    1500,
-  );
-};
+export const fetchNotificationPreferences =
+  async (): Promise<NotificationPreference> => {
+    return withCachedGet<NotificationPreference>(
+      "notification:center:preferences",
+      async () => {
+        const response = await axiosClient.get<NotificationPreference>(
+          "/notifications/preferences",
+        );
+        return response.data;
+      },
+      1500,
+    );
+  };
 
 export const updateNotificationPreferences = async (
   payload: Partial<NotificationPreference>,
@@ -976,8 +986,11 @@ axiosClient.interceptors.request.use((config) => {
     return config;
   }
 
+  // Always attach Authorization header when we have an access token in storage.
+  // Token expiry/refresh is handled by the response interceptor (401 -> refresh).
   const token = localStorage.getItem("access_token");
   if (token) {
+    config.headers = config.headers ?? {};
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
@@ -1013,6 +1026,7 @@ axiosClient.interceptors.response.use(
     const status = error.response?.status;
 
     if (originalRequest?._skipAuthRecovery && status === 401) {
+      clearAuthSession();
       throw error;
     }
 

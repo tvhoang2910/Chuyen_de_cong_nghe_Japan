@@ -1,47 +1,55 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { Suspense, lazy, useEffect, useState, useRef } from 'react';
-import { usePushNotification } from '@/hooks/usePushNotification';
-import { Toaster } from 'react-hot-toast';
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Suspense, lazy, useEffect, useState } from "react";
+import { Toaster } from "react-hot-toast";
 import {
   AUTH_SESSION_CHANGED_EVENT,
   clearAuthSession,
   fetchCurrentUserProfile,
   getCurrentSessionRole,
-} from './api/axiosClient';
+} from "./api/axiosClient";
 
-const Home = lazy(() => import('./pages/Home'));
-const About = lazy(() => import('./pages/About'));
-const Features = lazy(() => import('./pages/Features'));
-const Pricing = lazy(() => import('./pages/Pricing'));
-const Login = lazy(() => import('./pages/Login'));
-const Register = lazy(() => import('./pages/Register'));
-const VerifyRegisterEmail = lazy(() => import('./pages/VerifyRegisterEmail'));
-const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
-const ForgotPasswordVerifyOtp = lazy(() => import('./pages/ForgotPasswordVerifyOtp'));
-const ResetPassword = lazy(() => import('./pages/ResetPassword'));
-const Dashboard = lazy(() => import('./pages/Dashboard'));
-const OAuth2Success = lazy(() => import('./pages/OAuth2Success'));
-const AdminUsers = lazy(() => import('./pages/AdminUsers'));
-const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
-const AdminAchievements = lazy(() => import('./pages/AdminAchievements'));
-const AuditLogPage = lazy(() => import('./pages/AuditLogPage'));
-const ExamManagement = lazy(() => import('./pages/ExamManagement'));
-const PublicExams = lazy(() => import('./pages/PublicExams'));
-const ExamStart = lazy(() => import('./pages/ExamStart'));
-const ExamAttempt = lazy(() => import('./pages/ExamAttempt'));
-const ExamResult = lazy(() => import('./pages/ExamResult'));
-const SpacedRepetition = lazy(() => import('./pages/SpacedRepetition.tsx'));
-const SpacedRepetitionPractice = lazy(() => import('./pages/SpacedRepetitionPractice.tsx'));
-const Gamification = lazy(() => import('./pages/Gamification'));
-const SubscriptionPayments = lazy(() => import('./pages/SubscriptionPayments'));
-const NotificationSettings = lazy(() => import('./pages/NotificationSettings'));
-const SubscriptionReviewQueue = lazy(() => import('./pages/SubscriptionReviewQueue'));
-const PremiumPlanManagement = lazy(() => import('./pages/PremiumPlanManagement'));
-const AdminReports = lazy(() => import('./pages/AdminReports'));
-const CommentsPage = lazy(() => import('./pages/CommentsPage'));
-const UserExamUpload = lazy(() => import('./pages/UserExamUpload'));
-const MyExamUploads = lazy(() => import('./pages/MyExamUploads'));
-const AdminUploadQueue = lazy(() => import('./pages/AdminUploadQueue'));
+const Home = lazy(() => import("./pages/Home"));
+const About = lazy(() => import("./pages/About"));
+const Features = lazy(() => import("./pages/Features"));
+const Pricing = lazy(() => import("./pages/Pricing"));
+const Login = lazy(() => import("./pages/Login"));
+const Register = lazy(() => import("./pages/Register"));
+const VerifyRegisterEmail = lazy(() => import("./pages/VerifyRegisterEmail"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ForgotPasswordVerifyOtp = lazy(
+  () => import("./pages/ForgotPasswordVerifyOtp"),
+);
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const OAuth2Success = lazy(() => import("./pages/OAuth2Success"));
+const AdminUsers = lazy(() => import("./pages/AdminUsers"));
+const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
+const AdminAchievements = lazy(() => import("./pages/AdminAchievements"));
+const ExamManagement = lazy(() => import("./pages/ExamManagement"));
+const PublicExams = lazy(() => import("./pages/PublicExams"));
+const ExamStart = lazy(() => import("./pages/ExamStart"));
+const ExamAttempt = lazy(() => import("./pages/ExamAttempt"));
+const ExamResult = lazy(() => import("./pages/ExamResult"));
+const SpacedRepetition = lazy(() => import("./pages/SpacedRepetition.tsx"));
+const SpacedRepetitionPractice = lazy(
+  () => import("./pages/SpacedRepetitionPractice.tsx"),
+);
+const Gamification = lazy(() => import("./pages/Gamification"));
+const SubscriptionPayments = lazy(() => import("./pages/SubscriptionPayments"));
+const NotificationSettings = lazy(() => import("./pages/NotificationSettings"));
+const SubscriptionReviewQueue = lazy(
+  () => import("./pages/SubscriptionReviewQueue"),
+);
+const PremiumPlanManagement = lazy(
+  () => import("./pages/PremiumPlanManagement"),
+);
+const AuditVipApproval = lazy(() => import("./pages/audit/AuditVipApproval"));
+const AuditPayments = lazy(() => import("./pages/audit/AuditPayments"));
+const AdminReports = lazy(() => import("./pages/AdminReports"));
+const CommentsPage = lazy(() => import("./pages/CommentsPage"));
+const UserExamUpload = lazy(() => import("./pages/UserExamUpload"));
+const MyExamUploads = lazy(() => import("./pages/MyExamUploads"));
+const AdminUploadQueue = lazy(() => import("./pages/AdminUploadQueue"));
 
 const RouteLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-600 font-semibold italic animate-pulse">
@@ -57,38 +65,49 @@ interface ProtectedRouteProps {
   defaultPath: string;
 }
 
-const ProtectedRoute = ({ children, allowedRoles, isAuthenticated, userRole, defaultPath }: ProtectedRouteProps) => {
+const ProtectedRoute = ({
+  children,
+  allowedRoles,
+  isAuthenticated,
+  userRole,
+  defaultPath,
+}: ProtectedRouteProps) => {
   if (!isAuthenticated) return <Navigate to="/login" />;
-  if (allowedRoles && !allowedRoles.includes(userRole || '')) return <Navigate to={defaultPath} />;
+  if (allowedRoles && !allowedRoles.includes(userRole || ""))
+    return <Navigate to={defaultPath} />;
   return <>{children}</>;
 };
 
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(() => Boolean(localStorage.getItem('access_token')));
+  const [isAuthenticated, setIsAuthenticated] = useState(() =>
+    Boolean(localStorage.getItem("access_token")),
+  );
   const [role, setRole] = useState(() => getCurrentSessionRole());
-  
-  const hasTokenInStorage = Boolean(localStorage.getItem('access_token'));
+
+  const hasTokenInStorage = Boolean(localStorage.getItem("access_token"));
   const effectiveIsAuthenticated = isAuthenticated || hasTokenInStorage;
   const effectiveRole = role ?? getCurrentSessionRole();
-  
-  let defaultAuthenticatedPath = '/dashboard';
-  if (effectiveRole === 'ADMIN') {
-    defaultAuthenticatedPath = '/admin/users';
-  } else if (effectiveRole === 'CONTRIBUTOR') {
-    defaultAuthenticatedPath = '/contributor';
+
+  let defaultAuthenticatedPath = "/dashboard";
+  if (effectiveRole === "ADMIN") {
+    defaultAuthenticatedPath = "/admin/users";
+  } else if (effectiveRole === "AUDIT") {
+    defaultAuthenticatedPath = "/admin/audit/vip";
+  } else if (effectiveRole === "CONTRIBUTOR") {
+    defaultAuthenticatedPath = "/contributor";
   }
 
   useEffect(() => {
     const syncAuthState = () => {
-      setIsAuthenticated(Boolean(localStorage.getItem('access_token')));
+      setIsAuthenticated(Boolean(localStorage.getItem("access_token")));
       setRole(getCurrentSessionRole());
     };
 
-    globalThis.addEventListener('storage', syncAuthState);
+    globalThis.addEventListener("storage", syncAuthState);
     globalThis.addEventListener(AUTH_SESSION_CHANGED_EVENT, syncAuthState);
 
     return () => {
-      globalThis.removeEventListener('storage', syncAuthState);
+      globalThis.removeEventListener("storage", syncAuthState);
       globalThis.removeEventListener(AUTH_SESSION_CHANGED_EVENT, syncAuthState);
     };
   }, []);
@@ -107,16 +126,16 @@ function App() {
         }
 
         const backendRole = profile.role;
-        const localRole = localStorage.getItem('user_role');
+        const localRole = localStorage.getItem("user_role");
 
         if (!localRole && backendRole) {
-          localStorage.setItem('user_role', backendRole);
+          localStorage.setItem("user_role", backendRole);
           setRole(backendRole);
           return;
         }
 
         if (backendRole && localRole && backendRole !== localRole) {
-          console.warn('[App] Role mismatch detected, clearing local session');
+          console.warn("[App] Role mismatch detected, clearing local session");
           clearAuthSession();
         }
       } catch {
@@ -133,30 +152,15 @@ function App() {
     };
   }, [effectiveIsAuthenticated]);
 
-  const { subscribe, unsubscribe } = usePushNotification();
-  const prevAuth = useRef(false);
-
-  useEffect(() => {
-    if (effectiveIsAuthenticated && !prevAuth.current) {
-      // User just logged in — refresh browser subscription with backend.
-      void subscribe({ forceRefreshExisting: true });
-    }
-    if (!effectiveIsAuthenticated && prevAuth.current) {
-      // User just logged out — remove stale browser subscription binding
-      void unsubscribe();
-    }
-    prevAuth.current = effectiveIsAuthenticated;
-  }, [effectiveIsAuthenticated, subscribe, unsubscribe]);
-
   return (
     <BrowserRouter>
       <div className="min-h-screen flex flex-col font-sans bg-slate-50 text-slate-900">
         <Toaster
           position="top-right"
-          containerStyle={{ pointerEvents: 'none' }}
+          containerStyle={{ pointerEvents: "none" }}
           toastOptions={{
             style: {
-              pointerEvents: 'none',
+              pointerEvents: "none",
             },
           }}
         />
@@ -167,33 +171,51 @@ function App() {
             <Route path="/features" element={<Features />} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/about" element={<About />} />
-            <Route 
-              path="/login" 
-              element={effectiveIsAuthenticated ? <Navigate to={defaultAuthenticatedPath} /> : <Login />} 
+            <Route
+              path="/login"
+              element={
+                effectiveIsAuthenticated ? (
+                  <Navigate to={defaultAuthenticatedPath} />
+                ) : (
+                  <Login />
+                )
+              }
             />
-            <Route 
-              path="/register" 
-              element={effectiveIsAuthenticated ? <Navigate to={defaultAuthenticatedPath} /> : <Register />} 
+            <Route
+              path="/register"
+              element={
+                effectiveIsAuthenticated ? (
+                  <Navigate to={defaultAuthenticatedPath} />
+                ) : (
+                  <Register />
+                )
+              }
             />
-            <Route path="/register/verify-email" element={<VerifyRegisterEmail />} />
+            <Route
+              path="/register/verify-email"
+              element={<VerifyRegisterEmail />}
+            />
             <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/forgot-password/verify" element={<ForgotPasswordVerifyOtp />} />
+            <Route
+              path="/forgot-password/verify"
+              element={<ForgotPasswordVerifyOtp />}
+            />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/oauth2/success" element={<OAuth2Success />} />
 
             {/* User/Contributor Routes */}
-            <Route 
-              path="/dashboard" 
+            <Route
+              path="/dashboard"
               element={
-                <ProtectedRoute 
-                  isAuthenticated={effectiveIsAuthenticated} 
-                  userRole={effectiveRole} 
-                  defaultPath={defaultAuthenticatedPath} 
-                  allowedRoles={['USER']}
+                <ProtectedRoute
+                  isAuthenticated={effectiveIsAuthenticated}
+                  userRole={effectiveRole}
+                  defaultPath={defaultAuthenticatedPath}
+                  allowedRoles={["USER"]}
                 >
                   <Dashboard />
                 </ProtectedRoute>
-              } 
+              }
             />
             <Route
               path="/dashboard/subscription-payments"
@@ -202,7 +224,7 @@ function App() {
                   isAuthenticated={effectiveIsAuthenticated}
                   userRole={effectiveRole}
                   defaultPath={defaultAuthenticatedPath}
-                  allowedRoles={['USER']}
+                  allowedRoles={["USER"]}
                 >
                   <SubscriptionPayments />
                 </ProtectedRoute>
@@ -215,7 +237,7 @@ function App() {
                   isAuthenticated={effectiveIsAuthenticated}
                   userRole={effectiveRole}
                   defaultPath={defaultAuthenticatedPath}
-                  allowedRoles={['USER']}
+                  allowedRoles={["USER"]}
                 >
                   <NotificationSettings />
                 </ProtectedRoute>
@@ -228,7 +250,7 @@ function App() {
                   isAuthenticated={effectiveIsAuthenticated}
                   userRole={effectiveRole}
                   defaultPath={defaultAuthenticatedPath}
-                  allowedRoles={['USER']}
+                  allowedRoles={["USER"]}
                 >
                   <PublicExams />
                 </ProtectedRoute>
@@ -241,7 +263,7 @@ function App() {
                   isAuthenticated={effectiveIsAuthenticated}
                   userRole={effectiveRole}
                   defaultPath={defaultAuthenticatedPath}
-                  allowedRoles={['USER']}
+                  allowedRoles={["USER"]}
                 >
                   <ExamStart />
                 </ProtectedRoute>
@@ -254,7 +276,7 @@ function App() {
                   isAuthenticated={effectiveIsAuthenticated}
                   userRole={effectiveRole}
                   defaultPath={defaultAuthenticatedPath}
-                  allowedRoles={['USER']}
+                  allowedRoles={["USER"]}
                 >
                   <ExamAttempt />
                 </ProtectedRoute>
@@ -267,7 +289,7 @@ function App() {
                   isAuthenticated={effectiveIsAuthenticated}
                   userRole={effectiveRole}
                   defaultPath={defaultAuthenticatedPath}
-                  allowedRoles={['USER']}
+                  allowedRoles={["USER"]}
                 >
                   <SpacedRepetition />
                 </ProtectedRoute>
@@ -280,7 +302,7 @@ function App() {
                   isAuthenticated={effectiveIsAuthenticated}
                   userRole={effectiveRole}
                   defaultPath={defaultAuthenticatedPath}
-                  allowedRoles={['USER']}
+                  allowedRoles={["USER"]}
                 >
                   <SpacedRepetitionPractice />
                 </ProtectedRoute>
@@ -293,7 +315,7 @@ function App() {
                   isAuthenticated={effectiveIsAuthenticated}
                   userRole={effectiveRole}
                   defaultPath={defaultAuthenticatedPath}
-                  allowedRoles={['USER']}
+                  allowedRoles={["USER"]}
                 >
                   <Gamification />
                 </ProtectedRoute>
@@ -306,7 +328,7 @@ function App() {
                   isAuthenticated={effectiveIsAuthenticated}
                   userRole={effectiveRole}
                   defaultPath={defaultAuthenticatedPath}
-                  allowedRoles={['USER']}
+                  allowedRoles={["USER"]}
                 >
                   <ExamResult />
                 </ProtectedRoute>
@@ -319,24 +341,24 @@ function App() {
                   isAuthenticated={effectiveIsAuthenticated}
                   userRole={effectiveRole}
                   defaultPath={defaultAuthenticatedPath}
-                  allowedRoles={['USER', 'ADMIN', 'CONTRIBUTOR', 'TEACHER']}
+                  allowedRoles={["USER", "ADMIN", "CONTRIBUTOR", "TEACHER"]}
                 >
                   <CommentsPage />
                 </ProtectedRoute>
               }
             />
-            <Route 
-              path="/contributor" 
+            <Route
+              path="/contributor"
               element={
-                <ProtectedRoute 
-                  isAuthenticated={effectiveIsAuthenticated} 
-                  userRole={effectiveRole} 
-                  defaultPath={defaultAuthenticatedPath} 
-                  allowedRoles={['CONTRIBUTOR']}
+                <ProtectedRoute
+                  isAuthenticated={effectiveIsAuthenticated}
+                  userRole={effectiveRole}
+                  defaultPath={defaultAuthenticatedPath}
+                  allowedRoles={["CONTRIBUTOR"]}
                 >
                   <Dashboard />
                 </ProtectedRoute>
-              } 
+              }
             />
             <Route
               path="/contributor/exams"
@@ -345,7 +367,7 @@ function App() {
                   isAuthenticated={effectiveIsAuthenticated}
                   userRole={effectiveRole}
                   defaultPath={defaultAuthenticatedPath}
-                  allowedRoles={['CONTRIBUTOR']}
+                  allowedRoles={["CONTRIBUTOR"]}
                 >
                   <ExamManagement mode="CONTRIBUTOR" />
                 </ProtectedRoute>
@@ -358,7 +380,7 @@ function App() {
                   isAuthenticated={effectiveIsAuthenticated}
                   userRole={effectiveRole}
                   defaultPath={defaultAuthenticatedPath}
-                  allowedRoles={['CONTRIBUTOR']}
+                  allowedRoles={["CONTRIBUTOR"]}
                 >
                   <SubscriptionReviewQueue mode="contributor" />
                 </ProtectedRoute>
@@ -371,7 +393,7 @@ function App() {
                   isAuthenticated={effectiveIsAuthenticated}
                   userRole={effectiveRole}
                   defaultPath={defaultAuthenticatedPath}
-                  allowedRoles={['CONTRIBUTOR']}
+                  allowedRoles={["CONTRIBUTOR"]}
                 >
                   <PremiumPlanManagement mode="contributor" />
                 </ProtectedRoute>
@@ -384,7 +406,7 @@ function App() {
                   isAuthenticated={effectiveIsAuthenticated}
                   userRole={effectiveRole}
                   defaultPath={defaultAuthenticatedPath}
-                  allowedRoles={['CONTRIBUTOR']}
+                  allowedRoles={["CONTRIBUTOR"]}
                 >
                   <AdminReports mode="contributor" />
                 </ProtectedRoute>
@@ -392,18 +414,18 @@ function App() {
             />
 
             {/* Admin Routes */}
-            <Route 
-              path="/admin/users" 
+            <Route
+              path="/admin/users"
               element={
-                <ProtectedRoute 
-                  isAuthenticated={effectiveIsAuthenticated} 
-                  userRole={effectiveRole} 
-                  defaultPath={defaultAuthenticatedPath} 
-                  allowedRoles={['ADMIN']}
+                <ProtectedRoute
+                  isAuthenticated={effectiveIsAuthenticated}
+                  userRole={effectiveRole}
+                  defaultPath={defaultAuthenticatedPath}
+                  allowedRoles={["ADMIN"]}
                 >
                   <AdminUsers />
                 </ProtectedRoute>
-              } 
+              }
             />
             <Route
               path="/admin/dashboard"
@@ -412,7 +434,7 @@ function App() {
                   isAuthenticated={effectiveIsAuthenticated}
                   userRole={effectiveRole}
                   defaultPath={defaultAuthenticatedPath}
-                  allowedRoles={['ADMIN']}
+                  allowedRoles={["ADMIN"]}
                 >
                   <AdminDashboard />
                 </ProtectedRoute>
@@ -425,22 +447,9 @@ function App() {
                   isAuthenticated={effectiveIsAuthenticated}
                   userRole={effectiveRole}
                   defaultPath={defaultAuthenticatedPath}
-                  allowedRoles={['ADMIN']}
+                  allowedRoles={["ADMIN"]}
                 >
                   <AdminAchievements />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/audit-logs"
-              element={
-                <ProtectedRoute
-                  isAuthenticated={effectiveIsAuthenticated}
-                  userRole={effectiveRole}
-                  defaultPath={defaultAuthenticatedPath}
-                  allowedRoles={['ADMIN']}
-                >
-                  <AuditLogPage />
                 </ProtectedRoute>
               }
             />
@@ -451,7 +460,7 @@ function App() {
                   isAuthenticated={effectiveIsAuthenticated}
                   userRole={effectiveRole}
                   defaultPath={defaultAuthenticatedPath}
-                  allowedRoles={['ADMIN']}
+                  allowedRoles={["ADMIN"]}
                 >
                   <ExamManagement mode="ADMIN" />
                 </ProtectedRoute>
@@ -464,9 +473,35 @@ function App() {
                   isAuthenticated={effectiveIsAuthenticated}
                   userRole={effectiveRole}
                   defaultPath={defaultAuthenticatedPath}
-                  allowedRoles={['ADMIN']}
+                  allowedRoles={["ADMIN"]}
                 >
                   <SubscriptionReviewQueue mode="admin" />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/audit/vip"
+              element={
+                <ProtectedRoute
+                  isAuthenticated={effectiveIsAuthenticated}
+                  userRole={effectiveRole}
+                  defaultPath={defaultAuthenticatedPath}
+                  allowedRoles={["AUDIT"]}
+                >
+                  <AuditVipApproval />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/audit/payments"
+              element={
+                <ProtectedRoute
+                  isAuthenticated={effectiveIsAuthenticated}
+                  userRole={effectiveRole}
+                  defaultPath={defaultAuthenticatedPath}
+                  allowedRoles={["AUDIT"]}
+                >
+                  <AuditPayments />
                 </ProtectedRoute>
               }
             />
@@ -477,7 +512,7 @@ function App() {
                   isAuthenticated={effectiveIsAuthenticated}
                   userRole={effectiveRole}
                   defaultPath={defaultAuthenticatedPath}
-                  allowedRoles={['ADMIN']}
+                  allowedRoles={["ADMIN"]}
                 >
                   <PremiumPlanManagement mode="admin" />
                 </ProtectedRoute>
@@ -490,7 +525,7 @@ function App() {
                   isAuthenticated={effectiveIsAuthenticated}
                   userRole={effectiveRole}
                   defaultPath={defaultAuthenticatedPath}
-                  allowedRoles={['ADMIN']}
+                  allowedRoles={["ADMIN"]}
                 >
                   <AdminReports mode="admin" />
                 </ProtectedRoute>
@@ -503,13 +538,26 @@ function App() {
                   isAuthenticated={effectiveIsAuthenticated}
                   userRole={effectiveRole}
                   defaultPath={defaultAuthenticatedPath}
-                  allowedRoles={['ADMIN', 'CONTRIBUTOR']}
+                  allowedRoles={["ADMIN", "CONTRIBUTOR"]}
                 >
-                  {effectiveRole === 'ADMIN' ? <AdminReports mode="admin" /> : <AdminReports mode="contributor" />}
+                  {effectiveRole === "ADMIN" ? (
+                    <AdminReports mode="admin" />
+                  ) : (
+                    <AdminReports mode="contributor" />
+                  )}
                 </ProtectedRoute>
               }
             />
-            <Route path="/admin" element={<Navigate to="/admin/users" />} />
+            <Route
+              path="/admin"
+              element={
+                !effectiveIsAuthenticated ? (
+                  <Navigate to="/login" />
+                ) : (
+                  <Navigate to={defaultAuthenticatedPath} />
+                )
+              }
+            />
 
             {/* Exam Upload (shared) */}
             <Route
@@ -519,7 +567,7 @@ function App() {
                   isAuthenticated={effectiveIsAuthenticated}
                   userRole={effectiveRole}
                   defaultPath={defaultAuthenticatedPath}
-                  allowedRoles={['USER', 'CONTRIBUTOR', 'ADMIN']}
+                  allowedRoles={["USER", "CONTRIBUTOR", "ADMIN"]}
                 >
                   <UserExamUpload />
                 </ProtectedRoute>
@@ -532,7 +580,7 @@ function App() {
                   isAuthenticated={effectiveIsAuthenticated}
                   userRole={effectiveRole}
                   defaultPath={defaultAuthenticatedPath}
-                  allowedRoles={['USER', 'CONTRIBUTOR', 'ADMIN']}
+                  allowedRoles={["USER", "CONTRIBUTOR", "ADMIN"]}
                 >
                   <MyExamUploads />
                 </ProtectedRoute>
@@ -545,7 +593,7 @@ function App() {
                   isAuthenticated={effectiveIsAuthenticated}
                   userRole={effectiveRole}
                   defaultPath={defaultAuthenticatedPath}
-                  allowedRoles={['ADMIN', 'CONTRIBUTOR']}
+                  allowedRoles={["ADMIN", "CONTRIBUTOR"]}
                 >
                   <AdminUploadQueue />
                 </ProtectedRoute>
@@ -558,7 +606,7 @@ function App() {
                   isAuthenticated={effectiveIsAuthenticated}
                   userRole={effectiveRole}
                   defaultPath={defaultAuthenticatedPath}
-                  allowedRoles={['CONTRIBUTOR', 'ADMIN']}
+                  allowedRoles={["CONTRIBUTOR", "ADMIN"]}
                 >
                   <AdminUploadQueue />
                 </ProtectedRoute>
