@@ -25,6 +25,7 @@ import {
   Flag,
   Trophy,
   Upload,
+  ScrollText,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import axiosClient, {
@@ -289,20 +290,52 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     if (user?.role === "AUDIT") {
       return [
         {
-          label: "VIP Approval",
+          label: "Duyệt VIP",
           icon: ClipboardCheck,
           path: "/admin/audit/vip",
         },
         {
-          label: "Payments",
+          label: "Thanh toán",
           icon: ClipboardCheck,
           path: "/admin/audit/payments",
+        },
+        {
+          label: "Nhật ký hệ thống",
+          icon: ScrollText,
+          path: "/admin/audit/logs",
+        },
+      ];
+    }
+
+    if (user?.role === "SYSTEM_ADMIN") {
+      return [
+        {
+          label: "Dashboard kỹ thuật",
+          icon: LayoutDashboard,
+          path: "/admin/system/dashboard",
+        },
+        {
+          label: "Quản lý người dùng & phân quyền",
+          icon: Users,
+          path: "/admin/system/users",
+        },
+        {
+          label: "Nhật ký hệ thống",
+          icon: ScrollText,
+          path: "/admin/system/logs",
         },
       ];
     }
 
     return [...baseNavItems];
   }, [user]);
+
+  const dashboardTitle =
+    user?.role === "AUDIT"
+      ? "Audit Dashboard"
+      : user?.role === "SYSTEM_ADMIN"
+        ? "System Admin"
+        : "Admin Dashboard";
 
   const avatar = user?.avatarUrl?.trim()
     ? `${user.avatarUrl}${user.avatarUrl.includes("?") ? "&" : "?"}v=${avatarCacheBuster}`
@@ -401,7 +434,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
               <ShieldCheck className="text-white w-6 h-6" />
             </div>
             <span className="text-xl font-bold text-white tracking-tight">
-              Audit Dashboard
+              {dashboardTitle}
             </span>
           </div>
           <button

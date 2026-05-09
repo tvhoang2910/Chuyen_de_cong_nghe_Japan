@@ -19,6 +19,15 @@ const statusBadgeClass = (status: string) => {
   return "bg-slate-100 text-slate-700";
 };
 
+const statusLabel = (status: string) => {
+  if (status === "APPROVED") return "Đã duyệt";
+  if (status === "PENDING_REVIEW") return "Chờ duyệt";
+  if (status === "REJECTED") return "Từ chối";
+  if (status === "EXPIRED") return "Hết hạn";
+  if (status === "CANCELLED") return "Đã hủy";
+  return status;
+};
+
 const AuditVipApproval: React.FC = () => {
   const [rows, setRows] = useState<VipRequestItem[]>([]);
   const page = 0;
@@ -194,7 +203,7 @@ const AuditVipApproval: React.FC = () => {
                         <span
                           className={`px-3 py-1 rounded-full text-xs font-semibold ${statusBadgeClass(r.status)}`}
                         >
-                          {r.status}
+                          {statusLabel(r.status)}
                         </span>
                       </td>
                       <td className="p-3 align-top">
@@ -252,14 +261,16 @@ const AuditVipApproval: React.FC = () => {
                 <div className="text-sm font-semibold">Bill chuyển khoản</div>
                 {billPreviewUrl ? (
                   <div className="mt-3 space-y-2">
-                    <a
-                      href={selected.billImageUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-xs text-cyan-700 underline"
-                    >
-                      Mở ảnh gốc
-                    </a>
+                    {selected.billImageUrl && (
+                      <a
+                        href={selected.billImageUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-cyan-700 underline"
+                      >
+                        Mở ảnh gốc
+                      </a>
+                    )}
                     <img
                       src={billPreviewUrl}
                       alt="Bill chuyển khoản"
