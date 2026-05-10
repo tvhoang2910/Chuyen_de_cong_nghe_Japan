@@ -1,11 +1,12 @@
 import React from "react";
 import type {
-  ServiceHealthItem,
-  SystemAdminRole,
   SystemAdminUserStatus,
-  SystemLogSeverity,
-} from "../../mock/systemAdminMock";
-import { roleLabelMap } from "../../mock/systemAdminMock";
+  SystemAdminLogSeverity,
+} from "../../api/systemAdminClient";
+import {
+  roleLabelMap,
+  type SystemAdminRole,
+} from "../../constants/systemAdmin";
 
 interface RoleBadgeProps {
   role: SystemAdminRole;
@@ -46,17 +47,17 @@ export const UserStatusBadge: React.FC<UserStatusBadgeProps> = ({ status }) => {
 };
 
 interface SeverityBadgeProps {
-  severity: SystemLogSeverity;
+  severity: SystemAdminLogSeverity;
 }
 
 export const SeverityBadge: React.FC<SeverityBadgeProps> = ({ severity }) => {
-  const labelMap: Record<SystemLogSeverity, string> = {
+  const labelMap: Record<SystemAdminLogSeverity, string> = {
     INFO: "Thông tin",
     WARNING: "Cảnh báo",
     ERROR: "Lỗi",
   };
 
-  const classes: Record<SystemLogSeverity, string> = {
+  const classes: Record<SystemAdminLogSeverity, string> = {
     INFO: "bg-cyan-100 text-cyan-700",
     WARNING: "bg-amber-100 text-amber-700",
     ERROR: "bg-rose-100 text-rose-700",
@@ -72,19 +73,19 @@ export const SeverityBadge: React.FC<SeverityBadgeProps> = ({ severity }) => {
 };
 
 interface ServiceStatusBadgeProps {
-  status: ServiceHealthItem["status"];
+  status: "ONLINE" | "DOWN";
 }
 
 export const ServiceStatusBadge: React.FC<ServiceStatusBadgeProps> = ({
   status,
 }) => {
-  return status === "Hoạt động" ? (
+  return status === "ONLINE" ? (
     <span className="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
-      Hoạt động
+      Online
     </span>
   ) : (
     <span className="inline-flex rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700">
-      Ngừng hoạt động
+      Offline
     </span>
   );
 };

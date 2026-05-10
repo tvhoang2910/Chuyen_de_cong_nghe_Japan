@@ -56,6 +56,9 @@ const SystemAdminUsers = lazy(
 const SystemAdminLogs = lazy(
   () => import("./pages/system-admin/SystemAdminLogs"),
 );
+const SystemAdminSystemStatus = lazy(
+  () => import("./pages/system-admin/SystemAdminSystemStatus"),
+);
 const AdminReports = lazy(() => import("./pages/AdminReports"));
 const CommentsPage = lazy(() => import("./pages/CommentsPage"));
 const UserExamUpload = lazy(() => import("./pages/UserExamUpload"));
@@ -571,6 +574,32 @@ function App() {
                   allowedRoles={["SYSTEM_ADMIN"]}
                 >
                   <SystemAdminLogs />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/system/system-status"
+              element={
+                <ProtectedRoute
+                  isAuthenticated={effectiveIsAuthenticated}
+                  userRole={effectiveRole}
+                  defaultPath={defaultAuthenticatedPath}
+                  allowedRoles={["SYSTEM_ADMIN"]}
+                >
+                  <SystemAdminSystemStatus />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/system-admin/system-status"
+              element={
+                <ProtectedRoute
+                  isAuthenticated={effectiveIsAuthenticated}
+                  userRole={effectiveRole}
+                  defaultPath={defaultAuthenticatedPath}
+                  allowedRoles={["SYSTEM_ADMIN"]}
+                >
+                  <SystemAdminSystemStatus />
                 </ProtectedRoute>
               }
             />

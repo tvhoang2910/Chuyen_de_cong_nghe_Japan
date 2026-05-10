@@ -65,6 +65,20 @@ export type SystemAdminDashboard = {
   failedLoginAttempts: number;
 };
 
+export type ServiceRuntimeStatus = "ONLINE" | "DOWN";
+
+export type ServiceStatusFilter = "ALL" | "ONLINE" | "OFFLINE";
+
+export type SystemAdminServiceStatusItem = {
+  id: number;
+  name: string;
+  status: ServiceRuntimeStatus;
+  port: number;
+  heartbeat: string;
+  responseTime: string;
+  updatedAt: string;
+};
+
 const normalizeDepartment = (user: AdminUserItem): string => {
   return user.school?.trim() || user.subject?.trim() || "Không xác định";
 };
@@ -183,3 +197,12 @@ export const fetchSystemAdminDashboard =
     );
     return response.data;
   };
+
+export const fetchSystemAdminServiceStatus = async (): Promise<
+  SystemAdminServiceStatusItem[]
+> => {
+  const response = await axiosClient.get<SystemAdminServiceStatusItem[]>(
+    "/system-admin/system-status",
+  );
+  return response.data;
+};

@@ -8,12 +8,13 @@ import {
 } from "lucide-react";
 import AdminLayout from "../../components/AdminLayout";
 import { ServiceStatusBadge } from "../../components/system-admin/SystemAdminBadges";
-import { serviceHealthMock } from "../../mock/systemAdminMock";
 import {
   fetchSystemAdminDashboard,
   fetchSystemAdminLogs,
+  fetchSystemAdminServiceStatus,
   type SystemAdminDashboard,
   type SystemAdminLogItem,
+  type SystemAdminServiceStatusItem,
 } from "../../api/systemAdminClient";
 
 const formatDateTime = (value: string) =>
@@ -25,6 +26,9 @@ const SystemAdminDashboard: React.FC = () => {
     null,
   );
   const [recentLogs, setRecentLogs] = React.useState<SystemAdminLogItem[]>([]);
+  const [serviceStatuses, setServiceStatuses] = React.useState<
+    SystemAdminServiceStatusItem[]
+  >([]);
 
   React.useEffect(() => {
     let mounted = true;
@@ -32,14 +36,17 @@ const SystemAdminDashboard: React.FC = () => {
     const load = async () => {
       setIsLoading(true);
       try {
-        const [dashboardResponse, logsResponse] = await Promise.all([
-          fetchSystemAdminDashboard(),
-          fetchSystemAdminLogs({ page: 0, size: 6 }),
-        ]);
+        const [dashboardResponse, logsResponse, servicesResponse] =
+          await Promise.all([
+            fetchSystemAdminDashboard(),
+            fetchSystemAdminLogs({ page: 0, size: 6 }),
+            fetchSystemAdminServiceStatus(),
+          ]);
 
         if (mounted) {
           setDashboard(dashboardResponse);
           setRecentLogs(logsResponse.content);
+          setServiceStatuses(servicesResponse);
         }
       } catch (error) {
         console.error("Failed to load system-admin dashboard", error);
@@ -289,30 +296,41 @@ const SystemAdminDashboard: React.FC = () => {
         </div>
 
         <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="mb-4 flex items-center gap-2">
-            <Activity className="h-5 w-5 text-cyan-600" />
-            <h2 className="text-lg font-bold text-slate-900">
-              Trạng thái hệ thống
-            </h2>
+          <div className="mb-4 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Activity className="h-5 w-5 text-cyan-600" />
+              <h2 className="text-lg font-bold text-slate-900">
+                Trạng thái hệ thống
+              </h2>
+            </div>
+            <span className="text-xs font-semibold text-slate-500">
+              Đồng bộ từ backend
+            </span>
           </div>
 
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {serviceHealthMock.map((service) => (
-              <div
-                key={service.serviceName}
-                className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4"
-              >
-                <p className="text-sm font-semibold text-slate-900">
-                  {service.serviceName}
-                </p>
-                <p className="mt-1 text-xs text-slate-500">
-                  Cập nhật: {formatDateTime(service.lastCheckedAt)}
-                </p>
-                <div className="mt-3">
-                  <ServiceStatusBadge status={service.status} />
+            {serviceStatuses.length === 0 ? (
+              <p className="col-span-full rounded-2xl border border-slate-200 bg-slate-50/70 p-4 text-sm text-slate-500">
+                Chưa có dữ liệu trạng thái service.
+              </p>
+            ) : (
+              serviceStatuses.map((service) => (
+                <div
+                  key={service.id}
+                  className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4"
+                >
+                  <p className="text-sm font-semibold text-slate-900">
+                    {service.name}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Cập nhật: {formatDateTime(service.updatedAt)}
+                  </p>
+                  <div className="mt-3">
+                    <ServiceStatusBadge status={service.status} />
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </section>
       </div>

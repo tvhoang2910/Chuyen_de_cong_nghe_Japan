@@ -8,6 +8,7 @@ import React, {
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import type { AxiosError } from "axios";
 import {
+  Activity,
   Users,
   LayoutDashboard,
   Settings,
@@ -323,6 +324,11 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           label: "Nhật ký hệ thống",
           icon: ScrollText,
           path: "/admin/system/logs",
+        },
+        {
+          label: "Trạng thái hệ thống",
+          icon: Activity,
+          path: "/admin/system/system-status",
         },
       ];
     }

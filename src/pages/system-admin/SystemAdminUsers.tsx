@@ -7,7 +7,7 @@ import {
   UserStatusBadge,
 } from "../../components/system-admin/SystemAdminBadges";
 import SystemAdminDialog from "../../components/system-admin/SystemAdminDialog";
-import { roleOptions, type SystemAdminRole } from "../../mock/systemAdminMock";
+import { roleOptions, type SystemAdminRole } from "../../constants/systemAdmin";
 import {
   fetchSystemAdminUser,
   fetchSystemAdminUsers,
