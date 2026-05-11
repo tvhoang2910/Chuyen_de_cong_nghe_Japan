@@ -65,7 +65,7 @@ export type SystemAdminDashboard = {
   failedLoginAttempts: number;
 };
 
-export type ServiceRuntimeStatus = "ONLINE" | "DOWN";
+export type ServiceRuntimeStatus = "ONLINE" | "OFFLINE";
 
 export type ServiceStatusFilter = "ALL" | "ONLINE" | "OFFLINE";
 

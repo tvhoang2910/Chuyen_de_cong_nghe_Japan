@@ -7,12 +7,12 @@ interface StatusBadgeProps {
 
 const statusLabelMap: Record<ServiceRuntimeStatus, string> = {
   ONLINE: "Online",
-  DOWN: "Offline",
+  OFFLINE: "Offline",
 };
 
 const statusClassMap: Record<ServiceRuntimeStatus, string> = {
   ONLINE: "bg-emerald-100 text-emerald-700",
-  DOWN: "bg-rose-100 text-rose-700",
+  OFFLINE: "bg-rose-100 text-rose-700",
 };
 
 const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {

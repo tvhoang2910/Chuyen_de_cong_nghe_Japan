@@ -73,7 +73,7 @@ export const SeverityBadge: React.FC<SeverityBadgeProps> = ({ severity }) => {
 };
 
 interface ServiceStatusBadgeProps {
-  status: "ONLINE" | "DOWN";
+  status: "ONLINE" | "OFFLINE";
 }
 
 export const ServiceStatusBadge: React.FC<ServiceStatusBadgeProps> = ({

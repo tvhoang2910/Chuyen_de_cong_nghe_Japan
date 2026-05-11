@@ -72,7 +72,7 @@ const SystemAdminSystemStatus: React.FC = () => {
           ? true
           : statusFilter === "ONLINE"
             ? service.status === "ONLINE"
-            : service.status === "DOWN";
+            : service.status === "OFFLINE";
 
       return matchSearch && matchStatus;
     });
@@ -83,7 +83,7 @@ const SystemAdminSystemStatus: React.FC = () => {
     (service) => service.status === "ONLINE",
   ).length;
   const offlineCount = services.filter(
-    (service) => service.status === "DOWN",
+    (service) => service.status === "OFFLINE",
   ).length;
 
   const averageResponseMs = React.useMemo(() => {
