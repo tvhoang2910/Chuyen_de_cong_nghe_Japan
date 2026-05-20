@@ -253,7 +253,7 @@ const AuditVipApproval: React.FC = () => {
                 {billPreviewUrl ? (
                   <div className="mt-3 space-y-2">
                     <a
-                      href={selected.billImageUrl}
+                      href={selected.billImageUrl ?? undefined}
                       target="_blank"
                       rel="noreferrer"
                       className="text-xs text-cyan-700 underline"
@@ -261,7 +261,7 @@ const AuditVipApproval: React.FC = () => {
                       Mở ảnh gốc
                     </a>
                     <img
-                      src={billPreviewUrl}
+                      src={billPreviewUrl ?? undefined}
                       alt="Bill chuyển khoản"
                       className="max-h-96 w-full rounded-xl object-contain bg-white"
                       loading="lazy"
@@ -316,7 +316,7 @@ const AuditVipApproval: React.FC = () => {
                   </div>
                 </div>
               </div>
-            </div>
+            </div> 
 
             <h4 className="mt-6 font-bold">Lịch sử xử lý</h4>
             <div className="mt-3 space-y-2">
