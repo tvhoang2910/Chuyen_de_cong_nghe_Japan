@@ -1,9 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { InternalAxiosRequestConfig } from 'axios';
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { InternalAxiosRequestConfig } from "axios";
 
 const getItemMock = vi.fn();
 
-Object.defineProperty(globalThis, 'localStorage', {
+Object.defineProperty(globalThis, "localStorage", {
   value: {
     getItem: getItemMock,
     setItem: vi.fn(),
@@ -42,7 +42,7 @@ const { mockClient, mockRefreshClient } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('axios', () => ({
+vi.mock("axios", () => ({
   default: {
     create: vi
       .fn()
@@ -51,25 +51,27 @@ vi.mock('axios', () => ({
   },
 }));
 
-import '../api/axiosClient';
+import "../api/axiosClient";
 
-describe('axiosClient request auth header behavior', () => {
+describe("axiosClient request auth header behavior", () => {
   beforeEach(() => {
+    vi.mocked(localStorage.removeItem).mockClear();
     getItemMock.mockImplementation((key: string) => {
-      if (key === 'access_token') {
-        return 'expired-access-token';
+      if (key === "access_token") {
+        return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjQxMDI0NDQ4MDB9.signature";
       }
       return null;
     });
   });
 
-  it('does not attach Authorization header for /refresh', () => {
-    const requestInterceptor = mockClient.interceptors.request.use.mock.calls[0][0] as (
+  it("does not attach Authorization header for /refresh", () => {
+    const requestInterceptor = mockClient.interceptors.request.use.mock
+      .calls[0][0] as (
       config: InternalAxiosRequestConfig,
     ) => InternalAxiosRequestConfig;
 
     const config = {
-      url: '/refresh',
+      url: "/refresh",
       headers: {},
     } as InternalAxiosRequestConfig;
 
@@ -78,18 +80,45 @@ describe('axiosClient request auth header behavior', () => {
     expect(nextConfig.headers.Authorization).toBeUndefined();
   });
 
-  it('attaches Authorization header for protected endpoints', () => {
-    const requestInterceptor = mockClient.interceptors.request.use.mock.calls[0][0] as (
+  it("attaches Authorization header for protected endpoints", () => {
+    const requestInterceptor = mockClient.interceptors.request.use.mock
+      .calls[0][0] as (
       config: InternalAxiosRequestConfig,
     ) => InternalAxiosRequestConfig;
 
     const config = {
-      url: '/me',
+      url: "/me",
       headers: {},
     } as InternalAxiosRequestConfig;
 
     const nextConfig = requestInterceptor(config);
 
-    expect(nextConfig.headers.Authorization).toBe('Bearer expired-access-token');
+    expect(nextConfig.headers.Authorization).toBe(
+      "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjQxMDI0NDQ4MDB9.signature",
+    );
+  });
+
+  it("does not attach Authorization header for malformed access token", () => {
+    getItemMock.mockImplementation((key: string) => {
+      if (key === "access_token") {
+        return "not-a-jwt-token";
+      }
+      return null;
+    });
+
+    const requestInterceptor = mockClient.interceptors.request.use.mock
+      .calls[0][0] as (
+      config: InternalAxiosRequestConfig,
+    ) => InternalAxiosRequestConfig;
+
+    const config = {
+      url: "/me",
+      headers: {},
+    } as InternalAxiosRequestConfig;
+
+    const nextConfig = requestInterceptor(config);
+
+    expect(nextConfig.headers.Authorization).toBeUndefined();
+    expect(localStorage.removeItem).toHaveBeenCalledWith("access_token");
   });
 });

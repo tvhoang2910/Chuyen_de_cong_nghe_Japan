@@ -85,6 +85,8 @@ const Login: React.FC = () => {
       let targetPath = "/dashboard";
       if (userRole === "ADMIN") {
         targetPath = "/admin/users";
+      } else if (userRole === "AUDIT") {
+        targetPath = "/admin/audit/vip";
       } else if (userRole === "CONTRIBUTOR") {
         targetPath = "/contributor";
       }
