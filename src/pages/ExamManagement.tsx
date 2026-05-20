@@ -3,7 +3,6 @@ import { Pencil, Trash2, Eye, Plus, Save, Megaphone, Archive, FilePlus2, Upload,
 import { AnimatePresence, motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { AxiosError } from 'axios';
-import MainLayout from '../components/MainLayout';
 import AdminLayout from '../components/AdminLayout';
 import { ExamDifficultyBadge, type DifficultyLevel } from '../components/ExamDifficultyBadge';
 import { fetchEventSource } from '@microsoft/fetch-event-source'; 
@@ -27,7 +26,6 @@ import {
 import { getCurrentSessionRole } from '../api/axiosClient';
 import { formatOnlineExamStatus } from '../utils/statusLabels';
 
-/** Question shape that may carry a difficulty field from the backend */
 export type QuestionWithDifficulty = ExamQuestion & { difficulty?: DifficultyLevel };
 type DifficultyFilter = Exclude<DifficultyLevel, null | undefined> | '';
 
@@ -138,7 +136,6 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  /** Filter for question difficulty in the question card list */
   const [difficultyFilter, setDifficultyFilter] = useState<DifficultyFilter>('');
 
   const addTagToSelected = (tag: TagOption) => {
@@ -149,7 +146,6 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
       return [...prev, tag];
     });
   };
-
 
   const handleCreateOrSelectTag = async (rawValue: string) => {
     const candidate = rawValue.trim();
@@ -203,7 +199,7 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
   const detailSectionRef = useRef<HTMLElement | null>(null);
 
   const pageTitle = useMemo(() => {
-    return mode === 'ADMIN' ? 'Quản lí đề thi hệ thống' : 'Quản lí đề thi của tôi';
+    return mode === 'ADMIN' ? 'Quản lý đề thi hệ thống' : 'Quản lý kho đề của tôi';
   }, [mode]);
 
   const role = getCurrentSessionRole();
@@ -261,19 +257,15 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
   React.useEffect(() => {
     const token = localStorage.getItem("access_token");
     
-    // Nếu chưa đăng nhập thì không kết nối
     if (!token) {
       console.warn("Chưa có Token, tạm hoãn kết nối SSE.");
       return;
     }
 
-    // Đóng vai trò là công tắc để ngắt kết nối khi chuyển trang
     const ctrl = new AbortController();
 
     const connectSSE = async () => {
       try {
-        // Dùng thư viện của Microsoft để gửi được Header Authorization
-        // Đường dẫn này nối từ examApiBaseUrl (giống các API khác trong examClient.ts)
         const sseUrl = `${import.meta.env.VITE_EXAM_API_BASE_URL || "http://localhost:8082/api/v1/exam"}/sse/events`;
 
         await fetchEventSource(sseUrl, {
@@ -290,18 +282,13 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
             }
           },
           onmessage(msg) {
-            // Lắng nghe đúng sự kiện tên là "exam" (Khớp với emitter.send().name("exam") ở backend)
             if (msg.event === 'exam') {
               try {
                 const data = JSON.parse(msg.data);
-                console.log("SSE Nhận được data:", data);
-
-                // --- BẮT SÓNG THÀNH CÔNG ---
                 if (data.eventType === "AI_EXTRACTION_SUCCESS") {
                   toast.success(data.message || "Đề thi đã được AI bóc tách xong!");
                   void loadManagedExams();
                 } 
-                // --- BẮT SÓNG LỖI ---
                 else if (data.eventType === "AI_EXTRACTION_FAILED") {
                   toast.error(data.message || "Lỗi khi AI bóc tách đề thi.");
                 }
@@ -315,7 +302,6 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
           },
           onerror(err) {
             console.error("SSE Error:", err);
-            // Throw error để thư viện tự động retry, hoặc return để ngắt luôn
           }
         });
       } catch (err) {
@@ -325,7 +311,6 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
 
     void connectSSE();
 
-    // Dọn dẹp kết nối khi người dùng rời khỏi trang
     return () => {
       ctrl.abort();
     };
@@ -719,7 +704,7 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
   };
   
   const validateAndSetUploadFile = (file: File) => {
-    if (file.size > 50 * 1024 * 1024) { // Giới hạn 50MB
+    if (file.size > 50 * 1024 * 1024) { 
       toast.error('File quá lớn, vui lòng chọn file dưới 50MB.');
       return;
     }
@@ -760,7 +745,7 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
     try {
       setIsUploadingSource(true);
       await uploadExamSource(uploadTitle, uploadFile);
-      toast.success('Đã tải file lên thành công! File đang được đưa vào hàng đợi xử lý.');
+      toast.success('Đã tải file lên thành công! Đề thi đang được AI xử lý.');
       setPanelMode('none');
       await loadManagedExams();
     } catch (error) {
@@ -886,32 +871,42 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-3xl font-bold text-slate-900 tracking-tight">{pageTitle}</h1>
-          <p className="text-slate-500 mt-1">Đầy đủ chức năng thêm, sửa, xóa, xem và publish/archive đề thi.</p>
+          <p className="text-slate-500 mt-1">
+            {mode === 'ADMIN' ? 'Đầy đủ chức năng thêm, sửa, xóa, xem và publish/archive toàn bộ đề thi hệ thống.' : 'Quản lý kho đề thi do bạn biên soạn. Thêm mới, chỉnh sửa hoặc dùng AI hỗ trợ tách đề PDF.'}
+          </p>
         </div>
-        <button
-          type="button"
-          onClick={openUploadSource}
-          className={primaryActionButtonClass}
-        >
-          <CloudUpload className="w-4 h-4" />
-          Upload File
-        </button>
-        <button
-          type="button"
-          onClick={openCreate}
-          className={primaryActionButtonClass}
-        >
-          <FilePlus2 className="w-4 h-4" />
-          Tạo đề thi
-        </button>
-        <button
-          type="button"
-          onClick={openImport}
-          className={primaryActionButtonClass}
-        >
-          <Upload className="w-4 h-4" />
-          Import JSON
-        </button>
+        
+        <div className="flex flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={openUploadSource}
+            className={primaryActionButtonClass}
+          >
+            <CloudUpload className="w-4 h-4" />
+            AI Bóc Tách Đề
+          </button>
+          
+          <button
+            type="button"
+            onClick={openCreate}
+            className={primaryActionButtonClass}
+          >
+            <FilePlus2 className="w-4 h-4" />
+            Tạo thủ công
+          </button>
+          
+          {/* Chỉ Admin mới được Import JSON hàng loạt */}
+          {mode === 'ADMIN' && (
+            <button
+              type="button"
+              onClick={openImport}
+              className={primaryActionButtonClass}
+            >
+              <Upload className="w-4 h-4" />
+              Import JSON
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
@@ -1090,7 +1085,7 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
                       <div className="bg-violet-100 p-2 rounded-lg text-violet-600">
                         <CloudUpload className="w-5 h-5" />
                       </div>
-                      <h2 id="exam-management-upload-title" className="text-xl font-bold text-slate-900">Upload File Đề Thi</h2>
+                      <h2 id="exam-management-upload-title" className="text-xl font-bold text-slate-900">Upload File Đề Thi AI</h2>
                     </div>
                     <button
                       type="button"
@@ -1460,19 +1455,22 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
                     </div>
 
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                      <label className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
-                        <input
-                          type="checkbox"
-                          checked={form.premium}
-                          onChange={(event) =>
-                            setForm((prev) => ({
-                              ...prev,
-                              premium: event.target.checked,
-                            }))
-                          }
-                        />
-                        <span className="text-sm font-semibold text-amber-800">Đề này là nội dung Premium</span>
-                      </label>
+                      {/* Chỉ Admin mới được đánh dấu đề là Premium */}
+                      {mode === 'ADMIN' && (
+                        <label className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
+                          <input
+                            type="checkbox"
+                            checked={form.premium}
+                            onChange={(event) =>
+                              setForm((prev) => ({
+                                ...prev,
+                                premium: event.target.checked,
+                              }))
+                            }
+                          />
+                          <span className="text-sm font-semibold text-amber-800">Đề này là nội dung Premium</span>
+                        </label>
+                      )}
 
                       <div>
                         <label className="mb-1 block text-sm font-semibold text-slate-700">Số câu teaser cho user miễn phí</label>
@@ -1502,7 +1500,6 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
                       </div>
                     </div>
 
-                    {/* Difficulty filter */}
                     <div className="flex items-center gap-2">
                       <label className="text-sm font-semibold text-slate-600 whitespace-nowrap">Lọc độ khó:</label>
                       <select
@@ -1658,18 +1655,11 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
 };
 
 const ExamManagement: React.FC<ExamManagementProps> = ({ mode }) => {
-  if (mode === 'ADMIN') {
-    return (
-      <AdminLayout>
-        <ExamManagementContent mode={mode} />
-      </AdminLayout>
-    );
-  }
-
+  // Thay vì dùng MainLayout, chúng ta dùng AdminLayout cho cả ADMIN và CONTRIBUTOR
   return (
-    <MainLayout>
+    <AdminLayout>
       <ExamManagementContent mode={mode} />
-    </MainLayout>
+    </AdminLayout>
   );
 };
 

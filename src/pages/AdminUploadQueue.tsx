@@ -41,7 +41,11 @@ type RejectFormValues = z.infer<typeof rejectSchema>;
 
 type DetailTab = "preview" | "history";
 
-const AdminUploadQueue: React.FC = () => {
+interface AdminUploadQueueProps {
+  mode?: "admin" | "contributor";
+}
+
+const AdminUploadQueue: React.FC<AdminUploadQueueProps> = ({ mode = "admin" }) => {
   const [queue, setQueue] = useState<ExamUploadResponse[]>([]);
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -300,11 +304,10 @@ const AdminUploadQueue: React.FC = () => {
         <header className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">
-              Duyệt upload đề thi
+              Duyệt upload đề thi {mode === "contributor" && "(Contributor)"}
             </h1>
             <p className="mt-1 text-sm text-slate-600">
-              Các yêu cầu upload đang chờ duyệt. Bấm vào một hàng để xem chi
-              tiết.
+              Các yêu cầu upload đang chờ duyệt. Bấm vào một hàng để xem chi tiết.
             </p>
           </div>
           <button

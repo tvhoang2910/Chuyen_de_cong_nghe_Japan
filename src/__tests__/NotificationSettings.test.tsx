@@ -270,8 +270,10 @@ describe('NotificationSettings page', () => {
       expect(markUserNotificationRead).toHaveBeenCalledWith(301);
     });
 
-    expect(screen.queryByRole('button', { name: 'Đánh dấu đã đọc' })).not.toBeInTheDocument();
-    expect(screen.getByText('0 chưa đọc')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: 'Đánh dấu đã đọc' })).not.toBeInTheDocument();
+      expect(screen.getByText('0 chưa đọc')).toBeInTheDocument();
+    });
   });
 
   it('shows web push as off when browser has no subscription even if preference is enabled', async () => {
