@@ -272,7 +272,7 @@ const AuditVipApproval: React.FC = () => {
                       </a>
                     )}
                     <img
-                      src={billPreviewUrl}
+                      src={billPreviewUrl ?? undefined}
                       alt="Bill chuyển khoản"
                       className="max-h-96 w-full rounded-xl object-contain bg-white"
                       loading="lazy"
@@ -327,7 +327,7 @@ const AuditVipApproval: React.FC = () => {
                   </div>
                 </div>
               </div>
-            </div>
+            </div> 
 
             <h4 className="mt-6 font-bold">Lịch sử xử lý</h4>
             <div className="mt-3 space-y-2">

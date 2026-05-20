@@ -996,8 +996,17 @@ axiosClient.interceptors.request.use((config) => {
   // Token expiry/refresh is handled by the response interceptor (401 -> refresh).
   const token = localStorage.getItem("access_token");
   if (token) {
-    config.headers = config.headers ?? {};
-    config.headers.Authorization = `Bearer ${token}`;
+    // Kiểm tra: token chuẩn JWT phải có 3 phần ngăn cách bởi dấu chấm
+    if (token.split(".").length === 3) {
+      config.headers = config.headers ?? {};
+      config.headers.Authorization = `Bearer ${token}`;
+    } else {
+      // Nếu token hỏng (như chuỗi "***" của bài test), xóa nó đi và KHÔNG gán Header
+      localStorage.removeItem("access_token");
+      if (config.headers?.Authorization) {
+        delete config.headers.Authorization;
+      }
+    }
   }
   return config;
 });
