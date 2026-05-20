@@ -1,4 +1,4 @@
-import React, {
+import React, { 
   useCallback,
   useEffect,
   useMemo,
@@ -36,6 +36,7 @@ import axiosClient, {
   fetchCurrentUserProfile,
   updateCurrentUserProfile,
   uploadCurrentUserAvatar,
+  getCurrentSessionRole,
   type UserProfile,
 } from "../api/axiosClient";
 
@@ -179,6 +180,11 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
 
   useEffect(() => {
     let isMounted = true;
+    const currentRole = getCurrentSessionRole();
+    const reviewPath =
+      currentRole === "CONTRIBUTOR"
+        ? "/contributor/subscription-reviews"
+        : "/admin/subscription-reviews";
 
     const loadNotifications = async () => {
       try {
@@ -192,7 +198,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           title: `Request #${row.id} đang chờ duyệt`,
           description: `${row.userFullName} • ${row.planName} • ${Number(row.purchasedPrice).toLocaleString("vi-VN")}đ`,
           timeLabel: new Date(row.createdAt).toLocaleString("vi-VN"),
-          onClick: () => navigate("/admin/subscription-reviews"),
+          onClick: () => navigate(reviewPath),
         }));
 
         const dismissedIds = readDismissedIds();
@@ -210,7 +216,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
               description:
                 "Vui lòng thử lại sau ít phút hoặc nhấn làm mới trang.",
               timeLabel: "Hệ thống",
-              onClick: () => navigate("/admin/subscription-reviews"),
+              onClick: () => navigate(reviewPath),
             },
           ]);
         }
@@ -271,22 +277,6 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     navigate("/login");
   };
 
-  const baseNavItems = [
-    { label: "Dashboard", icon: LayoutDashboard, path: "/admin/dashboard" },
-    { label: "Quản lý Users", icon: Users, path: "/admin/users" },
-    { label: "Quản lý đề thi", icon: BookOpen, path: "/admin/exams" },
-    { label: "Duyệt upload", icon: Upload, path: "/admin/upload-queue" },
-    { label: "Kho thành tựu", icon: Trophy, path: "/admin/achievements" },
-    { label: "Báo cáo câu hỏi", icon: Flag, path: "/admin/reports" },
-    { label: "Quản lý gói Premium", icon: Gem, path: "/admin/premium-plans" },
-    {
-      label: "Duyệt thanh toán",
-      icon: ClipboardCheck,
-      path: "/admin/subscription-reviews",
-    },
-    { label: "Cài đặt hệ thống", icon: Settings, path: "/admin/settings" },
-  ];
-
   const navItems = useMemo(() => {
     if (user?.role === "AUDIT") {
       return [
@@ -333,7 +323,37 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       ];
     }
 
-    return [...baseNavItems];
+    if (user?.role === "CONTRIBUTOR") {
+      return [
+        { label: "Dashboard", icon: LayoutDashboard, path: "/contributor" },
+        { label: "Quản lý đề thi", icon: BookOpen, path: "/contributor/exams" },
+        { label: "Duyệt upload", icon: Upload, path: "/contributor/upload-queue" },
+        { label: "Báo cáo câu hỏi", icon: Flag, path: "/contributor/reports" },
+        { label: "Quản lý gói Premium", icon: Gem, path: "/contributor/premium-plans" },
+        {
+          label: "Duyệt thanh toán",
+          icon: ClipboardCheck,
+          path: "/contributor/subscription-reviews",
+        },
+      ];
+    }
+
+    // Default ADMIN navigation
+    return [
+      { label: "Dashboard", icon: LayoutDashboard, path: "/admin/dashboard" },
+      { label: "Quản lý Users", icon: Users, path: "/admin/users" },
+      { label: "Quản lý đề thi", icon: BookOpen, path: "/admin/exams" },
+      { label: "Duyệt upload", icon: Upload, path: "/admin/upload-queue" },
+      { label: "Kho thành tựu", icon: Trophy, path: "/admin/achievements" },
+      { label: "Báo cáo câu hỏi", icon: Flag, path: "/admin/reports" },
+      { label: "Quản lý gói Premium", icon: Gem, path: "/admin/premium-plans" },
+      {
+        label: "Duyệt thanh toán",
+        icon: ClipboardCheck,
+        path: "/admin/subscription-reviews",
+      },
+      { label: "Cài đặt hệ thống", icon: Settings, path: "/admin/settings" },
+    ];
   }, [user]);
 
   const dashboardTitle =
@@ -610,7 +630,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           <div className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
               <h2 className="text-xl font-bold text-slate-900">
-                Thiết lập tài khoản Admin
+                Thiết lập tài khoản {user?.role}
               </h2>
               <button
                 onClick={() => setIsProfileModalOpen(false)}
