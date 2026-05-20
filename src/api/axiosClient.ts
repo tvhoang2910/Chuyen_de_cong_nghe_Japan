@@ -18,7 +18,12 @@ type AuthTokenApiResponse = {
   refreshExpiresIn?: number;
 };
 
-export type AppRole = "USER" | "CONTRIBUTOR" | "ADMIN" | "AUDIT";
+export type AppRole =
+  | "USER"
+  | "CONTRIBUTOR"
+  | "ADMIN"
+  | "AUDIT"
+  | "SYSTEM_ADMIN";
 
 export type UserProfile = {
   id: number;
@@ -549,7 +554,8 @@ export const getCurrentSessionRole = (): AppRole | null => {
   return role === "USER" ||
     role === "CONTRIBUTOR" ||
     role === "ADMIN" ||
-    role === "AUDIT"
+    role === "AUDIT" ||
+    role === "SYSTEM_ADMIN"
     ? role
     : null;
 };

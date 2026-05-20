@@ -7,6 +7,7 @@ import {
   fetchCurrentUserProfile,
   getCurrentSessionRole,
 } from "./api/axiosClient";
+import { setupDevAuthConsole } from "./utils/devAuthMock";
 
 const Home = lazy(() => import("./pages/Home"));
 const About = lazy(() => import("./pages/About"));
@@ -45,6 +46,19 @@ const PremiumPlanManagement = lazy(
 );
 const AuditVipApproval = lazy(() => import("./pages/audit/AuditVipApproval"));
 const AuditPayments = lazy(() => import("./pages/audit/AuditPayments"));
+const AuditLogPage = lazy(() => import("./pages/audit/AuditLogPage"));
+const SystemAdminDashboard = lazy(
+  () => import("./pages/system-admin/SystemAdminDashboard"),
+);
+const SystemAdminUsers = lazy(
+  () => import("./pages/system-admin/SystemAdminUsers"),
+);
+const SystemAdminLogs = lazy(
+  () => import("./pages/system-admin/SystemAdminLogs"),
+);
+const SystemAdminSystemStatus = lazy(
+  () => import("./pages/system-admin/SystemAdminSystemStatus"),
+);
 const AdminReports = lazy(() => import("./pages/AdminReports"));
 const CommentsPage = lazy(() => import("./pages/CommentsPage"));
 const UserExamUpload = lazy(() => import("./pages/UserExamUpload"));
@@ -93,6 +107,8 @@ function App() {
     defaultAuthenticatedPath = "/admin/users";
   } else if (effectiveRole === "AUDIT") {
     defaultAuthenticatedPath = "/admin/audit/vip";
+  } else if (effectiveRole === "SYSTEM_ADMIN") {
+    defaultAuthenticatedPath = "/admin/system/dashboard";
   } else if (effectiveRole === "CONTRIBUTOR") {
     defaultAuthenticatedPath = "/contributor";
   }
@@ -110,6 +126,10 @@ function App() {
       globalThis.removeEventListener("storage", syncAuthState);
       globalThis.removeEventListener(AUTH_SESSION_CHANGED_EVENT, syncAuthState);
     };
+  }, []);
+
+  useEffect(() => {
+    setupDevAuthConsole();
   }, []);
 
   useEffect(() => {
@@ -502,6 +522,84 @@ function App() {
                   allowedRoles={["AUDIT"]}
                 >
                   <AuditPayments />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/audit/logs"
+              element={
+                <ProtectedRoute
+                  isAuthenticated={effectiveIsAuthenticated}
+                  userRole={effectiveRole}
+                  defaultPath={defaultAuthenticatedPath}
+                  allowedRoles={["AUDIT"]}
+                >
+                  <AuditLogPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/system/dashboard"
+              element={
+                <ProtectedRoute
+                  isAuthenticated={effectiveIsAuthenticated}
+                  userRole={effectiveRole}
+                  defaultPath={defaultAuthenticatedPath}
+                  allowedRoles={["SYSTEM_ADMIN"]}
+                >
+                  <SystemAdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/system/users"
+              element={
+                <ProtectedRoute
+                  isAuthenticated={effectiveIsAuthenticated}
+                  userRole={effectiveRole}
+                  defaultPath={defaultAuthenticatedPath}
+                  allowedRoles={["SYSTEM_ADMIN"]}
+                >
+                  <SystemAdminUsers />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/system/logs"
+              element={
+                <ProtectedRoute
+                  isAuthenticated={effectiveIsAuthenticated}
+                  userRole={effectiveRole}
+                  defaultPath={defaultAuthenticatedPath}
+                  allowedRoles={["SYSTEM_ADMIN"]}
+                >
+                  <SystemAdminLogs />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/system/system-status"
+              element={
+                <ProtectedRoute
+                  isAuthenticated={effectiveIsAuthenticated}
+                  userRole={effectiveRole}
+                  defaultPath={defaultAuthenticatedPath}
+                  allowedRoles={["SYSTEM_ADMIN"]}
+                >
+                  <SystemAdminSystemStatus />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/system-admin/system-status"
+              element={
+                <ProtectedRoute
+                  isAuthenticated={effectiveIsAuthenticated}
+                  userRole={effectiveRole}
+                  defaultPath={defaultAuthenticatedPath}
+                  allowedRoles={["SYSTEM_ADMIN"]}
+                >
+                  <SystemAdminSystemStatus />
                 </ProtectedRoute>
               }
             />
