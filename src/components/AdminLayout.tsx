@@ -1,4 +1,4 @@
-import React, {
+import React, { 
   useCallback,
   useEffect,
   useMemo,
@@ -460,7 +460,6 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
               <ShieldCheck className="text-white w-6 h-6" />
             </div>
             <span className="text-xl font-bold text-white tracking-tight">
-              {user?.role === "CONTRIBUTOR" ? "Contributor Panel" : "Admin Dashboard"}
               {dashboardTitle}
             </span>
           </div>
