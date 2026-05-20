@@ -8,6 +8,7 @@ import React, {
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import type { AxiosError } from "axios";
 import {
+  Activity,
   Users,
   LayoutDashboard,
   Settings,
@@ -25,6 +26,7 @@ import {
   Flag,
   Trophy,
   Upload,
+  ScrollText,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import axiosClient, {
@@ -279,14 +281,44 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     if (user?.role === "AUDIT") {
       return [
         {
-          label: "VIP Approval",
+          label: "Duyệt VIP",
           icon: ClipboardCheck,
           path: "/admin/audit/vip",
         },
         {
-          label: "Payments",
+          label: "Thanh toán",
           icon: ClipboardCheck,
           path: "/admin/audit/payments",
+        },
+        {
+          label: "Nhật ký hệ thống",
+          icon: ScrollText,
+          path: "/admin/audit/logs",
+        },
+      ];
+    }
+
+    if (user?.role === "SYSTEM_ADMIN") {
+      return [
+        {
+          label: "Dashboard kỹ thuật",
+          icon: LayoutDashboard,
+          path: "/admin/system/dashboard",
+        },
+        {
+          label: "Quản lý người dùng & phân quyền",
+          icon: Users,
+          path: "/admin/system/users",
+        },
+        {
+          label: "Nhật ký hệ thống",
+          icon: ScrollText,
+          path: "/admin/system/logs",
+        },
+        {
+          label: "Trạng thái hệ thống",
+          icon: Activity,
+          path: "/admin/system/system-status",
         },
       ];
     }
@@ -323,6 +355,13 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       { label: "Cài đặt hệ thống", icon: Settings, path: "/admin/settings" },
     ];
   }, [user]);
+
+  const dashboardTitle =
+    user?.role === "AUDIT"
+      ? "Audit Dashboard"
+      : user?.role === "SYSTEM_ADMIN"
+        ? "System Admin"
+        : "Admin Dashboard";
 
   const avatar = user?.avatarUrl?.trim()
     ? `${user.avatarUrl}${user.avatarUrl.includes("?") ? "&" : "?"}v=${avatarCacheBuster}`
@@ -422,6 +461,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
             </div>
             <span className="text-xl font-bold text-white tracking-tight">
               {user?.role === "CONTRIBUTOR" ? "Contributor Panel" : "Admin Dashboard"}
+              {dashboardTitle}
             </span>
           </div>
           <button

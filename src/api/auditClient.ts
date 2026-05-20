@@ -79,6 +79,44 @@ export const fetchVipRequestBill = async (
   return res.data as Blob;
 };
 
+export type AuditLogItem = {
+  userId: number | null;
+  userName: string | null;
+  userEmail: string | null;
+  action: string | null;
+  targetId: number | null;
+  targetName: string | null;
+  targetEmail: string | null;
+  oldValue: string | null;
+  newValue: string | null;
+  createdAt: string | null;
+};
+
+export type AuditLogPage = {
+  content: AuditLogItem[];
+  totalPages: number;
+  totalElements: number;
+};
+
+export const fetchAuditLogs = async (params: {
+  page?: number;
+  size?: number;
+  action?: string;
+  userId?: number;
+}) => {
+  const page = params.page ?? 0;
+  const size = params.size ?? 10;
+  const q = new URLSearchParams();
+  q.set("page", String(page));
+  q.set("size", String(size));
+  if (params.action) q.set("action", params.action);
+  if (typeof params.userId === "number") q.set("userId", String(params.userId));
+  const res = await axiosClient.get<AuditLogPage>(
+    `/audit/logs?${q.toString()}`,
+  );
+  return res.data;
+};
+
 // Payments
 export type PaymentTransaction = {
   id: number;
