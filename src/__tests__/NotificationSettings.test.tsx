@@ -157,8 +157,10 @@ describe('NotificationSettings page', () => {
       expect(markUserNotificationRead).toHaveBeenCalledWith(101);
     });
 
+    await waitFor(() => {
     expect(screen.queryByRole('button', { name: 'Đánh dấu đã đọc' })).not.toBeInTheDocument();
     expect(screen.getByText('0 chưa đọc')).toBeInTheDocument();
+    });
   });
 
   it('toggles email preference and calls update API', async () => {
