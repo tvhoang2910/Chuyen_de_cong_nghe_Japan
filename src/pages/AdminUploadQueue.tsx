@@ -19,6 +19,7 @@ import {
   fetchAdminUploadHistory,
   fetchPendingQueue,
   fetchUploadDetail,
+  fetchUploadPageBlob,
   rejectUpload,
   type ExamUploadHistoryResponse,
   type ExamUploadResponse,
@@ -45,6 +46,26 @@ interface AdminUploadQueueProps {
   mode?: "admin" | "contributor";
 }
 
+const PreviewUnavailable: React.FC<{ pageNumber?: number }> = ({
+  pageNumber,
+}) => (
+  <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-5 text-sm text-amber-800">
+    <p className="font-bold">
+      {pageNumber ? `Không xem được trang ${pageNumber}.` : "Không có file xem trước."}
+    </p>
+    <p className="mt-1 text-amber-700">
+      File gốc có thể đã mất khỏi lưu trữ hoặc chưa được upload hoàn tất.
+    </p>
+  </div>
+);
+
+const PreviewLoading: React.FC<{ pageNumber: number }> = ({ pageNumber }) => (
+  <div className="flex min-h-40 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-500">
+    <Loader2 className="h-4 w-4 animate-spin" />
+    Đang tải trang {pageNumber}...
+  </div>
+);
+
 const AdminUploadQueue: React.FC<AdminUploadQueueProps> = ({ mode = "admin" }) => {
   const [queue, setQueue] = useState<ExamUploadResponse[]>([]);
   const [page, setPage] = useState(0);
@@ -58,6 +79,13 @@ const AdminUploadQueue: React.FC<AdminUploadQueueProps> = ({ mode = "admin" }) =
   const [tab, setTab] = useState<DetailTab>("preview");
   const [history, setHistory] = useState<ExamUploadHistoryResponse[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [failedPreviewIndexes, setFailedPreviewIndexes] = useState<Set<number>>(
+    () => new Set(),
+  );
+  const [previewBlobUrls, setPreviewBlobUrls] = useState<Record<number, string>>(
+    {},
+  );
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
 
   const [isApproving, setIsApproving] = useState(false);
   const [isRejecting, setIsRejecting] = useState(false);
@@ -111,6 +139,8 @@ const AdminUploadQueue: React.FC<AdminUploadQueueProps> = ({ mode = "admin" }) =
     setSelectedId(uploadId);
     setTab("preview");
     setSelectedDetail(null);
+    setFailedPreviewIndexes(new Set());
+    setPreviewBlobUrls({});
     setIsLoadingDetail(true);
     try {
       const detail = await fetchUploadDetail(uploadId);
@@ -125,6 +155,8 @@ const AdminUploadQueue: React.FC<AdminUploadQueueProps> = ({ mode = "admin" }) =
   const closeDetail = useCallback(() => {
     setSelectedId(null);
     setSelectedDetail(null);
+    setFailedPreviewIndexes(new Set());
+    setPreviewBlobUrls({});
     setHistory([]);
     setExtractingUploadId(null);
     if (extractingTimeoutRef.current) {
@@ -293,10 +325,77 @@ const AdminUploadQueue: React.FC<AdminUploadQueueProps> = ({ mode = "admin" }) =
 
   const isPdfPreview = useMemo(() => {
     if (!selectedDetail?.viewUrls?.length) return false;
-    // Heuristic — if title or object keys include .pdf. Fallback to extension.
-    const first = selectedDetail.viewUrls[0] ?? "";
-    return first.toLowerCase().includes(".pdf");
+    const contentType = selectedDetail.contentType?.toLowerCase() ?? "";
+    if (contentType === "application/pdf") return true;
+    const firstObjectKey = selectedDetail.objectKeys?.[0]?.toLowerCase() ?? "";
+    return firstObjectKey.endsWith(".pdf");
   }, [selectedDetail]);
+
+  const markPreviewFailed = (index: number) => {
+    setFailedPreviewIndexes((current) => {
+      const next = new Set(current);
+      next.add(index);
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    if (tab !== "preview" || !selectedDetail?.viewUrls?.length) {
+      setPreviewBlobUrls({});
+      setIsLoadingPreview(false);
+      return undefined;
+    }
+
+    let cancelled = false;
+    const createdUrls: string[] = [];
+
+    setIsLoadingPreview(true);
+    setPreviewBlobUrls({});
+    setFailedPreviewIndexes(new Set());
+
+    Promise.all(
+      selectedDetail.viewUrls.map(async (_url, index) => {
+        try {
+          const blob = await fetchUploadPageBlob(selectedDetail.id, index + 1);
+          const objectUrl = URL.createObjectURL(blob);
+          if (cancelled) {
+            URL.revokeObjectURL(objectUrl);
+            return [index, null] as const;
+          }
+          createdUrls.push(objectUrl);
+          return [index, objectUrl] as const;
+        } catch {
+          return [index, null] as const;
+        }
+      }),
+    )
+      .then((entries) => {
+        if (cancelled) return;
+        const nextUrls: Record<number, string> = {};
+        const nextFailed = new Set<number>();
+
+        entries.forEach(([index, objectUrl]) => {
+          if (objectUrl) {
+            nextUrls[index] = objectUrl;
+          } else {
+            nextFailed.add(index);
+          }
+        });
+
+        setPreviewBlobUrls(nextUrls);
+        setFailedPreviewIndexes(nextFailed);
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoadingPreview(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      createdUrls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [tab, selectedDetail?.id, selectedDetail?.viewUrls?.length]);
 
   return (
     <AdminLayout>
@@ -304,10 +403,12 @@ const AdminUploadQueue: React.FC<AdminUploadQueueProps> = ({ mode = "admin" }) =
         <header className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">
-              Duyệt upload đề thi {mode === "contributor" && "(Contributor)"}
+              {mode === "contributor" ? "Duyệt đề từ học sinh" : "Duyệt upload đề thi"}
             </h1>
             <p className="mt-1 text-sm text-slate-600">
-              Các yêu cầu upload đang chờ duyệt. Bấm vào một hàng để xem chi tiết.
+              {mode === "contributor"
+                ? "Các đề học sinh gửi đang chờ duyệt. Đề contributor upload sẽ được xử lý trực tiếp."
+                : "Các yêu cầu upload đang chờ duyệt. Bấm vào một hàng để xem chi tiết."}
             </p>
           </div>
           <button
@@ -485,30 +586,56 @@ const AdminUploadQueue: React.FC<AdminUploadQueueProps> = ({ mode = "admin" }) =
               {tab === "preview" && !isLoadingDetail && previewItems.length > 0 && (
                 <div className="space-y-4">
                   {isPdfPreview
-                    ? previewItems.map((p) => (
-                        <iframe
-                          key={p.index}
-                          src={p.url}
-                          title={`Trang ${p.index + 1}`}
-                          className="h-[600px] w-full rounded-xl border border-slate-200"
-                        />
-                      ))
-                    : previewItems.map((p) => (
-                        <figure
-                          key={p.index}
-                          className="overflow-hidden rounded-xl border border-slate-200"
-                        >
-                          <img
-                            src={p.url}
-                            alt={`Trang ${p.index + 1}`}
-                            className="w-full"
+                    ? previewItems.map((p) => {
+                        const previewSrc = previewBlobUrls[p.index];
+                        if (failedPreviewIndexes.has(p.index)) {
+                          return (
+                            <PreviewUnavailable key={p.index} pageNumber={p.index + 1} />
+                          );
+                        }
+                        if (isLoadingPreview || !previewSrc) {
+                          return <PreviewLoading key={p.index} pageNumber={p.index + 1} />;
+                        }
+                        return (
+                          <iframe
+                            key={p.index}
+                            src={previewSrc}
+                            title={`Trang ${p.index + 1}`}
+                            onError={() => markPreviewFailed(p.index)}
+                            className="h-[600px] w-full rounded-xl border border-slate-200"
                           />
-                          <figcaption className="bg-slate-50 px-3 py-1.5 text-xs text-slate-500">
-                            Trang {p.index + 1}
-                          </figcaption>
-                        </figure>
-                      ))}
+                        );
+                      })
+                    : previewItems.map((p) => {
+                        const previewSrc = previewBlobUrls[p.index];
+                        return (
+                          <figure
+                            key={p.index}
+                            className="overflow-hidden rounded-xl border border-slate-200"
+                          >
+                            {failedPreviewIndexes.has(p.index) ? (
+                              <PreviewUnavailable pageNumber={p.index + 1} />
+                            ) : isLoadingPreview || !previewSrc ? (
+                              <PreviewLoading pageNumber={p.index + 1} />
+                            ) : (
+                              <img
+                                src={previewSrc}
+                                alt={`Trang ${p.index + 1}`}
+                                onError={() => markPreviewFailed(p.index)}
+                                className="w-full"
+                              />
+                            )}
+                            <figcaption className="bg-slate-50 px-3 py-1.5 text-xs text-slate-500">
+                              Trang {p.index + 1}
+                            </figcaption>
+                          </figure>
+                        );
+                      })}
                 </div>
+              )}
+
+              {tab === "preview" && !isLoadingDetail && previewItems.length === 0 && (
+                <PreviewUnavailable />
               )}
 
               {tab === "history" && (

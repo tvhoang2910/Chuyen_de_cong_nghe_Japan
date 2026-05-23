@@ -26,6 +26,7 @@ const OAuth2Success = lazy(() => import("./pages/OAuth2Success"));
 const AdminUsers = lazy(() => import("./pages/AdminUsers"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const AdminAchievements = lazy(() => import("./pages/AdminAchievements"));
+const ContributorDashboard = lazy(() => import("./pages/ContributorDashboard"));
 const ExamManagement = lazy(() => import("./pages/ExamManagement"));
 const PublicExams = lazy(() => import("./pages/PublicExams"));
 const ExamStart = lazy(() => import("./pages/ExamStart"));
@@ -376,7 +377,7 @@ function App() {
                   defaultPath={defaultAuthenticatedPath}
                   allowedRoles={["CONTRIBUTOR"]}
                 >
-                  <Dashboard />
+                  <ContributorDashboard />
                 </ProtectedRoute>
               }
             />
@@ -402,7 +403,7 @@ function App() {
                   defaultPath={defaultAuthenticatedPath}
                   allowedRoles={["CONTRIBUTOR"]}
                 >
-                  <SubscriptionReviewQueue mode="contributor" />
+                  <Navigate to="/contributor" />
                 </ProtectedRoute>
               }
             />
@@ -415,7 +416,7 @@ function App() {
                   defaultPath={defaultAuthenticatedPath}
                   allowedRoles={["CONTRIBUTOR"]}
                 >
-                  <PremiumPlanManagement mode="contributor" />
+                  <Navigate to="/contributor" />
                 </ProtectedRoute>
               }
             />

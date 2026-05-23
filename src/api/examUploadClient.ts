@@ -39,6 +39,7 @@ export interface ExamUploadResponse {
   title: string;
   description?: string;
   pageCount: number;
+  contentType?: string;
   status: ExamUploadStatus;
   rejectionReason?: string;
   reviewedBy?: number;
@@ -47,6 +48,7 @@ export interface ExamUploadResponse {
   extractionError?: string;
   createdAt: string;
   modifiedAt: string;
+  objectKeys?: string[];
   viewUrls?: string[];
 }
 
@@ -88,13 +90,6 @@ const examUploadClient = axios.create({
   },
 });
 
-const shouldRewriteStorageUrl = (): boolean => {
-  if (typeof window === "undefined") {
-    return false;
-  }
-  return window.location.protocol === "https:";
-};
-
 const isInternalMinioHost = (hostname: string): boolean => {
   const normalized = hostname.toLowerCase();
   return (
@@ -106,10 +101,9 @@ const isInternalMinioHost = (hostname: string): boolean => {
 
 export const toBrowserSafeStorageUrl = (
   rawUrl: string,
-  forceRewrite?: boolean,
+  forceRewrite = true,
 ): string => {
-  const shouldRewrite = forceRewrite ?? shouldRewriteStorageUrl();
-  if (!shouldRewrite) {
+  if (!forceRewrite) {
     return rawUrl;
   }
 
@@ -206,6 +200,19 @@ export const fetchUploadDetail = async (
     ...response.data,
     viewUrls: response.data.viewUrls?.map((url) => toBrowserSafeStorageUrl(url)),
   };
+};
+
+export const fetchUploadPageBlob = async (
+  uploadId: number,
+  pageIndex: number,
+): Promise<Blob> => {
+  const response = await examUploadClient.get<Blob>(
+    `/uploads/${uploadId}/pages/${pageIndex}`,
+    {
+      responseType: "blob",
+    },
+  );
+  return response.data;
 };
 
 export const fetchUploadHistory = async (

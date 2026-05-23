@@ -9,10 +9,12 @@ export type CommentNode = {
  id: number;
  userId?: number;
  authorName?: string | null;
+ authorAvatarUrl?: string | null;
  userFullName?: string | null;
  parentId?: number | null;
  replyToUserId?: number | null;
  replyToAuthorName?: string | null;
+ replyToAuthorAvatarUrl?: string | null;
  replyToUserFullName?: string | null;
  content: string;
  createdAt?: string;

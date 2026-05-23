@@ -11,7 +11,9 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
+import AdminLayout from "../components/AdminLayout";
 import MainLayout from "../components/MainLayout";
+import { getCurrentSessionRole } from "../api/axiosClient";
 import {
   fetchUploadDetail,
   fetchMyUploads,
@@ -58,6 +60,14 @@ const StatusIcon: React.FC<{ status: ExamUploadStatus }> = ({ status }) => {
 };
 
 const MyExamUploads: React.FC = () => {
+  const role = getCurrentSessionRole();
+  const Layout = role === "CONTRIBUTOR" || role === "ADMIN" ? AdminLayout : MainLayout;
+  const extractedExamPath =
+    role === "ADMIN"
+      ? "/admin/exams"
+      : role === "CONTRIBUTOR"
+        ? "/contributor/exams"
+        : null;
   const [items, setItems] = useState<ExamUploadResponse[]>([]);
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -162,7 +172,7 @@ const MyExamUploads: React.FC = () => {
   };
 
   return (
-    <MainLayout>
+    <Layout>
       <div className="space-y-6">
         <header className="flex items-center justify-between">
           <div>
@@ -270,7 +280,10 @@ const MyExamUploads: React.FC = () => {
                           {item.status === "EXTRACTED" &&
                             item.extractedExamId && (
                               <Link
-                                to={`/dashboard/exams/${item.extractedExamId}`}
+                                to={
+                                  extractedExamPath ??
+                                  `/dashboard/exams/${item.extractedExamId}`
+                                }
                                 className="mt-2 inline-flex items-center gap-1 rounded-md bg-indigo-600 px-3 py-1.5 text-sm text-white hover:bg-indigo-500"
                               >
                                 <ExternalLink className="h-3.5 w-3.5" />
@@ -374,7 +387,7 @@ const MyExamUploads: React.FC = () => {
           </div>
         )}
       </div>
-    </MainLayout>
+    </Layout>
   );
 };
 

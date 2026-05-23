@@ -11,7 +11,6 @@ import {
   Activity,
   Users,
   LayoutDashboard,
-  Settings,
   LogOut,
   Bell,
   Search,
@@ -21,22 +20,22 @@ import {
   KeyRound,
   ShieldCheck,
   ClipboardCheck,
-  Gem,
   BookOpen,
   Flag,
-  Trophy,
   Upload,
+  FileUp,
   ScrollText,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import axiosClient, {
   fetchSubscriptionReviewQueue,
+  fetchUserNotifications,
   SUBSCRIPTION_REVIEW_UPDATED_EVENT,
   clearAuthSession,
   fetchCurrentUserProfile,
+  getCurrentSessionRole,
   updateCurrentUserProfile,
   uploadCurrentUserAvatar,
-  getCurrentSessionRole,
   type UserProfile,
 } from "../api/axiosClient";
 
@@ -106,6 +105,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     NotificationItem[]
   >([]);
   const notificationRef = useRef<HTMLDivElement | null>(null);
+  const effectiveRole = user?.role ?? getCurrentSessionRole();
 
   const persistDismissedEntries = (entries: DismissedNotificationEntry[]) => {
     localStorage.setItem(
@@ -180,26 +180,52 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
 
   useEffect(() => {
     let isMounted = true;
-    const currentRole = getCurrentSessionRole();
-    const reviewPath =
-      currentRole === "CONTRIBUTOR"
-        ? "/contributor/subscription-reviews"
-        : "/admin/subscription-reviews";
 
     const loadNotifications = async () => {
+      if (effectiveRole !== "ADMIN" && effectiveRole !== "CONTRIBUTOR") {
+        if (isMounted) {
+          setNotificationItems([]);
+        }
+        return;
+      }
+
       try {
-        const queue = await fetchSubscriptionReviewQueue(
-          0,
-          5,
-          "PENDING_REVIEW",
-        );
-        const items: NotificationItem[] = queue.content.map((row) => ({
-          id: `review-item-${row.id}`,
-          title: `Request #${row.id} đang chờ duyệt`,
-          description: `${row.userFullName} • ${row.planName} • ${Number(row.purchasedPrice).toLocaleString("vi-VN")}đ`,
-          timeLabel: new Date(row.createdAt).toLocaleString("vi-VN"),
-          onClick: () => navigate(reviewPath),
-        }));
+        const [notificationFeed, subscriptionQueue] = await Promise.all([
+          fetchUserNotifications(0, 10),
+          effectiveRole === "ADMIN"
+            ? fetchSubscriptionReviewQueue(0, 5, "PENDING_REVIEW")
+            : Promise.resolve(null),
+        ]);
+
+        const notificationItemsFromFeed: NotificationItem[] =
+          notificationFeed.content.map((row) => ({
+            id: `user-notification-${row.id}-${row.createdAt}`,
+            title: row.title,
+            description: row.message,
+            timeLabel: new Date(row.createdAt).toLocaleString("vi-VN"),
+            onClick: () =>
+              navigate(
+                row.actionUrl ||
+                  (effectiveRole === "CONTRIBUTOR"
+                    ? "/contributor/upload-queue"
+                    : "/admin/upload-queue"),
+              ),
+          }));
+
+        const reviewQueueItems: NotificationItem[] = subscriptionQueue
+          ? subscriptionQueue.content.map((row) => ({
+              id: `review-item-${row.id}`,
+              title: `Request #${row.id} đang chờ duyệt`,
+              description: `${row.userFullName} • ${row.planName} • ${Number(row.purchasedPrice).toLocaleString("vi-VN")}đ`,
+              timeLabel: new Date(row.createdAt).toLocaleString("vi-VN"),
+              onClick: () => navigate("/admin/subscription-reviews"),
+            }))
+          : [];
+
+        const items: NotificationItem[] = [
+          ...notificationItemsFromFeed,
+          ...reviewQueueItems,
+        ];
 
         const dismissedIds = readDismissedIds();
         const visibleItems = items.filter((item) => !dismissedIds.has(item.id));
@@ -216,7 +242,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
               description:
                 "Vui lòng thử lại sau ít phút hoặc nhấn làm mới trang.",
               timeLabel: "Hệ thống",
-              onClick: () => navigate(reviewPath),
+              onClick: () => navigate("/admin/subscription-reviews"),
             },
           ]);
         }
@@ -228,6 +254,12 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     };
 
     void loadNotifications();
+    if (effectiveRole !== "ADMIN" && effectiveRole !== "CONTRIBUTOR") {
+      return () => {
+        isMounted = false;
+      };
+    }
+
     const intervalId = globalThis.setInterval(handleRefresh, 30000);
     globalThis.addEventListener(
       SUBSCRIPTION_REVIEW_UPDATED_EVENT,
@@ -242,7 +274,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         handleRefresh,
       );
     };
-  }, [navigate, readDismissedEntries, readDismissedIds]);
+  }, [effectiveRole, navigate, readDismissedEntries, readDismissedIds]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -261,9 +293,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   }, []);
 
   const bellBadgeCount = useMemo(() => {
-    return notificationItems.filter((item) =>
-      item.id.startsWith("review-item-"),
-    ).length;
+    return notificationItems.length;
   }, [notificationItems]);
 
   const handleLogout = async () => {
@@ -278,7 +308,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   };
 
   const navItems = useMemo(() => {
-    if (user?.role === "AUDIT") {
+    if (effectiveRole === "AUDIT") {
       return [
         {
           label: "Duyệt VIP",
@@ -298,7 +328,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       ];
     }
 
-    if (user?.role === "SYSTEM_ADMIN") {
+    if (effectiveRole === "SYSTEM_ADMIN") {
       return [
         {
           label: "Dashboard kỹ thuật",
@@ -323,18 +353,18 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       ];
     }
 
-    if (user?.role === "CONTRIBUTOR") {
+    if (effectiveRole === "CONTRIBUTOR") {
       return [
-        { label: "Dashboard", icon: LayoutDashboard, path: "/contributor" },
-        { label: "Quản lý đề thi", icon: BookOpen, path: "/contributor/exams" },
-        { label: "Duyệt upload", icon: Upload, path: "/contributor/upload-queue" },
-        { label: "Báo cáo câu hỏi", icon: Flag, path: "/contributor/reports" },
-        { label: "Quản lý gói Premium", icon: Gem, path: "/contributor/premium-plans" },
         {
-          label: "Duyệt thanh toán",
-          icon: ClipboardCheck,
-          path: "/contributor/subscription-reviews",
+          label: "Tổng quan",
+          icon: LayoutDashboard,
+          path: "/contributor",
         },
+        { label: "Quản lý đề thi", icon: BookOpen, path: "/contributor/exams" },
+        { label: "Duyệt đề từ học sinh", icon: Upload, path: "/contributor/upload-queue" },
+        { label: "Báo cáo câu hỏi", icon: Flag, path: "/contributor/reports" },
+        { label: "Upload đề", icon: Upload, path: "/upload-exam" },
+        { label: "Đề đã upload", icon: FileUp, path: "/my-uploads" },
       ];
     }
 
@@ -344,28 +374,32 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       { label: "Quản lý Users", icon: Users, path: "/admin/users" },
       { label: "Quản lý đề thi", icon: BookOpen, path: "/admin/exams" },
       { label: "Duyệt upload", icon: Upload, path: "/admin/upload-queue" },
-      { label: "Kho thành tựu", icon: Trophy, path: "/admin/achievements" },
       { label: "Báo cáo câu hỏi", icon: Flag, path: "/admin/reports" },
-      { label: "Quản lý gói Premium", icon: Gem, path: "/admin/premium-plans" },
       {
-        label: "Duyệt thanh toán",
+        label: "Quản lý thanh toán",
         icon: ClipboardCheck,
         path: "/admin/subscription-reviews",
       },
-      { label: "Cài đặt hệ thống", icon: Settings, path: "/admin/settings" },
+      {
+        label: "Gói Premium",
+        icon: ClipboardCheck,
+        path: "/admin/premium-plans",
+      },
     ];
-  }, [user]);
+  }, [effectiveRole]);
 
   const dashboardTitle =
-    user?.role === "AUDIT"
+    effectiveRole === "AUDIT"
       ? "Audit Dashboard"
-      : user?.role === "SYSTEM_ADMIN"
+      : effectiveRole === "SYSTEM_ADMIN"
         ? "System Admin"
-        : "Admin Dashboard";
+        : effectiveRole === "CONTRIBUTOR"
+          ? "Contributor"
+          : "Admin Dashboard";
 
   const avatar = user?.avatarUrl?.trim()
     ? `${user.avatarUrl}${user.avatarUrl.includes("?") ? "&" : "?"}v=${avatarCacheBuster}`
-    : `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.fullName || "Admin")}&background=0f172a&color=fff`;
+    : `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.fullName || effectiveRole || "Admin")}&background=0f172a&color=fff`;
 
   const handleUpdateProfile = async (
     event: React.SyntheticEvent<HTMLFormElement>,
@@ -450,7 +484,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       {/* Sidebar */}
       <aside
         className={`
-        fixed inset-y-0 left-0 z-50 w-72 bg-slate-900 text-slate-300 transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0
+        fixed inset-y-0 left-0 z-50 flex h-full w-72 flex-col bg-slate-900 text-slate-300 transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0
         ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}
       `}
       >
@@ -471,7 +505,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           </button>
         </div>
 
-        <nav className="flex-1 px-4 py-8 space-y-1 overflow-y-auto">
+        <nav className="flex-1 overflow-y-auto px-4 py-8 space-y-1">
           {navItems.map((item) => {
             const isActive = location.pathname === item.path;
             return (

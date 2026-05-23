@@ -9,6 +9,7 @@ import {
   type AllowedUploadContentType,
   type ExamUploadResponse,
 } from "../api/examUploadClient";
+import { getCurrentSessionRole } from "../api/axiosClient";
 
 export interface ExamUploadPayload {
   title: string;
@@ -140,7 +141,12 @@ export const useExamUploadFlow = (): UseExamUploadFlowResult => {
           initiateResponse.uploadId,
           note,
         );
-        toast.success("Tải đề thành công. Đang chờ duyệt.");
+        const role = getCurrentSessionRole();
+        toast.success(
+          role === "CONTRIBUTOR" || role === "ADMIN"
+            ? "Tải đề thành công. Hệ thống đang xử lý."
+            : "Tải đề thành công. Đang chờ duyệt.",
+        );
         return completed;
       } catch (err) {
         const message =

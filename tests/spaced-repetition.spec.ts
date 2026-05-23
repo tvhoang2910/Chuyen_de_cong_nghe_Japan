@@ -1,4 +1,8 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
+import {
+  mockUserShellApis,
+  seedAuthenticatedUser,
+} from './helpers/browser-auth';
 
 type DeckQuestion = {
   itemId: number;
@@ -127,87 +131,6 @@ const ATTEMPT_RESULT_RESPONSE = {
     },
   ],
 };
-
-async function seedAuthenticatedUser(page: Page): Promise<void> {
-  await page.addInitScript(() => {
-    localStorage.setItem('access_token', 'e2e-token');
-    localStorage.setItem('refresh_token', 'e2e-refresh-token');
-    localStorage.setItem('user_email', 'e2e-user@example.com');
-    localStorage.setItem('user_role', 'USER');
-  });
-}
-
-async function mockUserShellApis(page: Page): Promise<void> {
-  await page.route('**/api/v1/auth/me', async (route: Route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        id: 3,
-        email: 'e2e-user@example.com',
-        fullName: 'E2E User',
-        avatarUrl: null,
-        phoneNumber: null,
-        school: null,
-        subject: null,
-        role: 'USER',
-        premium: false,
-      }),
-    });
-  });
-
-  await page.route('**/api/v1/auth/subscriptions/my-requests', async (route: Route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: '[]',
-    });
-  });
-
-  await page.route('**/api/v1/auth/push-subscription/vapid-public-key', async (route: Route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ publicKey: 'BOr7dummyVapidPublicKeyForE2ETestOnly1234567890abcXYZ' }),
-    });
-  });
-
-  await page.route('**/api/v1/auth/push-subscription', async (route: Route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: '{}',
-    });
-  });
-
-  await page.route('**/api/v1/auth/notifications**', async (route: Route) => {
-    const method = route.request().method();
-
-    if (method === 'PATCH') {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ updatedCount: 0 }),
-      });
-      return;
-    }
-
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        content: [],
-        number: 0,
-        size: 5,
-        totalElements: 0,
-        totalPages: 0,
-        first: true,
-        last: true,
-        unreadCount: 0,
-      }),
-    });
-  });
-}
 
 async function mockAttemptViewApi(page: Page, responseBody = ATTEMPT_VIEW_RESPONSE): Promise<void> {
   await page.route('**/api/v1/exam/exams/public/*/attempt-view', async (route: Route) => {

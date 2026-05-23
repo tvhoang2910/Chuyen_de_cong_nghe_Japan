@@ -1,5 +1,9 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 import type { CommentNode, CreateCommentPayload, VotePayload } from '../src/api/commentClient';
+import {
+  mockUserShellApis,
+  seedAuthenticatedUser,
+} from './helpers/browser-auth';
 
 // ---------------------------------------------------------------------------
 // Shared types & helpers
@@ -7,71 +11,8 @@ import type { CommentNode, CreateCommentPayload, VotePayload } from '../src/api/
 
 const ISO_NOW = '2026-04-08T10:00:00.000Z';
 const EXAM_ID = '1';
-
-type SeedOptions = {
-  role?: string;
-  userId?: number;
-  userEmail?: string;
-  userFullName?: string;
-};
-
-const DEFAULT_SEED: SeedOptions = {
-  role: 'USER',
-  userId: 3,
-  userEmail: 'e2e-user@example.com',
-  userFullName: 'E2E User',
-};
-
-async function seedAuthenticatedUser(page: Page, options: SeedOptions = {}): Promise<void> {
-  const opts = { ...DEFAULT_SEED, ...options };
-  const role = opts.role ?? 'USER';
-  const userEmail = opts.userEmail ?? 'e2e-user@example.com';
-  await page.addInitScript(
-    ({ role, userEmail }) => {
-      localStorage.setItem('access_token', 'e2e-token');
-      localStorage.setItem('refresh_token', 'e2e-refresh-token');
-      localStorage.setItem('user_email', userEmail);
-      localStorage.setItem('user_role', role);
-    },
-    { role, userEmail },
-  );
-}
-
-async function mockUserShellApis(page: Page, role = 'USER'): Promise<void> {
-  await page.route('**/api/v1/auth/me', async (route: Route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        id: 3,
-        email: 'e2e-user@example.com',
-        fullName: 'E2E User',
-        avatarUrl: null,
-        phoneNumber: null,
-        school: null,
-        subject: null,
-        role,
-        premium: false,
-      }),
-    });
-  });
-
-  await page.route('**/api/v1/auth/subscriptions/my-requests', async (route: Route) => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
-  });
-
-  await page.route('**/api/v1/auth/push-subscription/vapid-public-key', async (route: Route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ publicKey: 'BOr7dummyVapidPublicKeyForE2ETestOnly1234567890abcXYZ' }),
-    });
-  });
-
-  await page.route('**/api/v1/auth/push-subscription', async (route: Route) => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
-  });
-}
+const MOCK_AVATAR_DATA_URL =
+  'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
 
 // Build a CommentNode with sensible defaults
 function makeCommentNode(overrides: Partial<CommentNode> & { id: number; content: string }): CommentNode {
@@ -183,8 +124,19 @@ test.describe('Comment Creation Flow', () => {
 
   test('displays existing comments on page load', async ({ page }) => {
     const existingComments: CommentNode[] = [
-      makeCommentNode({ id: 10, content: 'Một bình luận đã tồn tại' }),
-      makeCommentNode({ id: 11, content: 'Bình luận thứ hai' }),
+      makeCommentNode({
+        id: 10,
+        userId: 10,
+        authorName: 'Nguyen Van A',
+        authorAvatarUrl: MOCK_AVATAR_DATA_URL,
+        content: 'Một bình luận đã tồn tại',
+      }),
+      makeCommentNode({
+        id: 11,
+        userId: 11,
+        authorName: 'Tran Thi B',
+        content: 'Bình luận thứ hai',
+      }),
     ];
 
     await page.route(`**/api/v1/community/comments/exam/${EXAM_ID}`, async (route: Route) => {
@@ -199,6 +151,8 @@ test.describe('Comment Creation Flow', () => {
 
     await expect(page.getByText('Một bình luận đã tồn tại')).toBeVisible();
     await expect(page.getByText('Bình luận thứ hai')).toBeVisible();
+    await expect(page.getByText('Nguyen Van A')).toBeVisible();
+    await expect(page.getByText('Tran Thi B')).toBeVisible();
     await expect(page.getByText('2 bình luận gốc')).toBeVisible();
   });
 });
@@ -393,7 +347,7 @@ test.describe('Vote Flow', () => {
 test.describe('Pin Flow (Admin / Teacher)', () => {
   test('admin can pin a comment and see the pinned indicator', async ({ page }) => {
     await seedAuthenticatedUser(page, { role: 'ADMIN' });
-    await mockUserShellApis(page, 'ADMIN');
+    await mockUserShellApis(page, { role: 'ADMIN' });
 
     const comment: CommentNode = makeCommentNode({
       id: 80,
@@ -431,7 +385,7 @@ test.describe('Pin Flow (Admin / Teacher)', () => {
 
   test('admin can unpin a comment and indicator disappears', async ({ page }) => {
     await seedAuthenticatedUser(page, { role: 'ADMIN' });
-    await mockUserShellApis(page, 'ADMIN');
+    await mockUserShellApis(page, { role: 'ADMIN' });
 
     const comment: CommentNode = makeCommentNode({
       id: 81,
@@ -463,7 +417,7 @@ test.describe('Pin Flow (Admin / Teacher)', () => {
 
   test('regular user does not see pin button', async ({ page }) => {
     await seedAuthenticatedUser(page, { role: 'USER' });
-    await mockUserShellApis(page, 'USER');
+    await mockUserShellApis(page, { role: 'USER' });
 
     const comment: CommentNode = makeCommentNode({ id: 82, content: 'Regular user comment' });
     await page.route(`**/api/v1/community/comments/exam/${EXAM_ID}`, async (route: Route) => {

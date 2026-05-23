@@ -3,7 +3,6 @@ import type { AxiosError } from 'axios';
 import { AlertTriangle, CheckCircle2, Eye, RefreshCw, ShieldCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
 import AdminLayout from '../components/AdminLayout';
-import MainLayout from '../components/MainLayout';
 import {
   fetchReportQueue,
   fetchProcessedReportQueue,
@@ -37,7 +36,11 @@ const getSeverityTone = (count: number): string => {
 };
 
 const AdminReports: React.FC<AdminReportsProps> = ({ mode }) => {
-  const Layout = useMemo(() => (mode === 'admin' ? AdminLayout : MainLayout), [mode]);
+  const Layout = AdminLayout;
+  const pageDescription =
+    mode === 'admin'
+      ? 'Theo dõi câu hỏi bị báo lỗi và xử lý trực tiếp ngay trên từng cụm báo cáo.'
+      : 'Theo dõi các báo cáo câu hỏi liên quan tới kho đề và xử lý trong không gian Contributor.';
 
   const [queueItems, setQueueItems] = useState<ReportQueueItem[]>([]);
   const [processedItems, setProcessedItems] = useState<ReportQueueItem[]>([]);
@@ -171,7 +174,7 @@ const AdminReports: React.FC<AdminReportsProps> = ({ mode }) => {
             <div>
               <h1 className="text-3xl font-black tracking-tight">Trung tâm báo cáo câu hỏi</h1>
               <p className="mt-2 text-sm text-slate-200">
-                Theo dõi câu hỏi bị báo lỗi và xử lý trực tiếp ngay trên từng cụm báo cáo.
+                {pageDescription}
               </p>
             </div>
             <button

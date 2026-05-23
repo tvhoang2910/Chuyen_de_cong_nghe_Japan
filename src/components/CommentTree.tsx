@@ -128,15 +128,34 @@ const CommentTree = ({
 
   const upvoteActive = localUserVote === "UP";
   const downvoteActive = localUserVote === "DOWN";
-  const avatarChar = authorLabel.slice(0, 1).toUpperCase();
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
+  const avatarUrl =
+    !avatarLoadFailed && comment.authorAvatarUrl
+      ? comment.authorAvatarUrl
+      : null;
+  const avatarInitials = authorLabel
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.slice(0, 1).toUpperCase())
+    .join("");
 
   return (
     <div
       className={`rounded-[1.75rem] border bg-white p-4 shadow-sm ${indentationClass} ${localPinned ? "border-amber-300" : "border-slate-200"}`}
     >
       <div className="flex items-start gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-800 text-sm font-bold text-white">
-          {avatarChar}
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-slate-800 text-sm font-bold text-white">
+          {avatarUrl ? (
+            <img
+              src={avatarUrl}
+              alt={`avatar ${authorLabel}`}
+              className="h-full w-full object-cover"
+              onError={() => setAvatarLoadFailed(true)}
+            />
+          ) : (
+            avatarInitials || "?"
+          )}
         </div>
         <div className="min-w-0 flex-1 space-y-2">
           <div className="rounded-2xl bg-slate-50 px-4 py-3">

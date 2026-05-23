@@ -1,10 +1,9 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { Pencil, Trash2, Eye, Plus, Save, Megaphone, Archive, FilePlus2, Upload, Crown, Lock, CloudUpload, FileText, X } from 'lucide-react';
+import { Pencil, Trash2, Eye, Plus, Save, Megaphone, Archive, FilePlus2, Crown, Lock, CloudUpload, FileText, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { AxiosError } from 'axios';
 import AdminLayout from '../components/AdminLayout';
-import { ExamDifficultyBadge, type DifficultyLevel } from '../components/ExamDifficultyBadge';
 import { fetchEventSource } from '@microsoft/fetch-event-source'; 
 import {
   createGlobalTag,
@@ -26,16 +25,13 @@ import {
 import { getCurrentSessionRole } from '../api/axiosClient';
 import { formatOnlineExamStatus } from '../utils/statusLabels';
 
-export type QuestionWithDifficulty = ExamQuestion & { difficulty?: DifficultyLevel };
-type DifficultyFilter = Exclude<DifficultyLevel, null | undefined> | '';
-
 type RoleMode = 'ADMIN' | 'CONTRIBUTOR';
 
 type ExamManagementProps = {
   mode: RoleMode;
 };
 
-type PanelMode = 'none' | 'create' | 'edit' | 'view' | 'import'| 'upload-source';
+type PanelMode = 'none' | 'create' | 'edit' | 'view' | 'upload-source';
 
 type FormErrors = {
   title?: string;
@@ -67,42 +63,6 @@ const emptyPayload = (): CreateExamPayload => ({
   questions: [emptyQuestion()],
 });
 
-const importSampleExam = {
-  title: 'Đề thi mẫu Toán cơ bản',
-  description: 'Mẫu import JSON cho hệ thống exam bank',
-  durationMinutes: 45,
-  passingScore: 5,
-  premium: false,
-  teaserQuestionCount: 2,
-  tags: ['Toán', 'Cơ bản', 'Trắc nghiệm'],
-  questions: [
-    {
-      content: '2 + 2 = ?',
-      explanation: 'Phép cộng cơ bản',
-      scoreWeight: 1,
-      options: [
-        { content: '3', isCorrect: false },
-        { content: '4', isCorrect: true },
-        { content: '5', isCorrect: false },
-        { content: '6', isCorrect: false },
-      ],
-    },
-    {
-      content: 'Số nào là số nguyên tố?',
-      explanation: 'Số nguyên tố chỉ chia hết cho 1 và chính nó',
-      scoreWeight: 1,
-      options: [
-        { content: '9', isCorrect: false },
-        { content: '15', isCorrect: false },
-        { content: '17', isCorrect: true },
-        { content: '21', isCorrect: false },
-      ],
-    },
-  ],
-};
-
-const importSampleJsonText = JSON.stringify(importSampleExam, null, 2);
-
 const ALLOWED_UPLOAD_MIME_TYPES = [
   'application/pdf',
   'image/jpeg',
@@ -120,10 +80,6 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<CreateExamPayload>(emptyPayload());
   const [panelMode, setPanelMode] = useState<PanelMode>('none');
-  const [importJsonText, setImportJsonText] = useState('');
-  const [isImporting, setIsImporting] = useState(false);
-  const [importParseError, setImportParseError] = useState<string | null>(null);
-  const [importErrors, setImportErrors] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
   const [selectedTags, setSelectedTags] = useState<TagOption[]>([]);
   const [availableTags, setAvailableTags] = useState<TagOption[]>([]);
@@ -135,8 +91,6 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
   const [isUploadingSource, setIsUploadingSource] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const [difficultyFilter, setDifficultyFilter] = useState<DifficultyFilter>('');
 
   const addTagToSelected = (tag: TagOption) => {
     setSelectedTags((prev) => {
@@ -356,13 +310,6 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
     setPanelMode('create');
   };
 
-  const openImport = () => {
-    setImportJsonText('');
-    setImportParseError(null);
-    setImportErrors([]);
-    setPanelMode('import');
-  };
-
   const openUploadSource = () => {
     setUploadTitle('');
     setUploadFile(null);
@@ -521,188 +468,6 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
     return errors;
   };
 
-  const describeImportParseError = (raw: string, error: unknown): string => {
-    const fallback = 'JSON không hợp lệ.';
-    if (!(error instanceof Error)) {
-      return fallback;
-    }
-
-    const message = error.message || fallback;
-    const positionMatch = message.match(/position\s+(\d+)/i);
-    if (!positionMatch) {
-      return `JSON không hợp lệ: ${message}`;
-    }
-
-    const position = Number(positionMatch[1]);
-    if (!Number.isFinite(position)) {
-      return `JSON không hợp lệ: ${message}`;
-    }
-
-    const textUntilError = raw.slice(0, position);
-    const lines = textUntilError.split(/\r?\n/);
-    const line = lines.length;
-    const column = (lines[lines.length - 1] || '').length + 1;
-    return `JSON không hợp lệ tại dòng ${line}, cột ${column}.`;
-  };
-
-  const normalizeImportedExam = (raw: unknown): CreateExamPayload => {
-    const source = (raw ?? {}) as Record<string, unknown>;
-    const questionRows = Array.isArray(source.questions) ? source.questions : [];
-
-    const questions: ExamQuestion[] = questionRows.map((questionRaw) => {
-      const questionSource = (questionRaw ?? {}) as Record<string, unknown>;
-      const optionRows = Array.isArray(questionSource.options) ? questionSource.options : [];
-
-      const options = optionRows.map((optionRaw) => {
-        if (typeof optionRaw === 'string') {
-          return {
-            content: optionRaw,
-            isCorrect: false,
-          };
-        }
-
-        const optionSource = (optionRaw ?? {}) as Record<string, unknown>;
-        return {
-          content: String(optionSource.content ?? ''),
-          isCorrect: Boolean(optionSource.isCorrect),
-        };
-      });
-
-      return {
-        content: String(questionSource.content ?? ''),
-        explanation: String(questionSource.explanation ?? ''),
-        scoreWeight: Number(questionSource.scoreWeight ?? 1),
-        options,
-      };
-    });
-
-    return {
-      title: String(source.title ?? ''),
-      description: String(source.description ?? ''),
-      durationMinutes: Number(source.durationMinutes ?? 60),
-      passingScore: Number(source.passingScore ?? 5),
-      maxAttempts: Number(source.maxAttempts ?? 100),
-      premium: Boolean(source.premium),
-      teaserQuestionCount: Number(source.teaserQuestionCount ?? 2),
-      tagIds: [],
-      newTags: Array.isArray(source.tags) ? source.tags.map(String) : [],
-      questions,
-    };
-  };
-
-  const parseImportItems = (raw: unknown): unknown[] => {
-    if (Array.isArray(raw)) {
-      return raw;
-    }
-
-    if (raw && typeof raw === 'object') {
-      const obj = raw as Record<string, unknown>;
-      if (Array.isArray(obj.exams)) {
-        return obj.exams;
-      }
-      return [raw];
-    }
-
-    return [];
-  };
-
-  const handleImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) {
-      return;
-    }
-
-    try {
-      const text = await file.text();
-      setImportJsonText(text);
-      setImportParseError(null);
-      setImportErrors([]);
-    } catch {
-      toast.error('Không đọc được file JSON.');
-    } finally {
-      event.target.value = '';
-    }
-  };
-
-  const submitImportJson = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setImportParseError(null);
-    setImportErrors([]);
-
-    if (!importJsonText.trim()) {
-      toast.error('Vui lòng chọn file hoặc dán JSON.');
-      return;
-    }
-
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(importJsonText);
-    } catch (error) {
-      const detailedError = describeImportParseError(importJsonText, error);
-      setImportParseError(detailedError);
-      toast.error(detailedError);
-      return;
-    }
-
-    const items = parseImportItems(parsed);
-    if (items.length === 0) {
-      toast.error('Không tìm thấy đề thi trong JSON.');
-      return;
-    }
-
-    let successCount = 0;
-    const errors: string[] = [];
-
-    try {
-      setIsImporting(true);
-
-      for (let index = 0; index < items.length; index += 1) {
-        const payload = normalizeImportedExam(items[index]);
-        const validationMessage = validatePayload(payload);
-
-        if (validationMessage) {
-          errors.push(`Đề ${index + 1}: ${validationMessage}`);
-          continue;
-        }
-
-        await createExam(payload);
-        successCount += 1;
-      }
-
-      if (successCount > 0) {
-        toast.success(`Đã import ${successCount} đề thi.`);
-      }
-
-      if (errors.length > 0) {
-        setImportErrors(errors);
-        toast.error(`Có ${errors.length} đề import thất bại. Vui lòng xem danh sách lỗi.`);
-      }
-
-      await loadManagedExams();
-      if (successCount > 0 && errors.length === 0) {
-        setPanelMode('none');
-      }
-    } catch {
-      toast.error('Import đề thi thất bại do lỗi hệ thống.');
-    } finally {
-      setIsImporting(false);
-    }
-  };
-
-  const handleLoadSample = () => {
-    setImportJsonText(importSampleJsonText);
-    toast.success('Đã nạp JSON mẫu vào ô import.');
-  };
-
-  const handleCopySample = async () => {
-    try {
-      await navigator.clipboard.writeText(importSampleJsonText);
-      toast.success('Đã copy JSON mẫu.');
-    } catch {
-      toast.error('Không thể copy tự động. Vui lòng copy thủ công từ khung mẫu.');
-    }
-  };
-  
   const validateAndSetUploadFile = (file: File) => {
     if (file.size > 50 * 1024 * 1024) { 
       toast.error('File quá lớn, vui lòng chọn file dưới 50MB.');
@@ -862,9 +627,7 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
     ? 'exam-management-view-title'
     : panelMode === 'upload-source'
       ? 'exam-management-upload-title'
-      : panelMode === 'import'
-        ? 'exam-management-import-title'
-        : 'exam-management-form-title';
+      : 'exam-management-form-title';
 
   return (
     <div className={containerClass}>
@@ -894,18 +657,6 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
             <FilePlus2 className="w-4 h-4" />
             Tạo thủ công
           </button>
-          
-          {/* Chỉ Admin mới được Import JSON hàng loạt */}
-          {mode === 'ADMIN' && (
-            <button
-              type="button"
-              onClick={openImport}
-              className={primaryActionButtonClass}
-            >
-              <Upload className="w-4 h-4" />
-              Import JSON
-            </button>
-          )}
         </div>
       </div>
 
@@ -1059,11 +810,7 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
                         <div className="space-y-3">
                           {selectedExam.questions.map((question, questionIndex) => (
                             <div key={question.id || `q-${questionIndex}`} className="rounded-xl border border-slate-200 p-4">
-                              <div className="flex items-start justify-between gap-2">
-                                <h4 className="font-semibold text-slate-900">Câu {questionIndex + 1}: {question.content}</h4>
-                                {/* @ts-expect-error difficulty may exist on questions loaded from the backend */}
-                                <ExamDifficultyBadge difficulty={question.difficulty} size="sm" />
-                              </div>
+                              <h4 className="font-semibold text-slate-900">Câu {questionIndex + 1}: {question.content}</h4>
                               <ul className="mt-2 space-y-1 text-sm text-slate-700">
                                 {question.options.map((option, optionIndex) => (
                                   <li key={option.id || `opt-${optionIndex}`} className={option.isCorrect ? 'font-semibold text-emerald-700' : ''}>
@@ -1208,124 +955,6 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
                   </form>
                 </section>
 
-              ) : panelMode === 'import' ? (
-                <section className="h-full flex flex-col">
-                  <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-                    <h2 id="exam-management-import-title" className="text-xl font-bold text-slate-900">Import đề thi từ JSON</h2>
-                    <button
-                      type="button"
-                      className="rounded-lg bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-200"
-                      onClick={() => setPanelMode('none')}
-                    >
-                      Đóng
-                    </button>
-                  </div>
-
-                  <form onSubmit={submitImportJson} className="flex-1 overflow-y-auto p-6 space-y-4">
-                    <div className="rounded-xl border border-cyan-200 bg-cyan-50 p-4 text-sm text-cyan-900">
-                      Hỗ trợ 3 định dạng JSON: 1 đề thi, mảng nhiều đề thi, hoặc object có trường exams.
-                    </div>
-
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <p className="text-sm font-semibold text-slate-800">Mẫu JSON import</p>
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            onClick={handleLoadSample}
-                            className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-300"
-                          >
-                            Nạp mẫu
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void handleCopySample()}
-                            className="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-700"
-                          >
-                            Copy mẫu JSON
-                          </button>
-                        </div>
-                      </div>
-                      <textarea
-                        value={importSampleJsonText}
-                        readOnly
-                        rows={12}
-                        className="mt-3 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-mono text-xs text-slate-700"
-                      />
-                    </div>
-
-                    <label className="block">
-                      <span className="mb-1 block text-sm font-semibold text-slate-700">Chọn file JSON</span>
-                      <input
-                        type="file"
-                        accept="application/json"
-                        onChange={handleImportFile}
-                        className="block w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
-                      />
-                    </label>
-
-                    <label className="block">
-                      <span className="mb-1 block text-sm font-semibold text-slate-700">Hoặc dán JSON trực tiếp</span>
-                      <textarea
-                        value={importJsonText}
-                        onChange={(event) => {
-                          setImportJsonText(event.target.value);
-                          if (importParseError) {
-                            setImportParseError(null);
-                          }
-                        }}
-                        rows={16}
-                        className={`w-full rounded-xl border px-3 py-2 font-mono text-xs ${
-                          importParseError ? 'border-rose-400 bg-rose-50/50' : 'border-slate-300'
-                        }`}
-                        aria-invalid={Boolean(importParseError)}
-                        aria-describedby={importParseError ? 'exam-import-json-error' : undefined}
-                        placeholder={`{
-  "title": "Đề thi mẫu",
-  "description": "Mô tả",
-  "durationMinutes": 60,
-  "passingScore": 5,
-  "questions": [
-    {
-      "content": "2 + 2 = ?",
-      "scoreWeight": 1,
-      "options": [
-        { "content": "3", "isCorrect": false },
-        { "content": "4", "isCorrect": true }
-      ]
-    }
-  ]
-}`}
-                      />
-                      {importParseError && (
-                        <p id="exam-import-json-error" className="mt-2 text-xs font-semibold text-rose-600">
-                          {importParseError}
-                        </p>
-                      )}
-                    </label>
-
-                    {importErrors.length > 0 && (
-                      <div className="rounded-xl border border-rose-200 bg-rose-50 p-4">
-                        <p className="text-sm font-semibold text-rose-700">Danh sách lỗi import ({importErrors.length})</p>
-                        <ul className="mt-2 max-h-36 list-disc space-y-1 overflow-auto pl-5 text-xs text-rose-700">
-                          {importErrors.map((error, index) => (
-                            <li key={`import-error-${index}`}>{error}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
-                    <div className="sticky bottom-0 bg-white pt-2 flex flex-wrap gap-2">
-                      <button
-                        type="submit"
-                        disabled={isImporting}
-                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-cyan-600 px-4 py-2.5 font-semibold text-white hover:bg-cyan-700 disabled:bg-cyan-400"
-                      >
-                        <Upload className="w-4 h-4" /> {isImporting ? 'Đang import...' : 'Bắt đầu import'}
-                      </button>
-                    </div>
-                  </form>
-                </section>
               ) : (
                 <section ref={formSectionRef} className="h-full flex flex-col">
                   <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
@@ -1500,29 +1129,10 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm font-semibold text-slate-600 whitespace-nowrap">Lọc độ khó:</label>
-                      <select
-                        value={difficultyFilter}
-                        onChange={(e) => setDifficultyFilter(e.target.value as DifficultyFilter)}
-                        className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
-                      >
-                        <option value="">Tất cả</option>
-                        <option value="EASY">Dễ</option>
-                        <option value="MEDIUM">Trung bình</option>
-                        <option value="HARD">Khó</option>
-                        <option value="VERY_HARD">Cực khó</option>
-                      </select>
-                    </div>
-
                     {form.questions.map((question, questionIndex) => (
                       <div key={`question-${questionIndex}`} className="rounded-xl border border-slate-200 p-3">
                         <div className="mb-2 flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-semibold text-slate-800">Câu hỏi {questionIndex + 1}</h4>
-                            {/* @ts-expect-error difficulty may exist on questions loaded from the backend */}
-                            <ExamDifficultyBadge difficulty={question.difficulty} size="sm" />
-                          </div>
+                          <h4 className="font-semibold text-slate-800">Câu hỏi {questionIndex + 1}</h4>
                           {form.questions.length > 1 && (
                             <button type="button" className="text-xs font-semibold text-rose-600" onClick={() => removeQuestion(questionIndex)}>
                               Xóa câu

@@ -1,20 +1,24 @@
 import React from 'react';
-import { UserPlus, Mail, Lock, Shield, User } from 'lucide-react';
+import { UserPlus, Mail, Shield, User } from 'lucide-react';
 import { type AppRole } from '../../api/axiosClient';
+
+const roleOptions: Array<{ value: AppRole; label: string }> = [
+  { value: 'USER', label: 'Học sinh (USER)' },
+  { value: 'CONTRIBUTOR', label: 'Giáo viên (CONTRIBUTOR)' },
+  { value: 'ADMIN', label: 'Quản trị (ADMIN)' },
+  { value: 'AUDIT', label: 'Kiểm toán (AUDIT)' },
+  { value: 'SYSTEM_ADMIN', label: 'Quản trị hệ thống (SYSTEM_ADMIN)' },
+];
 
 interface CreateUserFormProps {
   createForm: {
     fullName: string;
     email: string;
-    password: string;
-    confirmPassword: string;
     role: AppRole;
   };
   setCreateForm: React.Dispatch<React.SetStateAction<{
     fullName: string;
     email: string;
-    password: string;
-    confirmPassword: string;
     role: AppRole;
   }>>;
   isCreating: boolean;
@@ -40,7 +44,7 @@ const CreateUserForm: React.FC<CreateUserFormProps> = ({
         </div>
         <div>
           <h2 className="text-lg font-black text-slate-900 leading-none">Khởi tạo</h2>
-          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">Thông tin tài khoản mới</p>
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">Hệ thống sẽ tự gửi mật khẩu qua email</p>
         </div>
       </div>
 
@@ -74,37 +78,6 @@ const CreateUserForm: React.FC<CreateUserFormProps> = ({
           </div>
         </div>
 
-        <div className="space-y-2">
-          <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Mật khẩu bảo mật</label>
-          <div className="relative group">
-            <Lock className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 group-focus-within:text-cyan-600 transition-colors" />
-            <input
-              name="password"
-              type="password"
-              value={createForm.password}
-              onChange={handleChange}
-              placeholder="Ít nhất 8 ký tự..."
-              className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border-2 border-transparent rounded-[20px] focus:bg-white focus:border-cyan-600 focus:ring-0 outline-none transition-all font-medium text-slate-700 placeholder:text-slate-300"
-            />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Nhập lại mật khẩu</label>
-          <div className="relative group">
-            <Lock className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 group-focus-within:text-cyan-600 transition-colors" />
-            <input
-              id="admin-create-confirm-password"
-              name="confirmPassword"
-              type="password"
-              value={createForm.confirmPassword}
-              onChange={handleChange}
-              placeholder="Nhập lại mật khẩu..."
-              className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border-2 border-transparent rounded-[20px] focus:bg-white focus:border-cyan-600 focus:ring-0 outline-none transition-all font-medium text-slate-700 placeholder:text-slate-300"
-            />
-          </div>
-        </div>
-
         <div className="space-y-2 pb-2">
           <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Phân quyền</label>
           <div className="relative group">
@@ -115,9 +88,11 @@ const CreateUserForm: React.FC<CreateUserFormProps> = ({
               onChange={handleChange}
               className="w-full pl-11 pr-8 py-3.5 bg-slate-50 border-2 border-transparent rounded-[20px] focus:bg-white focus:border-cyan-600 focus:ring-0 outline-none transition-all appearance-none cursor-pointer font-black text-slate-700 uppercase text-xs tracking-widest"
             >
-              <option value="USER">Học sinh (USER)</option>
-              <option value="CONTRIBUTOR">Giáo viên (CONTRIBUTOR)</option>
-              <option value="ADMIN">Quản trị (ADMIN)</option>
+              {roleOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
             </select>
           </div>
         </div>

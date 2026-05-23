@@ -1,43 +1,11 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
+import {
+  mockUserShellApis,
+  seedAuthenticatedUser,
+} from './helpers/browser-auth';
 
 const ISO_NOW = '2026-04-12T08:00:00.000Z';
-
-async function seedAuthenticatedUser(page: Page): Promise<void> {
-  await page.addInitScript(() => {
-    localStorage.setItem('access_token', 'e2e-token');
-    localStorage.setItem('refresh_token', 'e2e-refresh-token');
-    localStorage.setItem('user_email', 'premium-e2e-user@example.com');
-    localStorage.setItem('user_role', 'USER');
-  });
-}
-
-async function mockUserShellApis(page: Page, premium = false): Promise<void> {
-  await page.route('**/api/v1/auth/me', async (route: Route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        id: 12,
-        email: 'premium-e2e-user@example.com',
-        fullName: 'Premium E2E User',
-        avatarUrl: null,
-        phoneNumber: null,
-        school: null,
-        subject: null,
-        role: 'USER',
-        premium,
-      }),
-    });
-  });
-
-  await page.route('**/api/v1/auth/subscriptions/my-requests', async (route: Route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: '[]',
-    });
-  });
-
+async function mockPremiumPlans(page: Page): Promise<void> {
   await page.route('**/api/v1/auth/subscriptions/plans', async (route: Route) => {
     await route.fulfill({
       status: 200,
@@ -52,59 +20,25 @@ async function mockUserShellApis(page: Page, premium = false): Promise<void> {
           description: 'Gói premium theo tháng',
           active: true,
         },
-      ]),
-    });
-  });
-
-  await page.route('**/api/v1/auth/push-subscription/vapid-public-key', async (route: Route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ publicKey: 'BOr7dummyVapidPublicKeyForE2ETestOnly1234567890abcXYZ' }),
-    });
-  });
-
-  await page.route('**/api/v1/auth/push-subscription', async (route: Route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: '{}',
-    });
-  });
-
-  await page.route('**/api/v1/auth/notifications**', async (route: Route) => {
-    const method = route.request().method();
-
-    if (method === 'PATCH') {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ updatedCount: 0 }),
+        ]),
       });
-      return;
-    }
-
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        content: [],
-        number: 0,
-        size: 5,
-        totalElements: 0,
-        totalPages: 0,
-        first: true,
-        last: true,
-        unreadCount: 0,
-      }),
-    });
   });
 }
 
 test.describe('Premium paywall flow', () => {
   test('public exams list shows premium badge and teaser hint', async ({ page }) => {
-    await seedAuthenticatedUser(page);
-    await mockUserShellApis(page, false);
+    await seedAuthenticatedUser(page, {
+      userId: 12,
+      email: 'premium-e2e-user@example.com',
+      fullName: 'Premium E2E User',
+    });
+    await mockUserShellApis(page, {
+      userId: 12,
+      email: 'premium-e2e-user@example.com',
+      fullName: 'Premium E2E User',
+      premium: false,
+    });
+    await mockPremiumPlans(page);
 
     await page.route('**/api/v1/exam/exams/public', async (route: Route) => {
       await route.fulfill({
@@ -155,8 +89,18 @@ test.describe('Premium paywall flow', () => {
   });
 
   test('premium locked attempt shows teaser and upgrade modal', async ({ page }) => {
-    await seedAuthenticatedUser(page);
-    await mockUserShellApis(page, false);
+    await seedAuthenticatedUser(page, {
+      userId: 12,
+      email: 'premium-e2e-user@example.com',
+      fullName: 'Premium E2E User',
+    });
+    await mockUserShellApis(page, {
+      userId: 12,
+      email: 'premium-e2e-user@example.com',
+      fullName: 'Premium E2E User',
+      premium: false,
+    });
+    await mockPremiumPlans(page);
 
     await page.route('**/api/v1/exam/exams/public/99/attempt-view', async (route: Route) => {
       await route.fulfill({

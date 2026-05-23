@@ -7,7 +7,6 @@ import CommentForm from "../components/CommentForm";
 import CommentTree from "../components/CommentTree";
 import ReportModal from "../components/ReportModal";
 import ExamRatingStars from "../components/ExamRatingStars";
-import { ExamDifficultyBadge } from "../components/ExamDifficultyBadge";
 import { fetchAttemptResult, type AttemptResult } from "../api/examClient";
 import {
   createComment,
@@ -289,12 +288,9 @@ const ExamResult: React.FC = () => {
                   : "border-rose-200 bg-rose-50/30"
               }`}
             >
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <h2 className="font-semibold text-slate-900">
-                  Câu {idx + 1}: {question.content}
-                </h2>
-                <ExamDifficultyBadge difficulty={question.difficulty} size="sm" />
-              </div>
+              <h2 className="font-semibold text-slate-900">
+                Câu {idx + 1}: {question.content}
+              </h2>
               <p className="text-sm mt-2 text-slate-700">
                 Điểm: {question.earnedScore}/{question.maxScore} •{" "}
                 <span

@@ -1,4 +1,8 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
+import {
+  mockUserShellApis,
+  seedAuthenticatedUser,
+} from '../tests/helpers/browser-auth';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -22,7 +26,7 @@ async function mockAuthApis(page: Page): Promise<void> {
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          accessToken: 'mock-access-token',
+          accessToken: 'mock.header.signature',
           refreshToken: 'mock-refresh-token',
           email: VALID_EMAIL,
           role: 'USER',
@@ -82,18 +86,6 @@ async function mockAuthApis(page: Page): Promise<void> {
 }
 
 /** Seed authenticated user in localStorage before page loads */
-async function seedAuth(page: Page, role = 'USER'): Promise<void> {
-  await page.addInitScript(
-    ({ role, email }) => {
-      localStorage.setItem('access_token', 'mock-access-token');
-      localStorage.setItem('refresh_token', 'mock-refresh-token');
-      localStorage.setItem('user_email', email);
-      localStorage.setItem('user_role', role);
-    },
-    { role, email: VALID_EMAIL },
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Tests: Registration
 // ---------------------------------------------------------------------------
@@ -186,24 +178,12 @@ test.describe('Authentication — Login', () => {
 
 test.describe('Authentication — Logout', () => {
   test('user can logout from dashboard', async ({ page }) => {
-    // Mock APIs needed for dashboard
-    await page.route('**/api/v1/auth/me', async (route: Route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          id: 1, email: VALID_EMAIL, fullName: VALID_FULL_NAME,
-          avatarUrl: null, phoneNumber: null, school: null, subject: null,
-          role: 'USER', premium: false,
-        }),
-      });
+    await mockUserShellApis(page, {
+      email: VALID_EMAIL,
+      fullName: VALID_FULL_NAME,
     });
 
-    await page.route('**/api/v1/auth/subscriptions/my-requests', async (route: Route) => {
-      await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
-    });
-
-    await page.route('**/api/v1/exam/attempts/my-history**', async (route: Route) => {
+    await page.route('**/api/v1/exam/users/me/attempts**', async (route: Route) => {
       await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
     });
 
@@ -220,7 +200,7 @@ test.describe('Authentication — Logout', () => {
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content: [], totalElements: 0, totalPages: 0, number: 0, size: 20, first: true, last: true, unreadCount: 0 }) });
     });
 
-    await seedAuth(page);
+    await seedAuthenticatedUser(page, { role: 'USER', email: VALID_EMAIL, fullName: VALID_FULL_NAME });
     await page.goto('/dashboard');
 
     // Find and click logout button in sidebar/header
@@ -253,7 +233,7 @@ test.describe('Authentication — Access control', () => {
 
   test('authenticated user is redirected away from login page', async ({ page }) => {
     await mockAuthApis(page);
-    await seedAuth(page);
+    await seedAuthenticatedUser(page, { role: 'USER', email: VALID_EMAIL, fullName: VALID_FULL_NAME });
 
     await page.goto('/login');
 

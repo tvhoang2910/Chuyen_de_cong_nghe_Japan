@@ -2,46 +2,25 @@ import axios, { type AxiosError } from 'axios';
 import {
   ChevronLeft,
   ChevronRight,
-  FileUp,
   Filter,
   Search,
   UserPlus,
-  X
 } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
   createAdminUser,
   fetchAdminUsers,
-  importAdminUsers,
   updateAdminUserRole,
   updateAdminUserStatus,
   type AdminUserItem,
   type AppRole,
-  type ImportAdminUsersResponse,
 } from '../api/axiosClient';
 import AdminLayout from '../components/AdminLayout';
 import CreateUserForm from '../components/admin/CreateUserForm';
-import ImportUserSection from '../components/admin/ImportUserSection';
 import UserTable from '../components/admin/UserTable';
 
 const pageSize = 10;
-const SAMPLE_IMPORT_PASSWORD = ['User', '@', '123', '456'].join('');
-
-const adminImportSampleUsers = [
-  {
-    email: 'teacher.one@example.com',
-    fullName: 'Teacher One',
-    password: SAMPLE_IMPORT_PASSWORD,
-    role: 'CONTRIBUTOR' as AppRole,
-  },
-  {
-    email: 'teacher.two@example.com',
-    fullName: 'Teacher Two',
-    password: SAMPLE_IMPORT_PASSWORD,
-    role: 'USER' as AppRole,
-  },
-];
 
 const AdminUsers: React.FC = () => {
   const [users, setUsers] = useState<AdminUserItem[]>([]);
@@ -55,21 +34,14 @@ const AdminUsers: React.FC = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [actionLoadingUserId, setActionLoadingUserId] = useState<number | null>(null);
   const [statusReasonByUserId, setStatusReasonByUserId] = useState<Record<number, string>>({});
-  const [importJsonInput, setImportJsonInput] = useState('');
-  const [skipExistingOnImport, setSkipExistingOnImport] = useState(true);
-  const [isImporting, setIsImporting] = useState(false);
-  const [lastImportResult, setLastImportResult] = useState<ImportAdminUsersResponse | null>(null);
   const [activeTab, setActiveTab] = useState<'ALL' | AppRole>('ALL');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isCreateFormOpen, setIsCreateFormOpen] = useState(false);
-  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [spotlightUserId, setSpotlightUserId] = useState<number | null>(null);
 
   const [createForm, setCreateForm] = useState({
     fullName: '',
     email: '',
-    password: '',
-    confirmPassword: '',
     role: 'CONTRIBUTOR' as AppRole,
   });
 
@@ -154,12 +126,8 @@ const AdminUsers: React.FC = () => {
 
   const handleCreateUser = async (event: React.SyntheticEvent) => {
     event.preventDefault();
-    if (!createForm.fullName.trim() || !createForm.email.trim() || createForm.password.length < 8) {
+    if (!createForm.fullName.trim() || !createForm.email.trim()) {
       toast.error('Vui lòng nhập đủ thông tin hợp lệ để tạo user.');
-      return;
-    }
-    if (createForm.password !== createForm.confirmPassword) {
-      toast.error('Mật khẩu xác nhận không khớp.');
       return;
     }
 
@@ -168,11 +136,10 @@ const AdminUsers: React.FC = () => {
       const created = await createAdminUser({
         fullName: createForm.fullName.trim(),
         email: createForm.email.trim(),
-        password: createForm.password,
         role: createForm.role,
       });
       toast.success('Tạo user thành công.');
-      setCreateForm({ fullName: '', email: '', password: '', confirmPassword: '', role: 'CONTRIBUTOR' });
+      setCreateForm({ fullName: '', email: '', role: 'CONTRIBUTOR' });
       setPage(0);
       void loadUsers();
       setSpotlightUserId(created.id);
@@ -218,38 +185,8 @@ const AdminUsers: React.FC = () => {
     }
   };
 
-  const handleImport = async () => {
-    try {
-      const parsed = JSON.parse(importJsonInput);
-      const usersToImport = Array.isArray(parsed) ? parsed : parsed.users;
-      if (!Array.isArray(usersToImport)) throw new Error('Dữ liệu không hợp lệ');
-
-      setIsImporting(true);
-      const response = await importAdminUsers({
-        users: usersToImport,
-        skipExisting: skipExistingOnImport,
-      });
-      setLastImportResult(response);
-      void loadUsers();
-      toast.success('Đã hoàn tất import.');
-    } catch (error) {
-      toast.error(resolveErrorMessage(error, 'Lỗi import dữ liệu.'));
-    } finally {
-      setIsImporting(false);
-    }
-  };
-
   const handleDeleteUser = (user: AdminUserItem) => {
     toast(`API xóa user #${user.id} chưa được backend hỗ trợ. Tạm thời hãy khóa tài khoản.`);
-  };
-
-  const handleCopySample = async () => {
-    try {
-      await navigator.clipboard.writeText(JSON.stringify(adminImportSampleUsers, null, 2));
-      toast.success('Đã copy JSON mẫu.');
-    } catch {
-      toast.error('Không thể copy JSON mẫu, vui lòng copy thủ công.');
-    }
   };
 
   const currentStart = totalElements === 0 ? 0 : page * pageSize + 1;
@@ -260,6 +197,8 @@ const AdminUsers: React.FC = () => {
     { id: 'USER', label: 'Học sinh' },
     { id: 'CONTRIBUTOR', label: 'Giáo viên' },
     { id: 'ADMIN', label: 'Quản trị' },
+    { id: 'AUDIT', label: 'Kiểm toán' },
+    { id: 'SYSTEM_ADMIN', label: 'Quản trị hệ thống' },
   ];
 
   return (
@@ -275,14 +214,6 @@ const AdminUsers: React.FC = () => {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setIsImportModalOpen(true)}
-                className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:border-emerald-400 hover:bg-emerald-100"
-              >
-                <FileUp className="h-4 w-4" />
-                Import JSON
-              </button>
               <button
                 type="button"
                 onClick={() => setIsCreateFormOpen(prev => !prev)}
@@ -452,50 +383,6 @@ const AdminUsers: React.FC = () => {
           </section>
         )}
       </div>
-
-      {isImportModalOpen && (
-        <div className="fixed inset-0 z-[80] flex items-start justify-center overflow-y-auto p-4 md:p-8">
-          <button
-            type="button"
-            aria-label="Đóng modal import"
-            className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
-            onClick={() => setIsImportModalOpen(false)}
-          />
-
-          <div className="relative z-10 w-full max-w-3xl rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl md:p-6">
-            <div className="mb-4 flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
-              <div>
-                <h2 className="text-xl font-bold text-slate-900">Import người dùng từ JSON</h2>
-                <p className="mt-1 text-sm text-slate-600">
-                  Khu vực này được đặt trong modal để bảng người dùng luôn chiếm 100% chiều rộng.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setIsImportModalOpen(false)}
-                className="rounded-lg border border-slate-200 p-2 text-slate-600 transition hover:border-slate-400 hover:text-slate-900"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <ImportUserSection
-              importJsonInput={importJsonInput}
-              setImportJsonInput={setImportJsonInput}
-              skipExistingOnImport={skipExistingOnImport}
-              setSkipExistingOnImport={setSkipExistingOnImport}
-              isImporting={isImporting}
-              onImport={handleImport}
-              onGenerateSample={() => setImportJsonInput(JSON.stringify(adminImportSampleUsers, null, 2))}
-              onCopySample={() => {
-                void handleCopySample();
-              }}
-              lastImportResult={lastImportResult}
-            />
-          </div>
-        </div>
-      )}
     </AdminLayout>
   );
 };

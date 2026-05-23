@@ -81,7 +81,6 @@ export type FetchAdminUsersParams = {
 export type CreateAdminUserPayload = {
   email: string;
   fullName: string;
-  password: string;
   role?: AppRole;
 };
 
@@ -98,7 +97,6 @@ export type UpdateAdminUserRolePayload = {
 export type ImportAdminUserItemPayload = {
   email: string;
   fullName: string;
-  password: string;
   role?: AppRole;
   avatarUrl?: string;
   phoneNumber?: string;
@@ -658,17 +656,6 @@ export const updateAdminUserRole = async (
 ): Promise<AdminUserItem> => {
   const response = await axiosClient.put<AdminUserItem>(
     `/admin/users/${userId}/role`,
-    payload,
-  );
-  invalidateCacheByPrefix("admin:users:");
-  return response.data;
-};
-
-export const importAdminUsers = async (
-  payload: ImportAdminUsersPayload,
-): Promise<ImportAdminUsersResponse> => {
-  const response = await axiosClient.post<ImportAdminUsersResponse>(
-    "/admin/users/import-json",
     payload,
   );
   invalidateCacheByPrefix("admin:users:");

@@ -1,4 +1,8 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
+import {
+  mockUserShellApis,
+  seedAuthenticatedUser,
+} from '../tests/helpers/browser-auth';
 
 // ---------------------------------------------------------------------------
 // Shared fixtures
@@ -70,61 +74,14 @@ const MOCK_ATTEMPT_RESULT = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-async function seedAuth(page: Page, role = 'USER'): Promise<void> {
-  await page.addInitScript(
-    ({ role }) => {
-      localStorage.setItem('access_token', 'mock-access-token');
-      localStorage.setItem('refresh_token', 'mock-refresh-token');
-      localStorage.setItem('user_email', 'user@example.com');
-      localStorage.setItem('user_role', role);
-    },
-    { role },
-  );
-}
-
-async function mockShellApis(page: Page): Promise<void> {
-  await page.route('**/api/v1/auth/me', async (route: Route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        id: 1,
-        email: 'user@example.com',
-        fullName: 'E2E User',
-        avatarUrl: null,
-        phoneNumber: null,
-        school: null,
-        subject: null,
-        role: 'USER',
-        premium: false,
-      }),
-    });
-  });
-
-  await page.route('**/api/v1/auth/subscriptions/my-requests', async (route: Route) => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
-  });
-
-  await page.route('**/api/v1/notification**', async (route: Route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        content: [], totalElements: 0, totalPages: 0, number: 0, size: 20,
-        first: true, last: true, unreadCount: 0,
-      }),
-    });
-  });
-}
-
 // ---------------------------------------------------------------------------
 // Tests: Browse public exams
 // ---------------------------------------------------------------------------
 
 test.describe('Exam Flow — Browse', () => {
   test('user can browse public exams', async ({ page }) => {
-    await seedAuth(page);
-    await mockShellApis(page);
+    await seedAuthenticatedUser(page);
+    await mockUserShellApis(page);
 
     await page.route('**/api/v1/exam/exams**', async (route: Route) => {
       await route.fulfill({
@@ -144,10 +101,10 @@ test.describe('Exam Flow — Browse', () => {
   });
 
   test('user can view exam details / start page', async ({ page }) => {
-    await seedAuth(page);
-    await mockShellApis(page);
+    await seedAuthenticatedUser(page);
+    await mockUserShellApis(page);
 
-    await page.route(`**/api/v1/exam/exams/${EXAM_ID}`, async (route: Route) => {
+    await page.route(`**/api/v1/exam/exams/public/${EXAM_ID}`, async (route: Route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -155,7 +112,7 @@ test.describe('Exam Flow — Browse', () => {
       });
     });
 
-    await page.route(`**/api/v1/exam/exams/${EXAM_ID}/attempt-view`, async (route: Route) => {
+    await page.route(`**/api/v1/exam/exams/public/${EXAM_ID}/attempt-view`, async (route: Route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -163,7 +120,7 @@ test.describe('Exam Flow — Browse', () => {
       });
     });
 
-    await page.route(`**/api/v1/exam/exams/${EXAM_ID}/ratings/summary`, async (route: Route) => {
+    await page.route(`**/api/v1/community/ratings/exams/${EXAM_ID}`, async (route: Route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -171,7 +128,11 @@ test.describe('Exam Flow — Browse', () => {
       });
     });
 
-    await page.route('**/api/v1/exam/attempts/my-history**', async (route: Route) => {
+    await page.route(`**/api/v1/community/comments/exam/${EXAM_ID}`, async (route: Route) => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+    });
+
+    await page.route('**/api/v1/exam/users/me/attempts**', async (route: Route) => {
       await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
     });
 
@@ -187,10 +148,10 @@ test.describe('Exam Flow — Browse', () => {
 
 test.describe('Exam Flow — Attempt', () => {
   test('user can start an exam attempt', async ({ page }) => {
-    await seedAuth(page);
-    await mockShellApis(page);
+    await seedAuthenticatedUser(page);
+    await mockUserShellApis(page);
 
-    await page.route(`**/api/v1/exam/exams/${EXAM_ID}/attempt-view`, async (route: Route) => {
+    await page.route(`**/api/v1/exam/exams/public/${EXAM_ID}/attempt-view`, async (route: Route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -223,10 +184,10 @@ test.describe('Exam Flow — Attempt', () => {
   });
 
   test('user can answer questions and submit exam', async ({ page }) => {
-    await seedAuth(page);
-    await mockShellApis(page);
+    await seedAuthenticatedUser(page);
+    await mockUserShellApis(page);
 
-    await page.route(`**/api/v1/exam/exams/${EXAM_ID}/attempt-view`, async (route: Route) => {
+    await page.route(`**/api/v1/exam/exams/public/${EXAM_ID}/attempt-view`, async (route: Route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -281,8 +242,8 @@ test.describe('Exam Flow — Attempt', () => {
   });
 
   test('user can see exam results after submit', async ({ page }) => {
-    await seedAuth(page);
-    await mockShellApis(page);
+    await seedAuthenticatedUser(page);
+    await mockUserShellApis(page);
 
     await page.route('**/api/v1/exam/attempts/999', async (route: Route) => {
       await route.fulfill({

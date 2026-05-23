@@ -16,8 +16,6 @@ import {
   Crown,
   Flame,
   Banknote,
-  ClipboardCheck,
-  Gem,
   Flag,
   Settings2,
   Upload,
@@ -27,8 +25,6 @@ import toast from 'react-hot-toast';
 import axiosClient, { 
   fetchUserNotifications,
   markUserNotificationRead,
-  fetchSubscriptionReviewQueue,
-  SUBSCRIPTION_REVIEW_UPDATED_EVENT,
   clearAuthSession, 
   fetchCurrentUserProfile, 
   updateCurrentUserProfile,
@@ -135,7 +131,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, fallbackStreakDays, f
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isSavingPassword, setIsSavingPassword] = useState(false);
-  const [pendingReviewCount, setPendingReviewCount] = useState(0);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [notificationItems, setNotificationItems] = useState<NotificationItem[]>([]);
   const [gamificationOverview, setGamificationOverview] = useState<GamificationOverview | null>(null);
@@ -250,9 +245,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, fallbackStreakDays, f
   const dismissNotification = (id: string) => {
     setNotificationItems((current) => {
       const next = current.filter((item) => item.id !== id);
-      if (user?.role === 'CONTRIBUTOR') {
-        setPendingReviewCount(next.filter((item) => item.id.startsWith('review-item-')).length);
-      }
       return next;
     });
     const dismissedEntries = readDismissedEntries().filter((entry) => entry.id !== id);
@@ -298,27 +290,21 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, fallbackStreakDays, f
     let isMounted = true;
 
     const loadNotifications = async () => {
-      try {
-        if (user?.role === 'CONTRIBUTOR') {
-          const queue = await fetchSubscriptionReviewQueue(0, 5, 'PENDING_REVIEW');
-          const items: NotificationItem[] = queue.content.map((row) => ({
-            id: `review-item-${row.id}-${row.createdAt}`,
-            title: `Request #${row.id} cần bạn duyệt`,
-            description: `${row.userFullName} • ${row.planName} • ${Number(row.purchasedPrice).toLocaleString('vi-VN')}đ`,
-            timeLabel: new Date(row.createdAt).toLocaleString('vi-VN'),
-            onClick: () => navigate('/contributor/subscription-reviews'),
-          }));
-
-          const dismissedIds = readDismissedIds();
-          const visibleItems = items.filter((item) => !dismissedIds.has(item.id));
-
-          if (isMounted) {
-            setPendingReviewCount(visibleItems.filter((item) => item.id.startsWith('review-item-')).length);
-            setNotificationItems(visibleItems);
-          }
-          return;
+      if (!user) {
+        if (isMounted) {
+          setNotificationItems([]);
         }
+        return;
+      }
 
+      if (user?.role === 'CONTRIBUTOR') {
+        if (isMounted) {
+          setNotificationItems([]);
+        }
+        return;
+      }
+
+      try {
         const [feed, overview, examDecksResp] = await Promise.all([
           fetchUserNotifications(0, 5),
           fetchGamificationOverview().catch(() => null),
@@ -356,7 +342,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, fallbackStreakDays, f
           .filter((item) => !dismissedIds.has(item.id));
 
         if (isMounted) {
-          setPendingReviewCount(0);
           setNotificationItems(mergeUserNotifications(visibleItems));
         }
       } catch {
@@ -365,12 +350,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, fallbackStreakDays, f
             {
               id: 'fallback-main',
               title: 'Không tải được thông báo',
-              description: 'Vui lòng thử lại sau hoặc mở trang thanh toán để kiểm tra.',
+              description: 'Vui lòng thử lại sau hoặc mở trang thông báo để kiểm tra.',
               timeLabel: 'Hệ thống',
-              onClick: () => navigate(user?.role === 'CONTRIBUTOR' ? '/contributor/subscription-reviews' : '/dashboard/subscription-payments'),
+              onClick: () => navigate('/dashboard/notifications'),
             },
           ];
-          setPendingReviewCount(0);
           setNotificationItems(mergeUserNotifications(fallbackItems));
         }
       }
@@ -382,12 +366,10 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, fallbackStreakDays, f
 
     void loadNotifications();
     const intervalId = globalThis.setInterval(handleRefresh, 30000);
-    globalThis.addEventListener(SUBSCRIPTION_REVIEW_UPDATED_EVENT, handleRefresh);
 
     return () => {
       isMounted = false;
       globalThis.clearInterval(intervalId);
-      globalThis.removeEventListener(SUBSCRIPTION_REVIEW_UPDATED_EVENT, handleRefresh);
     };
   }, [buildNotifications, mergeUserNotifications, navigate, readDismissedIds, user?.role]);
 
@@ -480,11 +462,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, fallbackStreakDays, f
   }, []);
 
   const bellBadgeCount = useMemo(() => {
-    if (user?.role === 'CONTRIBUTOR') {
-      return pendingReviewCount;
-    }
     return notificationItems.length;
-  }, [notificationItems.length, pendingReviewCount, user?.role]);
+  }, [notificationItems.length]);
 
   const handleLogout = async () => {
     try {
@@ -497,13 +476,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, fallbackStreakDays, f
 
   const navItems = user?.role === 'CONTRIBUTOR' ? [
     { label: 'Tổng quan', icon: LayoutDashboard, path: '/contributor' },
-    { label: 'Tạo gói Premium', icon: Gem, path: '/contributor/premium-plans' },
-    { label: 'Duyệt thanh toán', icon: ClipboardCheck, path: '/contributor/subscription-reviews' },
-    { label: 'Báo cáo câu hỏi', icon: Flag, path: '/contributor/reports' },
     { label: 'Đề thi của tôi', icon: BookOpen, path: '/contributor/exams' },
+    { label: 'Duyệt upload', icon: Upload, path: '/contributor/upload-queue' },
+    { label: 'Báo cáo câu hỏi', icon: Flag, path: '/contributor/reports' },
     { label: 'Upload đề', icon: Upload, path: '/upload-exam' },
     { label: 'Đề đã upload', icon: FileUp, path: '/my-uploads' },
-    { label: 'Thống kê', icon: Zap, path: '/contributor/analytics' },
   ] : [
     { label: 'Tổng quan', icon: LayoutDashboard, path: '/dashboard' },
     { label: 'Nâng cấp Premium', icon: Banknote, path: '/dashboard/subscription-payments' },
@@ -636,6 +613,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, fallbackStreakDays, f
             );
           })}
           
+          {user?.role === 'USER' && (
           <div className="mt-auto pt-6">
              <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl p-4 border border-blue-100">
                 <div className="flex items-center gap-2 mb-2">
@@ -648,6 +626,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, fallbackStreakDays, f
                 </button>
              </div>
           </div>
+          )}
         </nav>
 
         <div className="p-4 border-t border-slate-100">

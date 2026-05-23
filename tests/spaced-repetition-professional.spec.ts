@@ -1,4 +1,8 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
+import {
+  mockUserShellApis,
+  seedAuthenticatedUser,
+} from './helpers/browser-auth';
 
 type DeckQuestion = {
   itemId: number;
@@ -111,73 +115,6 @@ const BASE_ATTEMPT_VIEW = {
   ],
 };
 
-async function seedAuthenticatedUser(page: Page, role: 'USER' | 'ADMIN' | 'CONTRIBUTOR' = 'USER'): Promise<void> {
-  await page.addInitScript(([seedRole]) => {
-    localStorage.setItem('access_token', 'seed-token');
-    localStorage.setItem('refresh_token', 'seed-refresh-token');
-    localStorage.setItem('user_email', 'qa-user@example.com');
-    localStorage.setItem('user_role', seedRole);
-  }, [role]);
-}
-
-async function mockAuthApis(page: Page, role: 'USER' | 'ADMIN' | 'CONTRIBUTOR' = 'USER'): Promise<void> {
-  await page.route('**/api/v1/auth/**', async (route: Route) => {
-    const url = route.request().url();
-
-    if (url.endsWith('/me')) {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          id: 50,
-          email: 'qa-user@example.com',
-          fullName: 'QA User',
-          avatarUrl: null,
-          phoneNumber: null,
-          school: null,
-          subject: null,
-          role,
-          premium: false,
-        }),
-      });
-      return;
-    }
-
-    if (url.includes('/subscriptions/my-requests')) {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: '[]',
-      });
-      return;
-    }
-
-    if (url.endsWith('/push-subscription/vapid-public-key')) {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ publicKey: 'BOr7dummyVapidPublicKeyForE2ETestOnly1234567890abcXYZ' }),
-      });
-      return;
-    }
-
-    if (url.endsWith('/push-subscription')) {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: '{}',
-      });
-      return;
-    }
-
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: '{}',
-    });
-  });
-}
-
 async function mockDecks(page: Page, responseBody: DeckResponse): Promise<void> {
   await page.route('**/api/v1/study/spaced-repetition/me/exam-decks', async (route: Route) => {
     await route.fulfill({
@@ -200,8 +137,18 @@ async function mockAttemptView(page: Page, body = BASE_ATTEMPT_VIEW): Promise<vo
 
 test.describe('Professional coverage for spaced repetition', () => {
   test('redirects admin user away from USER-only spaced repetition route', async ({ page }) => {
-    await seedAuthenticatedUser(page, 'ADMIN');
-    await mockAuthApis(page, 'ADMIN');
+    await seedAuthenticatedUser(page, {
+      role: 'ADMIN',
+      userId: 50,
+      email: 'qa-user@example.com',
+      fullName: 'QA User',
+    });
+    await mockUserShellApis(page, {
+      role: 'ADMIN',
+      userId: 50,
+      email: 'qa-user@example.com',
+      fullName: 'QA User',
+    });
 
     await page.goto('/dashboard/spaced-repetition');
 
@@ -209,8 +156,16 @@ test.describe('Professional coverage for spaced repetition', () => {
   });
 
   test('computes completion rate based on reviewed questions', async ({ page }) => {
-    await seedAuthenticatedUser(page);
-    await mockAuthApis(page);
+    await seedAuthenticatedUser(page, {
+      userId: 50,
+      email: 'qa-user@example.com',
+      fullName: 'QA User',
+    });
+    await mockUserShellApis(page, {
+      userId: 50,
+      email: 'qa-user@example.com',
+      fullName: 'QA User',
+    });
 
     const response: DeckResponse = {
       ...BASE_DECK_RESPONSE,
@@ -237,8 +192,16 @@ test.describe('Professional coverage for spaced repetition', () => {
   });
 
   test('uses attemptId query to choose matching deck for practice page', async ({ page }) => {
-    await seedAuthenticatedUser(page);
-    await mockAuthApis(page);
+    await seedAuthenticatedUser(page, {
+      userId: 50,
+      email: 'qa-user@example.com',
+      fullName: 'QA User',
+    });
+    await mockUserShellApis(page, {
+      userId: 50,
+      email: 'qa-user@example.com',
+      fullName: 'QA User',
+    });
 
     const response: DeckResponse = {
       ...BASE_DECK_RESPONSE,
@@ -288,8 +251,16 @@ test.describe('Professional coverage for spaced repetition', () => {
   });
 
   test('navigates back to list when user clicks back button in practice page', async ({ page }) => {
-    await seedAuthenticatedUser(page);
-    await mockAuthApis(page);
+    await seedAuthenticatedUser(page, {
+      userId: 50,
+      email: 'qa-user@example.com',
+      fullName: 'QA User',
+    });
+    await mockUserShellApis(page, {
+      userId: 50,
+      email: 'qa-user@example.com',
+      fullName: 'QA User',
+    });
     await mockDecks(page, BASE_DECK_RESPONSE);
     await mockAttemptView(page);
 
@@ -301,8 +272,16 @@ test.describe('Professional coverage for spaced repetition', () => {
   });
 
   test('shows warning block when attempt-view has no options for question', async ({ page }) => {
-    await seedAuthenticatedUser(page);
-    await mockAuthApis(page);
+    await seedAuthenticatedUser(page, {
+      userId: 50,
+      email: 'qa-user@example.com',
+      fullName: 'QA User',
+    });
+    await mockUserShellApis(page, {
+      userId: 50,
+      email: 'qa-user@example.com',
+      fullName: 'QA User',
+    });
     await mockDecks(page, BASE_DECK_RESPONSE);
     await mockAttemptView(page, {
       ...BASE_ATTEMPT_VIEW,
@@ -323,8 +302,16 @@ test.describe('Professional coverage for spaced repetition', () => {
   });
 
   test('sends isCorrect=false for wrong answer submission', async ({ page }) => {
-    await seedAuthenticatedUser(page);
-    await mockAuthApis(page);
+    await seedAuthenticatedUser(page, {
+      userId: 50,
+      email: 'qa-user@example.com',
+      fullName: 'QA User',
+    });
+    await mockUserShellApis(page, {
+      userId: 50,
+      email: 'qa-user@example.com',
+      fullName: 'QA User',
+    });
     await mockDecks(page, BASE_DECK_RESPONSE);
     await mockAttemptView(page);
 
@@ -360,8 +347,16 @@ test.describe('Professional coverage for spaced repetition', () => {
   });
 
   test('shows backend message when review save fails and stays on practice page', async ({ page }) => {
-    await seedAuthenticatedUser(page);
-    await mockAuthApis(page);
+    await seedAuthenticatedUser(page, {
+      userId: 50,
+      email: 'qa-user@example.com',
+      fullName: 'QA User',
+    });
+    await mockUserShellApis(page, {
+      userId: 50,
+      email: 'qa-user@example.com',
+      fullName: 'QA User',
+    });
     await mockDecks(page, BASE_DECK_RESPONSE);
     await mockAttemptView(page);
 

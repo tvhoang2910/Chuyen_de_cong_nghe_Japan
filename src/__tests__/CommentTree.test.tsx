@@ -23,6 +23,7 @@ const baseComment: CommentNode = {
   id: 1,
   userId: 10,
   authorName: "Teacher One",
+  authorAvatarUrl: null,
   parentId: null,
   replyToUserId: null,
   content: "This is the root comment content",
@@ -39,9 +40,11 @@ const replyComment: CommentNode = {
   id: 2,
   userId: 22,
   authorName: "Student Two",
+  authorAvatarUrl: null,
   parentId: 1,
   replyToUserId: 10,
   replyToAuthorName: "Teacher One",
+  replyToAuthorAvatarUrl: null,
   content: "This is a reply comment",
   createdAt: "2026-04-09T10:01:00.000Z",
   replies: [],
@@ -166,6 +169,18 @@ describe("CommentTree component", () => {
 
       expect(screen.getByText("Student Two")).toBeInTheDocument();
       expect(screen.getByText("@Teacher One")).toBeInTheDocument();
+    });
+
+    it("renders author avatar image when avatar url is available", () => {
+      render(
+        <CommentTree
+          comment={{ ...baseComment, authorAvatarUrl: "/api/v1/auth/users/10/avatar" }}
+          depth={0}
+          {...defaultProps}
+        />,
+      );
+
+      expect(screen.getByAltText("avatar Teacher One")).toBeInTheDocument();
     });
 
     it("shows replyCount badge when replyCount > 0", () => {

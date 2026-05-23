@@ -199,4 +199,55 @@ describe('PublicExams', () => {
       expect(screen.getByText('1 đề thi')).toBeInTheDocument();
     });
   });
+
+  it('resets filters back to full exam list', async () => {
+    vi.mocked(searchExams).mockResolvedValueOnce([
+      {
+        id: 1,
+        title: 'Đề thi Công nghệ & Tin học',
+        status: 'PUBLISHED',
+        tags: ['IT', 'Công nghệ'],
+      },
+    ]);
+
+    renderPage();
+
+    expect(await screen.findByText('Đề thi Công nghệ & Tin học')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText(/Tìm theo từ khóa/i), {
+      target: { value: 'công nghệ' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Tìm kiếm' }));
+
+    await screen.findByText('1 đề thi');
+
+    fireEvent.click(screen.getByRole('button', { name: /Xóa lọc/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('3 đề thi')).toBeInTheDocument();
+      expect(screen.getByText('Đề thi Công nghệ & Tin học')).toBeInTheDocument();
+      expect(screen.getByText('Đề thi Toán 12')).toBeInTheDocument();
+      expect(screen.getByText('Đề thi Vật lý')).toBeInTheDocument();
+    });
+  });
+
+  it('falls back to local filtering when search service fails', async () => {
+    vi.mocked(searchExams).mockRejectedValueOnce(new Error('search down'));
+
+    renderPage();
+
+    expect(await screen.findByText('Đề thi Công nghệ & Tin học')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText(/Lọc tags/i), {
+      target: { value: 'toan' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Tìm kiếm' }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Search service đang bận/i)).toBeInTheDocument();
+      expect(screen.getByText('Đề thi Toán 12')).toBeInTheDocument();
+      expect(screen.queryByText('Đề thi Công nghệ & Tin học')).not.toBeInTheDocument();
+      expect(screen.queryByText('Đề thi Vật lý')).not.toBeInTheDocument();
+    });
+  });
 });

@@ -56,6 +56,15 @@ export default defineConfig({
         target: "http://localhost:8081",
         changeOrigin: true,
       },
+      // Browser-safe MinIO proxy used by rewritten presigned URLs (/minio/...).
+      "/minio": {
+        target: "http://localhost:9000",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/minio/, ""),
+        headers: {
+          host: "minio:9000",
+        },
+      },
       // Catch-all for any other /api/* routes (keep last so it does not shadow specific services)
       "/api": {
         target: "http://localhost:8080",

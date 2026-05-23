@@ -12,7 +12,9 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
+import AdminLayout from "../components/AdminLayout";
 import MainLayout from "../components/MainLayout";
+import { getCurrentSessionRole } from "../api/axiosClient";
 import { useExamUploadFlow } from "../hooks/useExamUploadFlow";
 import {
   ALLOWED_UPLOAD_CONTENT_TYPES,
@@ -49,6 +51,8 @@ const createStagedFile = (file: File): StagedFile => ({
 
 const UserExamUpload: React.FC = () => {
   const navigate = useNavigate();
+  const role = getCurrentSessionRole();
+  const Layout = role === "CONTRIBUTOR" || role === "ADMIN" ? AdminLayout : MainLayout;
   const [stagedFiles, setStagedFiles] = useState<StagedFile[]>([]);
   const [isDragActive, setIsDragActive] = useState(false);
   const { upload, progress, isUploading } = useExamUploadFlow();
@@ -125,7 +129,7 @@ const UserExamUpload: React.FC = () => {
   };
 
   return (
-    <MainLayout>
+    <Layout>
       <div className="space-y-6">
         <header>
           <h1 className="text-2xl font-bold text-slate-900">Upload đề thi</h1>
@@ -334,7 +338,7 @@ const UserExamUpload: React.FC = () => {
           </div>
         </form>
       </div>
-    </MainLayout>
+    </Layout>
   );
 };
 
