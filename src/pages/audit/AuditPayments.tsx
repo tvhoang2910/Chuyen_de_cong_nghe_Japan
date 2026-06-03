@@ -74,10 +74,10 @@ const AuditPayments: React.FC = () => {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h1 className="text-2xl font-bold text-slate-900">
-                Quản lý Giao dịch & Phí
+                Đối soát giao dịch & phí
               </h1>
               <p className="text-sm text-slate-600">
-                Theo dõi dòng tiền và lịch sử giao dịch đã xử lý.
+                Audit chỉ xem, lọc và kiểm tra dòng tiền đã xử lý.
               </p>
             </div>
           </div>

@@ -18,6 +18,7 @@ import {
   type ExamQuestion,
   type ExamSummary,
   type OnlineExamStatus,
+  type QuestionType,
   type TagOption,
   updateExam,
   updateExamStatus,
@@ -41,8 +42,11 @@ type FormErrors = {
 
 const emptyQuestion = (): ExamQuestion => ({
   content: '',
+  questionType: 'MULTIPLE_CHOICE',
   explanation: '',
   scoreWeight: 1,
+  sampleAnswer: '',
+  gradingGuide: '',
   options: [
     { content: '', isCorrect: true },
     { content: '', isCorrect: false },
@@ -240,11 +244,9 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
               try {
                 const data = JSON.parse(msg.data);
                 if (data.eventType === "AI_EXTRACTION_SUCCESS") {
-                  toast.success(data.message || "Đề thi đã được AI bóc tách xong!");
                   void loadManagedExams();
-                } 
-                else if (data.eventType === "AI_EXTRACTION_FAILED") {
-                  toast.error(data.message || "Lỗi khi AI bóc tách đề thi.");
+                } else if (data.eventType === "AI_EXTRACTION_FAILED") {
+                  void loadManagedExams();
                 }
               } catch (err) {
                 console.error("Lỗi parse SSE JSON:", err);
@@ -334,8 +336,11 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
         questions: detail.questions.map((q) => ({
           id: q.id,
           content: q.content,
+          questionType: q.questionType ?? ((q.options ?? []).length === 0 ? 'ESSAY' : 'MULTIPLE_CHOICE'),
           explanation: q.explanation || '',
           scoreWeight: q.scoreWeight,
+          sampleAnswer: q.sampleAnswer || '',
+          gradingGuide: q.gradingGuide || '',
           options: q.options.map((opt) => ({
             id: opt.id,
             content: opt.content,
@@ -376,20 +381,37 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
     const questions = Array.isArray(detail.questions) ? detail.questions : [];
     return {
       ...detail,
-      questions: questions.map((question) => ({
-        ...question,
-        options: Array.isArray(question.options) ? question.options : [],
-      })),
+        questions: questions.map((question) => ({
+          ...question,
+          questionType: question.questionType ?? ((question.options ?? []).length === 0 ? 'ESSAY' : 'MULTIPLE_CHOICE'),
+          sampleAnswer: question.sampleAnswer ?? '',
+          gradingGuide: question.gradingGuide ?? '',
+          options: Array.isArray(question.options) ? question.options : [],
+        })),
     };
   };
 
-  const setQuestionCorrectIndex = (questionIndex: number, optionIndex: number) => {
+  const toggleQuestionCorrectOption = (questionIndex: number, optionIndex: number) => {
     setForm((prev) => {
       const next = structuredClone(prev);
       next.questions[questionIndex].options = next.questions[questionIndex].options.map((opt, idx) => ({
         ...opt,
-        isCorrect: idx === optionIndex,
+        isCorrect: idx === optionIndex ? !Boolean(opt.isCorrect) : opt.isCorrect,
       }));
+      return next;
+    });
+  };
+
+  const updateQuestionType = (index: number, questionType: QuestionType) => {
+    setForm((prev) => {
+      const next = structuredClone(prev);
+      next.questions[index].questionType = questionType;
+      next.questions[index].options =
+        questionType === 'ESSAY'
+          ? []
+          : next.questions[index].options.length >= 2
+            ? next.questions[index].options
+            : emptyQuestion().options;
       return next;
     });
   };
@@ -413,15 +435,23 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
     });
   };
 
-  const updateQuestionField = (index: number, key: 'content' | 'explanation' | 'scoreWeight', value: string) => {
+  const updateQuestionField = (
+    index: number,
+    key: 'content' | 'explanation' | 'scoreWeight' | 'sampleAnswer' | 'gradingGuide',
+    value: string,
+  ) => {
     setForm((prev) => {
       const next = structuredClone(prev);
       if (key === 'scoreWeight') {
         next.questions[index].scoreWeight = Number(value || 1);
       } else if (key === 'content') {
         next.questions[index].content = value;
-      } else {
+      } else if (key === 'explanation') {
         next.questions[index].explanation = value;
+      } else if (key === 'sampleAnswer') {
+        next.questions[index].sampleAnswer = value;
+      } else {
+        next.questions[index].gradingGuide = value;
       }
       return next;
     });
@@ -446,6 +476,11 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
     for (let i = 0; i < payload.questions.length; i += 1) {
       const q = payload.questions[i];
       if (!q.content.trim()) return `Câu hỏi ${i + 1} chưa có nội dung.`;
+      if ((q.questionType ?? 'MULTIPLE_CHOICE') === 'ESSAY') {
+        if (!q.sampleAnswer?.trim()) return `Câu tự luận ${i + 1} cần đáp án mẫu.`;
+        if (!q.gradingGuide?.trim()) return `Câu tự luận ${i + 1} cần rubric/hướng dẫn chấm.`;
+        continue;
+      }
       if (q.options.length < 2) return `Câu hỏi ${i + 1} phải có ít nhất 2 đáp án.`;
       const filled = q.options.filter((opt) => opt.content.trim()).length;
       if (filled < 2) return `Câu hỏi ${i + 1} cần tối thiểu 2 đáp án có nội dung.`;
@@ -548,11 +583,17 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
       questions: form.questions.map((q) => ({
         ...q,
         content: q.content.trim(),
+        questionType: q.questionType ?? 'MULTIPLE_CHOICE',
         explanation: q.explanation?.trim() || '',
-        options: q.options.map((opt) => ({
-          content: opt.content.trim(),
-          isCorrect: opt.isCorrect,
-        })),
+        sampleAnswer: q.sampleAnswer?.trim() || '',
+        gradingGuide: q.gradingGuide?.trim() || '',
+        options:
+          (q.questionType ?? 'MULTIPLE_CHOICE') === 'ESSAY'
+            ? []
+            : q.options.map((opt) => ({
+                content: opt.content.trim(),
+                isCorrect: opt.isCorrect,
+              })),
       })),
     };
 
@@ -811,13 +852,26 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
                           {selectedExam.questions.map((question, questionIndex) => (
                             <div key={question.id || `q-${questionIndex}`} className="rounded-xl border border-slate-200 p-4">
                               <h4 className="font-semibold text-slate-900">Câu {questionIndex + 1}: {question.content}</h4>
-                              <ul className="mt-2 space-y-1 text-sm text-slate-700">
-                                {question.options.map((option, optionIndex) => (
-                                  <li key={option.id || `opt-${optionIndex}`} className={option.isCorrect ? 'font-semibold text-emerald-700' : ''}>
-                                    {optionIndex + 1}. {option.content} {option.isCorrect ? '(Đúng)' : ''}
-                                  </li>
-                                ))}
-                              </ul>
+                              {(question.questionType ?? 'MULTIPLE_CHOICE') === 'ESSAY' ? (
+                                <div className="mt-3 space-y-3 text-sm">
+                                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                    <p className="text-xs font-bold uppercase text-slate-500">Đáp án mẫu</p>
+                                    <p className="mt-1 whitespace-pre-wrap text-slate-700">{question.sampleAnswer || 'Chưa nhập'}</p>
+                                  </div>
+                                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                    <p className="text-xs font-bold uppercase text-slate-500">Rubric</p>
+                                    <p className="mt-1 whitespace-pre-wrap text-slate-700">{question.gradingGuide || 'Chưa nhập'}</p>
+                                  </div>
+                                </div>
+                              ) : (
+                                <ul className="mt-2 space-y-1 text-sm text-slate-700">
+                                  {question.options.map((option, optionIndex) => (
+                                    <li key={option.id || `opt-${optionIndex}`} className={option.isCorrect ? 'font-semibold text-emerald-700' : ''}>
+                                      {optionIndex + 1}. {option.content} {option.isCorrect ? '(Đúng)' : ''}
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -1147,39 +1201,74 @@ const ExamManagementContent: React.FC<{ mode: RoleMode }> = ({ mode }) => {
                           placeholder="Nội dung câu hỏi"
                           rows={2}
                         />
+                        <div className="mb-2 grid gap-2 sm:grid-cols-2">
+                          <label className="text-xs font-semibold uppercase text-slate-500">
+                            Loại câu hỏi
+                            <select
+                              value={question.questionType ?? 'MULTIPLE_CHOICE'}
+                              onChange={(event) => updateQuestionType(questionIndex, event.target.value as QuestionType)}
+                              className="mt-1 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm normal-case text-slate-800"
+                            >
+                              <option value="MULTIPLE_CHOICE">Trắc nghiệm</option>
+                              <option value="ESSAY">Tự luận</option>
+                            </select>
+                          </label>
+                          <label className="text-xs font-semibold uppercase text-slate-500">
+                            Điểm
+                            <input
+                              type="number"
+                              value={question.scoreWeight}
+                              onChange={(event) => updateQuestionField(questionIndex, 'scoreWeight', event.target.value)}
+                              className="mt-1 w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm normal-case text-slate-800"
+                              min={0.1}
+                              step={0.1}
+                            />
+                          </label>
+                        </div>
                         <input
                           value={question.explanation || ''}
                           onChange={(event) => updateQuestionField(questionIndex, 'explanation', event.target.value)}
                           className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm mb-2"
                           placeholder="Giải thích"
                         />
-                        <input
-                          type="number"
-                          value={question.scoreWeight}
-                          onChange={(event) => updateQuestionField(questionIndex, 'scoreWeight', event.target.value)}
-                          className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm mb-2"
-                          min={0.1}
-                          step={0.1}
-                        />
 
-                        <div className="space-y-2">
-                          {question.options.map((option, optionIndex) => (
-                            <div key={`opt-${optionIndex}`} className="flex items-center gap-2">
-                              <input
-                                type="radio"
-                                checked={Boolean(option.isCorrect)}
-                                onChange={() => setQuestionCorrectIndex(questionIndex, optionIndex)}
-                                name={`question-correct-${questionIndex}`}
-                              />
-                              <input
-                                value={option.content}
-                                onChange={(event) => updateOptionContent(questionIndex, optionIndex, event.target.value)}
-                                className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
-                                placeholder={`Đáp án ${optionIndex + 1}`}
-                              />
-                            </div>
-                          ))}
-                        </div>
+                        {(question.questionType ?? 'MULTIPLE_CHOICE') === 'ESSAY' ? (
+                          <div className="space-y-2">
+                            <textarea
+                              value={question.sampleAnswer || ''}
+                              onChange={(event) => updateQuestionField(questionIndex, 'sampleAnswer', event.target.value)}
+                              className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+                              placeholder="Đáp án mẫu"
+                              rows={3}
+                            />
+                            <textarea
+                              value={question.gradingGuide || ''}
+                              onChange={(event) => updateQuestionField(questionIndex, 'gradingGuide', event.target.value)}
+                              className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+                              placeholder="Rubric / hướng dẫn chấm"
+                              rows={3}
+                            />
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            {question.options.map((option, optionIndex) => (
+                              <div key={`opt-${optionIndex}`} className="flex items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  checked={Boolean(option.isCorrect)}
+                                  onChange={() => toggleQuestionCorrectOption(questionIndex, optionIndex)}
+                                  aria-label={`Đánh dấu đáp án ${optionIndex + 1} là đúng`}
+                                />
+                                <input
+                                  value={option.content}
+                                  onChange={(event) => updateOptionContent(questionIndex, optionIndex, event.target.value)}
+                                  className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+                                  placeholder={`Đáp án ${optionIndex + 1}`}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     ))}
 

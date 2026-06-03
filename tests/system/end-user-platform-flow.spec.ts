@@ -97,6 +97,27 @@ const requestJson = async <T>(
   return { status: response.status(), body };
 };
 
+const loginAndGetToken = async (
+  request: APIRequestContext,
+  email: string,
+  password: string,
+): Promise<string> => {
+  const response = await request.post(`${ctx.authBaseUrl}/login`, {
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    data: { email, password },
+    failOnStatusCode: false,
+    timeout: 20_000,
+  });
+
+  const text = await response.text();
+  const body = text ? (JSON.parse(text) as AuthTokenResponse) : null;
+  if (response.status() !== 200 || !body?.accessToken) {
+    throw new Error(`Login failed for ${email}. status=${response.status()} body=${text}`);
+  }
+
+  return body.accessToken;
+};
+
 const getJwtUserId = (token: string): number | null => {
   const segments = token.split('.');
   if (segments.length < 2) {
@@ -123,8 +144,8 @@ const resolveFlowActor = async (request: APIRequestContext): Promise<FlowActor> 
   const loginResponse = await request.post(`${ctx.authBaseUrl}/login`, {
     headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
     data: {
-      email: ctx.adminLoginEmail,
-      password: ctx.adminLoginPassword,
+      email: ctx.contributorLoginEmail,
+      password: ctx.contributorLoginPassword,
     },
     failOnStatusCode: false,
     timeout: 20_000,
@@ -136,7 +157,7 @@ const resolveFlowActor = async (request: APIRequestContext): Promise<FlowActor> 
   if (loginResponse.status() === 200 && loginBody?.accessToken) {
     return {
       token: loginBody.accessToken,
-      userId: getJwtUserId(loginBody.accessToken) ?? ctx.adminIdentity.userId,
+      userId: getJwtUserId(loginBody.accessToken) ?? ctx.userIdentity.userId,
     };
   }
 
@@ -185,7 +206,7 @@ const resolveFlowActor = async (request: APIRequestContext): Promise<FlowActor> 
   };
 };
 
-const ensurePublishedExam = async (request: APIRequestContext, adminToken: string): Promise<PublicExam> => {
+const ensurePublishedExam = async (request: APIRequestContext, contributorToken: string): Promise<PublicExam> => {
   const timestamp = Date.now();
   const createExamPayload = {
     title: `E2E Published Exam ${timestamp}`,
@@ -223,17 +244,18 @@ const ensurePublishedExam = async (request: APIRequestContext, adminToken: strin
     request,
     'POST',
     `${ctx.examBaseUrl}/exams`,
-    adminToken,
+    contributorToken,
     createExamPayload,
   );
   expect(createdExam.status).toBe(200);
   expect(createdExam.body?.id).toBeTruthy();
 
+  const publishToken = await loginAndGetToken(request, ctx.adminLoginEmail, ctx.adminLoginPassword);
   const updateStatus = await requestJson<{ id: number; status: string }>(
     request,
     'PATCH',
     `${ctx.examBaseUrl}/exams/${createdExam.body!.id}/status?status=PUBLISHED`,
-    adminToken,
+    publishToken,
   );
   expect(updateStatus.status).toBe(200);
 
@@ -315,7 +337,7 @@ test.describe.serial('End-user full platform journey (real services)', () => {
     );
     expect(submitAttemptRes.status).toBe(200);
     expect(submitAttemptRes.body?.attemptId).toBe(startAttemptRes.body!.attemptId);
-    expect(submitAttemptRes.body?.status).toMatch(/SUBMITTED|AUTO_SUBMITTED/);
+    expect(submitAttemptRes.body?.status).toMatch(/SUBMITTED|AUTO_SUBMITTED|GRADED/);
 
     const resultRes = await requestJson<SubmittedAttemptResult>(
       request,

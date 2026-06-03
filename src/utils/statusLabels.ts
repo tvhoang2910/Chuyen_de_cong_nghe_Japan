@@ -17,6 +17,8 @@ export const ATTEMPT_STATUS_LABEL: Record<AttemptStatus, string> = {
   IN_PROGRESS: "Đang làm",
   SUBMITTED: "Đã nộp",
   AUTO_SUBMITTED: "Tự nộp",
+  PARTIALLY_GRADED: "Chấm một phần",
+  GRADED: "Đã chấm",
 };
 
 export const formatAttemptStatus = (status: AttemptStatus): string => {

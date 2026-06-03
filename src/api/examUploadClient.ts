@@ -229,7 +229,7 @@ export const fetchPendingQueue = async (
   size: number,
 ): Promise<ExamUploadPageResponse> => {
   const response = await examUploadClient.get<ExamUploadPageResponse>(
-    "/admin/uploads/queue",
+    "/uploads/pending",
     {
       params: { page, size },
     },
@@ -241,7 +241,7 @@ export const approveUpload = async (
   uploadId: number,
 ): Promise<ExamUploadResponse> => {
   const response = await examUploadClient.post<ExamUploadResponse>(
-    `/admin/uploads/${uploadId}/approve`,
+    `/uploads/${uploadId}/approve`,
   );
   return response.data;
 };
@@ -251,7 +251,7 @@ export const rejectUpload = async (
   reason: string,
 ): Promise<ExamUploadResponse> => {
   const response = await examUploadClient.post<ExamUploadResponse>(
-    `/admin/uploads/${uploadId}/reject`,
+    `/uploads/${uploadId}/reject`,
     { reason },
   );
   return response.data;
@@ -260,8 +260,5 @@ export const rejectUpload = async (
 export const fetchAdminUploadHistory = async (
   uploadId: number,
 ): Promise<ExamUploadHistoryResponse[]> => {
-  const response = await examUploadClient.get<ExamUploadHistoryResponse[]>(
-    `/admin/uploads/${uploadId}/history`,
-  );
-  return response.data;
+  return fetchUploadHistory(uploadId);
 };

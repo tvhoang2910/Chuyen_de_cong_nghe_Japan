@@ -61,13 +61,10 @@ const StatusIcon: React.FC<{ status: ExamUploadStatus }> = ({ status }) => {
 
 const MyExamUploads: React.FC = () => {
   const role = getCurrentSessionRole();
-  const Layout = role === "CONTRIBUTOR" || role === "ADMIN" ? AdminLayout : MainLayout;
+  const isContributor = role === "CONTRIBUTOR";
+  const Layout = role === "CONTRIBUTOR" ? AdminLayout : MainLayout;
   const extractedExamPath =
-    role === "ADMIN"
-      ? "/admin/exams"
-      : role === "CONTRIBUTOR"
-        ? "/contributor/exams"
-        : null;
+    isContributor ? "/contributor/exams" : null;
   const [items, setItems] = useState<ExamUploadResponse[]>([]);
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -177,10 +174,12 @@ const MyExamUploads: React.FC = () => {
         <header className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">
-              Đề đã upload
+              {isContributor ? "Đề tôi đã upload" : "Đề đã upload"}
             </h1>
             <p className="mt-1 text-sm text-slate-600">
-              Theo dõi trạng thái duyệt và lý do từ chối (nếu có).
+              {isContributor
+                ? "Đây là danh sách file do chính bạn upload. Upload từ user thường sẽ nằm ở mục Duyệt upload người dùng."
+                : "Theo dõi trạng thái duyệt và lý do từ chối (nếu có)."}
             </p>
           </div>
           <button
@@ -227,7 +226,9 @@ const MyExamUploads: React.FC = () => {
                     colSpan={5}
                     className="px-4 py-12 text-center text-sm text-slate-500"
                   >
-                    Bạn chưa upload đề nào.
+                    {isContributor
+                      ? "Bạn chưa tự upload đề nào. Nếu cần xử lý đề do user gửi, hãy mở mục Duyệt upload người dùng."
+                      : "Bạn chưa upload đề nào."}
                   </td>
                 </tr>
               ) : (

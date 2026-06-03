@@ -58,7 +58,6 @@ const Register: React.FC = () => {
         fullName: data.fullName,
         email: data.email,
         password: data.password,
-        role: "USER",
       };
       const res = await axiosClient.post("/register", payload);
       if (res.status === 201) {

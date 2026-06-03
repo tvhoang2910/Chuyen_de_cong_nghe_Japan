@@ -52,7 +52,7 @@ const createStagedFile = (file: File): StagedFile => ({
 const UserExamUpload: React.FC = () => {
   const navigate = useNavigate();
   const role = getCurrentSessionRole();
-  const Layout = role === "CONTRIBUTOR" || role === "ADMIN" ? AdminLayout : MainLayout;
+  const Layout = role === "CONTRIBUTOR" ? AdminLayout : MainLayout;
   const [stagedFiles, setStagedFiles] = useState<StagedFile[]>([]);
   const [isDragActive, setIsDragActive] = useState(false);
   const { upload, progress, isUploading } = useExamUploadFlow();

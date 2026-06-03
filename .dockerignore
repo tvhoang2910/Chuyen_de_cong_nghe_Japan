@@ -1,0 +1,11 @@
+node_modules/
+dist/
+dist-ssr/
+playwright-report/
+test-results/
+.git/
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.log

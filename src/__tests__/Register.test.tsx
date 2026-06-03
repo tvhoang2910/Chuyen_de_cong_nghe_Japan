@@ -169,7 +169,6 @@ describe('Register page', () => {
         fullName: 'Nguyen Van A',
         email: 'nguyenvana@student.edu.vn',
         password: 'Password123',
-        role: 'USER',
       });
     });
   });

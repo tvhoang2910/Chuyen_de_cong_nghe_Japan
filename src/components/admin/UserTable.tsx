@@ -211,7 +211,7 @@ const UserTableRow: React.FC<UserTableRowProps> = ({
 
             {isRoleMenuOpen && (
               <div className="absolute right-0 z-10 mt-1 w-36 rounded-lg border border-slate-200 bg-white p-1 shadow-lg">
-                {(['USER', 'CONTRIBUTOR', 'ADMIN'] as AppRole[]).map((role) => (
+                {(['USER', 'CONTRIBUTOR'] as AppRole[]).map((role) => (
                   <button
                     key={role}
                     type="button"
@@ -269,6 +269,12 @@ function toRoleLabel(role: AppRole): string {
       return 'Quản trị';
     case 'CONTRIBUTOR':
       return 'Giáo viên';
+    case 'AUDIT':
+      return 'Kiểm toán';
+    case 'SYSTEM_ADMIN':
+      return 'Quản trị hệ thống';
+    case 'ADMIN':
+      return 'Quản trị';
     default:
       return 'Học sinh';
   }
@@ -288,6 +294,20 @@ function getRoleBadge(role: AppRole) {
         <span className="inline-flex items-center gap-1.5 rounded-full bg-cyan-100 px-2.5 py-1 text-xs font-semibold text-cyan-700">
           <ShieldCheck className="h-3.5 w-3.5" />
           Giáo viên
+        </span>
+      );
+    case 'AUDIT':
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700">
+          <ShieldCheck className="h-3.5 w-3.5" />
+          Kiểm toán
+        </span>
+      );
+    case 'SYSTEM_ADMIN':
+      return (
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-violet-100 px-2.5 py-1 text-xs font-semibold text-violet-700">
+          <ShieldCheck className="h-3.5 w-3.5" />
+          Quản trị hệ thống
         </span>
       );
     default:

@@ -182,7 +182,11 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     let isMounted = true;
 
     const loadNotifications = async () => {
-      if (effectiveRole !== "ADMIN" && effectiveRole !== "CONTRIBUTOR") {
+      if (
+        effectiveRole !== "ADMIN" &&
+        effectiveRole !== "CONTRIBUTOR" &&
+        effectiveRole !== "AUDIT"
+      ) {
         if (isMounted) {
           setNotificationItems([]);
         }
@@ -192,7 +196,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       try {
         const [notificationFeed, subscriptionQueue] = await Promise.all([
           fetchUserNotifications(0, 10),
-          effectiveRole === "ADMIN"
+          effectiveRole === "AUDIT"
             ? fetchSubscriptionReviewQueue(0, 5, "PENDING_REVIEW")
             : Promise.resolve(null),
         ]);
@@ -208,7 +212,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                 row.actionUrl ||
                   (effectiveRole === "CONTRIBUTOR"
                     ? "/contributor/upload-queue"
-                    : "/admin/upload-queue"),
+                    : "/admin/dashboard"),
               ),
           }));
 
@@ -218,7 +222,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
               title: `Request #${row.id} đang chờ duyệt`,
               description: `${row.userFullName} • ${row.planName} • ${Number(row.purchasedPrice).toLocaleString("vi-VN")}đ`,
               timeLabel: new Date(row.createdAt).toLocaleString("vi-VN"),
-              onClick: () => navigate("/admin/subscription-reviews"),
+              onClick: () => navigate("/admin/audit/vip"),
             }))
           : [];
 
@@ -242,7 +246,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
               description:
                 "Vui lòng thử lại sau ít phút hoặc nhấn làm mới trang.",
               timeLabel: "Hệ thống",
-              onClick: () => navigate("/admin/subscription-reviews"),
+              onClick: () => navigate("/admin/audit/vip"),
             },
           ]);
         }
@@ -254,7 +258,11 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     };
 
     void loadNotifications();
-    if (effectiveRole !== "ADMIN" && effectiveRole !== "CONTRIBUTOR") {
+    if (
+      effectiveRole !== "ADMIN" &&
+      effectiveRole !== "CONTRIBUTOR" &&
+      effectiveRole !== "AUDIT"
+    ) {
       return () => {
         isMounted = false;
       };
@@ -311,12 +319,12 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     if (effectiveRole === "AUDIT") {
       return [
         {
-          label: "Duyệt VIP",
+          label: "Đối soát VIP",
           icon: ClipboardCheck,
           path: "/admin/audit/vip",
         },
         {
-          label: "Thanh toán",
+          label: "Đối soát thanh toán",
           icon: ClipboardCheck,
           path: "/admin/audit/payments",
         },
@@ -336,7 +344,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           path: "/admin/system/dashboard",
         },
         {
-          label: "Quản lý người dùng & phân quyền",
+          label: "Người dùng & phân quyền hệ thống",
           icon: Users,
           path: "/admin/system/users",
         },
@@ -354,32 +362,36 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     }
 
     if (effectiveRole === "CONTRIBUTOR") {
-      return [
+      const contributorItems = [
         {
           label: "Tổng quan",
           icon: LayoutDashboard,
           path: "/contributor",
         },
-        { label: "Quản lý đề thi", icon: BookOpen, path: "/contributor/exams" },
-        { label: "Duyệt đề từ học sinh", icon: Upload, path: "/contributor/upload-queue" },
-        { label: "Báo cáo câu hỏi", icon: Flag, path: "/contributor/reports" },
+        { label: "Đề thi của tôi", icon: BookOpen, path: "/contributor/exams" },
+        {
+          label: "Chấm tự luận",
+          icon: ClipboardCheck,
+          path: "/contributor/essay-grading",
+        },
+        { label: "Báo cáo của tôi", icon: Flag, path: "/contributor/reports" },
+        {
+          label: "Duyệt upload người dùng",
+          icon: FileUp,
+          path: "/contributor/upload-queue",
+        },
         { label: "Upload đề", icon: Upload, path: "/upload-exam" },
-        { label: "Đề đã upload", icon: FileUp, path: "/my-uploads" },
+        { label: "Đề tôi đã upload", icon: FileUp, path: "/my-uploads" },
       ];
+
+      return contributorItems;
     }
 
     // Default ADMIN navigation
     return [
       { label: "Dashboard", icon: LayoutDashboard, path: "/admin/dashboard" },
-      { label: "Quản lý Users", icon: Users, path: "/admin/users" },
-      { label: "Quản lý đề thi", icon: BookOpen, path: "/admin/exams" },
-      { label: "Duyệt upload", icon: Upload, path: "/admin/upload-queue" },
-      { label: "Báo cáo câu hỏi", icon: Flag, path: "/admin/reports" },
-      {
-        label: "Quản lý thanh toán",
-        icon: ClipboardCheck,
-        path: "/admin/subscription-reviews",
-      },
+      { label: "Người dùng nghiệp vụ", icon: Users, path: "/admin/users" },
+      { label: "Thành tích", icon: BookOpen, path: "/admin/achievements" },
       {
         label: "Gói Premium",
         icon: ClipboardCheck,

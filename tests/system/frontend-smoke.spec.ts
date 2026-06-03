@@ -55,17 +55,13 @@ const RATINGS = [
 ];
 
 const uploadedTitle = 'Smoke Upload Exam';
+const smokeUserPassword = 'Smoke@123456Aa';
 
 const onePxPng =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9k5x0AAAAASUVORK5CYII=';
 
 const installBrowserSmokeShims = async (page: Page): Promise<void> => {
-  await page.addInitScript(({ token, profile }) => {
-    localStorage.setItem('access_token', token);
-    localStorage.setItem('user_role', 'USER');
-    localStorage.setItem('user_email', profile.email);
-    localStorage.setItem('user_full_name', profile.fullName);
-
+  await page.addInitScript(() => {
     try {
       delete (window as unknown as Record<string, unknown>).Notification;
     } catch {
@@ -106,15 +102,105 @@ const installBrowserSmokeShims = async (page: Page): Promise<void> => {
         }),
       },
     });
-  }, { token: ctx.userToken, profile: USER_PROFILE });
+  });
+};
+
+const mockLoginApi = async (page: Page): Promise<void> => {
+  await page.route('**/api/v1/auth/login', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        accessToken: ctx.userToken,
+        refreshToken: 'smoke-refresh-token',
+        email: USER_PROFILE.email,
+        role: 'USER',
+      }),
+    });
+  });
+};
+
+const loginSmokeUser = async (page: Page): Promise<void> => {
+  await page.goto('/login');
+  await page.getByLabel(/địa chỉ email/i).fill(USER_PROFILE.email);
+  await page.getByLabel(/mật khẩu/i).fill(smokeUserPassword);
+  await page.getByRole('button', { name: 'Xác nhận đăng nhập' }).click();
+  await expect(page).toHaveURL(/\/dashboard(\/.*)?$/, { timeout: 10000 });
 };
 
 const mockAuthenticatedApis = async (page: Page): Promise<void> => {
+  await mockLoginApi(page);
+
   await page.route('**/api/v1/auth/me', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify(USER_PROFILE),
+    });
+  });
+
+  await page.route('**/api/v1/auth/notifications**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        content: [],
+        number: 0,
+        size: 20,
+        totalElements: 0,
+        totalPages: 0,
+        first: true,
+        last: true,
+        unreadCount: 0,
+      }),
+    });
+  });
+
+  await page.route('**/api/v1/notification**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        content: [],
+        totalElements: 0,
+        totalPages: 0,
+        number: 0,
+        size: 20,
+        first: true,
+        last: true,
+        unreadCount: 0,
+      }),
+    });
+  });
+
+  await page.route('**/api/v1/study/gamification/me/overview', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        streakDays: 5,
+        longestStreak: 12,
+        dailyStudyMinutes: 45,
+        dailyTargetMinutes: 60,
+        todayQualified: true,
+        justQualifiedToday: false,
+        points: 1200,
+        newlyUnlockedAchievements: [],
+        recentUnlockedAchievements: [],
+      }),
+    });
+  });
+
+  await page.route('**/api/v1/study/spaced-repetition/me/exam-decks', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        generatedAt: '2026-05-24T00:00:00Z',
+        deckCount: 0,
+        totalWrongQuestions: 0,
+        decks: [],
+      }),
     });
   });
 
@@ -228,6 +314,7 @@ test.describe('frontend smoke', () => {
   test('search smoke: public exams page loads and searches by keyword', async ({ page }) => {
     await installBrowserSmokeShims(page);
     await mockAuthenticatedApis(page);
+    await loginSmokeUser(page);
 
     await page.goto('/dashboard/exams');
 
@@ -236,7 +323,7 @@ test.describe('frontend smoke', () => {
     await expect(page.getByText('Đề thi Toán 12')).toBeVisible();
 
     await page.getByPlaceholder('Tìm theo từ khóa (ví dụ: toán 12)').fill('công nghệ');
-    await page.getByRole('button', { name: 'Tìm kiếm' }).click();
+    await page.getByPlaceholder('Tìm theo từ khóa (ví dụ: toán 12)').press('Enter');
 
     await expect(page.getByText('Đề thi Công nghệ & Tin học')).toBeVisible();
     await expect(page.getByText('Đề thi Toán 12')).toHaveCount(0);
@@ -246,9 +333,9 @@ test.describe('frontend smoke', () => {
   test('upload smoke: user can stage a file and complete upload flow', async ({ page }) => {
     await installBrowserSmokeShims(page);
     await mockAuthenticatedApis(page);
+    await loginSmokeUser(page);
 
     await page.goto('/upload-exam');
-
     await expect(page.getByRole('heading', { name: 'Upload đề thi' })).toBeVisible();
     await page.getByLabel('Tiêu đề đề thi').fill(uploadedTitle);
     await page.getByLabel('Mô tả (tuỳ chọn)').fill('Smoke upload test');

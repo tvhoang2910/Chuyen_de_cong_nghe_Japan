@@ -10,12 +10,14 @@ const {
   fetchUploadHistory,
   subscribe,
   unsubscribe,
+  getCurrentSessionRole,
 } = vi.hoisted(() => ({
   fetchMyUploads: vi.fn(),
   fetchUploadDetail: vi.fn(),
   fetchUploadHistory: vi.fn(),
   subscribe: vi.fn(),
   unsubscribe: vi.fn(),
+  getCurrentSessionRole: vi.fn(() => 'USER'),
 }));
 
 vi.mock('../api/examUploadClient', async () => {
@@ -37,8 +39,20 @@ vi.mock('../hooks/useExamEventsSSE', () => ({
   }),
 }));
 
+vi.mock('../api/axiosClient', async () => {
+  const actual = await vi.importActual<typeof import('../api/axiosClient')>('../api/axiosClient');
+  return {
+    ...actual,
+    getCurrentSessionRole,
+  };
+});
+
 vi.mock('../components/MainLayout', () => ({
   default: ({ children }: { children: React.ReactNode }) => <div data-testid="main-layout">{children}</div>,
+}));
+
+vi.mock('../components/AdminLayout', () => ({
+  default: ({ children }: { children: React.ReactNode }) => <div data-testid="admin-layout">{children}</div>,
 }));
 
 vi.mock('react-hot-toast', () => ({
@@ -54,6 +68,7 @@ describe('MyExamUploads', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useRealTimers();
+    getCurrentSessionRole.mockReturnValue('USER');
     localStorage.clear();
     localStorage.setItem('access_token', 'token');
     fetchUploadHistory.mockResolvedValue([]);
@@ -252,5 +267,26 @@ describe('MyExamUploads', () => {
 
     expect(fetchMyUploads).toHaveBeenCalledTimes(1);
     expect(fetchUploadDetail).not.toHaveBeenCalled();
+  });
+
+  it('shows contributor-specific heading and helper text', async () => {
+    getCurrentSessionRole.mockReturnValue('CONTRIBUTOR');
+    fetchMyUploads.mockResolvedValue({
+      content: [],
+      page: 0,
+      size: 10,
+      totalElements: 0,
+      totalPages: 0,
+    });
+
+    render(
+      <MemoryRouter>
+        <MyExamUploads />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText('Đề tôi đã upload')).toBeInTheDocument();
+    expect(screen.getByText('Đây là danh sách file do chính bạn upload. Upload từ user thường sẽ nằm ở mục Duyệt upload người dùng.')).toBeInTheDocument();
+    expect(screen.getByText('Bạn chưa tự upload đề nào. Nếu cần xử lý đề do user gửi, hãy mở mục Duyệt upload người dùng.')).toBeInTheDocument();
   });
 });

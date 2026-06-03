@@ -5,9 +5,6 @@ import { type AppRole } from '../../api/axiosClient';
 const roleOptions: Array<{ value: AppRole; label: string }> = [
   { value: 'USER', label: 'Học sinh (USER)' },
   { value: 'CONTRIBUTOR', label: 'Giáo viên (CONTRIBUTOR)' },
-  { value: 'ADMIN', label: 'Quản trị (ADMIN)' },
-  { value: 'AUDIT', label: 'Kiểm toán (AUDIT)' },
-  { value: 'SYSTEM_ADMIN', label: 'Quản trị hệ thống (SYSTEM_ADMIN)' },
 ];
 
 interface CreateUserFormProps {

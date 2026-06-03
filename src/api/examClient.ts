@@ -2,6 +2,17 @@ import axios from "axios";
 import { examApiBaseUrl } from "../config/env";
 
 export type OnlineExamStatus = "DRAFT" | "PUBLISHED" | "ARCHIVED";
+export type QuestionType = "MULTIPLE_CHOICE" | "ESSAY";
+export type AnswerStatus =
+  | "AUTO_GRADED"
+  | "PENDING_REVIEW"
+  | "MANUALLY_GRADED";
+export type AttemptStatus =
+  | "IN_PROGRESS"
+  | "SUBMITTED"
+  | "AUTO_SUBMITTED"
+  | "PARTIALLY_GRADED"
+  | "GRADED";
 
 export type TagOption = {
   id: number;
@@ -18,7 +29,11 @@ export type ExamQuestion = {
   id?: number;
   content: string;
   explanation?: string;
+  questionType?: QuestionType;
+  score?: number;
   scoreWeight: number;
+  sampleAnswer?: string | null;
+  gradingGuide?: string | null;
   options: ExamOption[];
 };
 
@@ -83,7 +98,10 @@ export type StartAttemptResponse = {
 
 export type SaveAttemptAnswerPayload = {
   questionId: number;
+  selectedOptionId?: number;
   selectedOptionIds: number[];
+  essayAnswer?: string;
+  textAnswer?: string;
   responseTimeMs?: number;
   answerChangeCount?: number;
 };
@@ -93,15 +111,26 @@ export type SaveAttemptAnswersBatchPayload = {
 };
 
 export type AttemptQuestionResult = {
+  answerId?: number;
   questionId: number;
   content: string;
+  questionType?: QuestionType;
   maxScore: number;
+  score?: number;
+  scoreWeight?: number;
   earnedScore: number;
   correct: boolean;
+  answerStatus?: AnswerStatus;
   difficulty?: 'EASY' | 'MEDIUM' | 'HARD' | 'VERY_HARD';
-  options: { id: number; content: string }[];
-  selectedOptionIds: number[];
-  correctOptionIds: number[];
+  essayAnswer?: string | null;
+  textAnswer?: string | null;
+  sampleAnswer?: string | null;
+  gradingGuide?: string | null;
+  teacherFeedback?: string | null;
+  feedback?: string | null;
+  options?: { id: number; content: string }[];
+  selectedOptionIds?: number[];
+  correctOptionIds?: number[];
   responseTimeMs?: number;
   answerChangeCount?: number;
 };
@@ -110,7 +139,7 @@ export type AttemptResult = {
   attemptId: number;
   examId: number;
   examTitle: string;
-  status: "IN_PROGRESS" | "SUBMITTED" | "AUTO_SUBMITTED";
+  status: AttemptStatus;
   startedAt: string;
   submittedAt: string;
   durationSeconds: number;
@@ -126,13 +155,24 @@ export type AttemptSummary = {
   attemptId: number;
   examId: number;
   examTitle: string;
-  status: "IN_PROGRESS" | "SUBMITTED" | "AUTO_SUBMITTED";
+  status: AttemptStatus;
   startedAt: string;
   submittedAt?: string;
   scoreRaw?: number;
   scoreMax?: number;
   scorePercent?: number;
   passed?: boolean;
+};
+
+export const isAttemptResultAccessibleStatus = (
+  status?: AttemptStatus,
+): boolean => {
+  return (
+    status === "SUBMITTED" ||
+    status === "AUTO_SUBMITTED" ||
+    status === "PARTIALLY_GRADED" ||
+    status === "GRADED"
+  );
 };
 
 const examClient = axios.create({

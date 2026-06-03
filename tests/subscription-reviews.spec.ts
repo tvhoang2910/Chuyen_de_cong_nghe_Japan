@@ -69,6 +69,40 @@ async function mockAdminShellApis(page: Page): Promise<void> {
       body: '{}',
     });
   });
+
+  await page.route('**/api/v1/auth/notifications**', async (route: Route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        content: [],
+        number: 0,
+        size: 20,
+        totalElements: 0,
+        totalPages: 0,
+        first: true,
+        last: true,
+        unreadCount: 0,
+      }),
+    });
+  });
+
+  await page.route('**/api/v1/notification**', async (route: Route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        content: [],
+        totalElements: 0,
+        totalPages: 0,
+        number: 0,
+        size: 20,
+        first: true,
+        last: true,
+        unreadCount: 0,
+      }),
+    });
+  });
 }
 
 test.describe('Admin subscription reviews history + cancel flow', () => {
@@ -157,7 +191,9 @@ test.describe('Admin subscription reviews history + cancel flow', () => {
 
     await expect(page.getByText('Doanh thu tháng')).toBeVisible();
     await expect(page.getByText('Premium User')).toBeVisible();
-    await expect(page.getByRole('cell', { name: 'APPROVED' })).toBeVisible();
+    await expect(
+      page.locator('tbody tr').filter({ hasText: 'Premium User' }).getByText('Đã duyệt', { exact: true }),
+    ).toBeVisible();
 
     await page.getByRole('button', { name: 'Hủy gói' }).first().click();
 
@@ -170,7 +206,9 @@ test.describe('Admin subscription reviews history + cancel flow', () => {
     await page.getByRole('button', { name: 'Xác nhận hủy' }).click();
 
     await expect(page.getByText('Đã hủy gói thành công')).toBeVisible();
-    await expect(page.getByRole('cell', { name: 'CANCELLED' })).toBeVisible();
+    await expect(
+      page.locator('tbody tr').filter({ hasText: 'Premium User' }).getByText('Đã hủy', { exact: true }),
+    ).toBeVisible();
     await expect(page.getByText('Khách hàng yêu cầu hủy gói ngay.')).toBeVisible();
   });
 });

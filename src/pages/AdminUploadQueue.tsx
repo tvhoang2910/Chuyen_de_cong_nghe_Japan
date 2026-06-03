@@ -211,12 +211,10 @@ const AdminUploadQueue: React.FC<AdminUploadQueueProps> = ({ mode = "admin" }) =
         return;
       }
       if (event.eventType === "AI_EXTRACTION_SUCCESS") {
-        toast.success("Đã trích xuất xong.");
         setExtractingUploadId(null);
         closeDetail();
         void loadQueue(page);
       } else {
-        toast.error(event.message ?? "Trích xuất thất bại.");
         extractingTimeoutRef.current = setTimeout(() => {
           setExtractingUploadId(null);
           closeDetail();
@@ -407,7 +405,7 @@ const AdminUploadQueue: React.FC<AdminUploadQueueProps> = ({ mode = "admin" }) =
             </h1>
             <p className="mt-1 text-sm text-slate-600">
               {mode === "contributor"
-                ? "Các đề học sinh gửi đang chờ duyệt. Đề contributor upload sẽ được xử lý trực tiếp."
+                ? "Các đề người dùng thường gửi lên sẽ xuất hiện ở đây để contributor duyệt. Danh sách file bạn tự upload nằm ở mục Đề tôi đã upload."
                 : "Các yêu cầu upload đang chờ duyệt. Bấm vào một hàng để xem chi tiết."}
             </p>
           </div>

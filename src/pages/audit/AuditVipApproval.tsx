@@ -5,8 +5,6 @@ import toast from "react-hot-toast";
 import AdminLayout from "../../components/AdminLayout";
 import {
   fetchVipRequests,
-  approveVipRequest,
-  rejectVipRequest,
   fetchVipRequestHistory,
   fetchVipRequestBill,
   type VipRequestItem,
@@ -119,45 +117,14 @@ const AuditVipApproval: React.FC = () => {
     };
   }, [billPreviewUrl]);
 
-  const doApprove = async (id: number) => {
-    try {
-      await approveVipRequest(id);
-      toast.success("Đã duyệt VIP.");
-      setSelected(null);
-      setHistory([]);
-      setBillError(null);
-      setBillPreviewUrl((prev) => {
-        if (prev) URL.revokeObjectURL(prev);
-        return null;
-      });
-      void load();
-    } catch {
-      toast.error("Duyệt thất bại.");
-    }
-  };
-
-  const doReject = async (id: number) => {
-    try {
-      await rejectVipRequest(id);
-      toast.success("Đã từ chối.");
-      setSelected(null);
-      setHistory([]);
-      setBillError(null);
-      setBillPreviewUrl((prev) => {
-        if (prev) URL.revokeObjectURL(prev);
-        return null;
-      });
-      void load();
-    } catch {
-      toast.error("Từ chối thất bại.");
-    }
-  };
-
   return (
     <AdminLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Duyệt nâng cấp VIP</h1>
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl font-bold">Đối soát yêu cầu VIP</h1>
+          <p className="text-sm text-slate-600">
+            Audit chỉ kiểm tra bill và lịch sử. Thao tác duyệt/từ chối nằm ở màn Admin thanh toán.
+          </p>
         </div>
 
         <div className="bg-white rounded-3xl border border-slate-200 p-4">
@@ -222,18 +189,6 @@ const AuditVipApproval: React.FC = () => {
                                 }`}
                               />
                             </span>
-                          </button>
-                          <button
-                            onClick={() => doApprove(r.id)}
-                            className="px-3 py-1 rounded-xl bg-emerald-600 text-white"
-                          >
-                            Duyệt
-                          </button>
-                          <button
-                            onClick={() => doReject(r.id)}
-                            className="px-3 py-1 rounded-xl bg-rose-600 text-white"
-                          >
-                            Từ chối
                           </button>
                         </div>
                       </td>

@@ -13,6 +13,7 @@ import { fetchCurrentUserProfile, type UserProfile } from "../api/axiosClient";
 import {
   fetchMyAttemptHistory,
   fetchPublicExamDetail,
+  isAttemptResultAccessibleStatus,
   type AttemptSummary,
   type ExamSummary,
 } from "../api/examClient";
@@ -150,9 +151,8 @@ const ExamStart: React.FC = () => {
 
   const hasSubmittedAttempt = useMemo(
     () =>
-      examAttempts.some(
-        (attempt) =>
-          attempt.status === "SUBMITTED" || attempt.status === "AUTO_SUBMITTED",
+      examAttempts.some((attempt) =>
+        isAttemptResultAccessibleStatus(attempt.status),
       ),
     [examAttempts],
   );

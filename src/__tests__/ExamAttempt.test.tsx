@@ -185,6 +185,33 @@ describe('ExamAttempt page', () => {
     });
   });
 
+  it('flushes a mixed answer payload with selectedOptionId for multiple-choice questions', async () => {
+    renderAttempt();
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^Nộp bài$/i })).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText(/2\. B\. 4/));
+    fireEvent.click(screen.getByRole('button', { name: /^Nộp bài$/i }));
+
+    await waitFor(() => {
+      expect(mockSaveAttemptAnswersBatch).toHaveBeenCalled();
+    });
+
+    const [attemptId, payload] = mockSaveAttemptAnswersBatch.mock.calls[0];
+    expect(attemptId).toBe(999);
+    expect(payload.answers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          questionId: 101,
+          selectedOptionId: 1002,
+          selectedOptionIds: [1002],
+        }),
+      ]),
+    );
+  });
+
   it('shows timer in remaining time display', async () => {
     renderAttempt();
 

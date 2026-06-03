@@ -477,8 +477,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children, fallbackStreakDays, f
   const navItems = user?.role === 'CONTRIBUTOR' ? [
     { label: 'Tổng quan', icon: LayoutDashboard, path: '/contributor' },
     { label: 'Đề thi của tôi', icon: BookOpen, path: '/contributor/exams' },
-    { label: 'Duyệt upload', icon: Upload, path: '/contributor/upload-queue' },
-    { label: 'Báo cáo câu hỏi', icon: Flag, path: '/contributor/reports' },
+    { label: 'Chấm tự luận', icon: Crown, path: '/contributor/essay-grading' },
+    { label: 'Báo cáo của tôi', icon: Flag, path: '/contributor/reports' },
     { label: 'Upload đề', icon: Upload, path: '/upload-exam' },
     { label: 'Đề đã upload', icon: FileUp, path: '/my-uploads' },
   ] : [

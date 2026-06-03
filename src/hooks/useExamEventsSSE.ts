@@ -14,6 +14,7 @@ export type ExamSseEventType =
   | 'ATTEMPT_ENDED'
   | 'SNAPSHOT'
   | 'AI_EXTRACTION_SUCCESS'
+  | 'AI_EXTRACTION_SUCCESS_MANUAL'
   | 'AI_EXTRACTION_FAILED';
 
 export interface ExamSseEvent {

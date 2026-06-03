@@ -7,6 +7,7 @@ import {
   fetchCurrentUserProfile,
   getCurrentSessionRole,
 } from "./api/axiosClient";
+import ExamExtractionNotifier from "./components/ExamExtractionNotifier";
 import { setupDevAuthConsole } from "./utils/devAuthMock";
 
 const Home = lazy(() => import("./pages/Home"));
@@ -27,6 +28,9 @@ const AdminUsers = lazy(() => import("./pages/AdminUsers"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const AdminAchievements = lazy(() => import("./pages/AdminAchievements"));
 const ContributorDashboard = lazy(() => import("./pages/ContributorDashboard"));
+const ContributorEssayGrading = lazy(
+  () => import("./pages/ContributorEssayGrading"),
+);
 const ExamManagement = lazy(() => import("./pages/ExamManagement"));
 const PublicExams = lazy(() => import("./pages/PublicExams"));
 const ExamStart = lazy(() => import("./pages/ExamStart"));
@@ -45,7 +49,6 @@ const SubscriptionReviewQueue = lazy(
 const PremiumPlanManagement = lazy(
   () => import("./pages/PremiumPlanManagement"),
 );
-const AuditVipApproval = lazy(() => import("./pages/audit/AuditVipApproval"));
 const AuditPayments = lazy(() => import("./pages/audit/AuditPayments"));
 const AuditLogPage = lazy(() => import("./pages/audit/AuditLogPage"));
 const SystemAdminDashboard = lazy(
@@ -185,6 +188,7 @@ function App() {
             },
           }}
         />
+        <ExamExtractionNotifier />
         <Suspense fallback={<RouteLoader />}>
           <Routes>
             {/* Public Routes */}
@@ -395,6 +399,19 @@ function App() {
               }
             />
             <Route
+              path="/contributor/essay-grading"
+              element={
+                <ProtectedRoute
+                  isAuthenticated={effectiveIsAuthenticated}
+                  userRole={effectiveRole}
+                  defaultPath={defaultAuthenticatedPath}
+                  allowedRoles={["CONTRIBUTOR"]}
+                >
+                  <ContributorEssayGrading />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/contributor/subscription-reviews"
               element={
                 <ProtectedRoute
@@ -483,7 +500,7 @@ function App() {
                   defaultPath={defaultAuthenticatedPath}
                   allowedRoles={["ADMIN"]}
                 >
-                  <ExamManagement mode="ADMIN" />
+                  <Navigate to="/admin/dashboard" replace />
                 </ProtectedRoute>
               }
             />
@@ -494,9 +511,9 @@ function App() {
                   isAuthenticated={effectiveIsAuthenticated}
                   userRole={effectiveRole}
                   defaultPath={defaultAuthenticatedPath}
-                  allowedRoles={["ADMIN"]}
+                  allowedRoles={["AUDIT"]}
                 >
-                  <SubscriptionReviewQueue mode="admin" />
+                  <Navigate to="/admin/audit/vip" replace />
                 </ProtectedRoute>
               }
             />
@@ -509,7 +526,7 @@ function App() {
                   defaultPath={defaultAuthenticatedPath}
                   allowedRoles={["AUDIT"]}
                 >
-                  <AuditVipApproval />
+                  <SubscriptionReviewQueue mode="audit" />
                 </ProtectedRoute>
               }
             />
@@ -637,13 +654,9 @@ function App() {
                   isAuthenticated={effectiveIsAuthenticated}
                   userRole={effectiveRole}
                   defaultPath={defaultAuthenticatedPath}
-                  allowedRoles={["ADMIN", "CONTRIBUTOR"]}
+                  allowedRoles={["CONTRIBUTOR"]}
                 >
-                  {effectiveRole === "ADMIN" ? (
-                    <AdminReports mode="admin" />
-                  ) : (
-                    <AdminReports mode="contributor" />
-                  )}
+                  <AdminReports mode="contributor" />
                 </ProtectedRoute>
               }
             />
@@ -666,7 +679,7 @@ function App() {
                   isAuthenticated={effectiveIsAuthenticated}
                   userRole={effectiveRole}
                   defaultPath={defaultAuthenticatedPath}
-                  allowedRoles={["USER", "CONTRIBUTOR", "ADMIN"]}
+                  allowedRoles={["USER", "CONTRIBUTOR"]}
                 >
                   <UserExamUpload />
                 </ProtectedRoute>
@@ -679,7 +692,7 @@ function App() {
                   isAuthenticated={effectiveIsAuthenticated}
                   userRole={effectiveRole}
                   defaultPath={defaultAuthenticatedPath}
-                  allowedRoles={["USER", "CONTRIBUTOR", "ADMIN"]}
+                  allowedRoles={["USER", "CONTRIBUTOR"]}
                 >
                   <MyExamUploads />
                 </ProtectedRoute>
@@ -692,9 +705,9 @@ function App() {
                   isAuthenticated={effectiveIsAuthenticated}
                   userRole={effectiveRole}
                   defaultPath={defaultAuthenticatedPath}
-                  allowedRoles={["ADMIN", "CONTRIBUTOR"]}
+                  allowedRoles={["ADMIN"]}
                 >
-                  <AdminUploadQueue />
+                  <Navigate to="/admin/dashboard" replace />
                 </ProtectedRoute>
               }
             />
@@ -705,9 +718,9 @@ function App() {
                   isAuthenticated={effectiveIsAuthenticated}
                   userRole={effectiveRole}
                   defaultPath={defaultAuthenticatedPath}
-                  allowedRoles={["CONTRIBUTOR", "ADMIN"]}
+                  allowedRoles={["CONTRIBUTOR"]}
                 >
-                  <AdminUploadQueue />
+                  <AdminUploadQueue mode="contributor" />
                 </ProtectedRoute>
               }
             />

@@ -3,29 +3,29 @@ import type { ResolveReportPayload } from '../src/api/reportClient';
 
 const ISO_NOW = '2026-04-12T09:30:00.000Z';
 
-async function seedContributor(page: Page): Promise<void> {
+async function seedAdmin(page: Page): Promise<void> {
   await page.addInitScript(() => {
     localStorage.setItem('access_token', 'report-e2e-token');
     localStorage.setItem('refresh_token', 'report-e2e-refresh-token');
-    localStorage.setItem('user_email', 'contributor-report-e2e@example.com');
-    localStorage.setItem('user_role', 'CONTRIBUTOR');
+    localStorage.setItem('user_email', 'admin-report-e2e@example.com');
+    localStorage.setItem('user_role', 'ADMIN');
   });
 }
 
-async function mockContributorShellApis(page: Page): Promise<void> {
+async function mockAdminShellApis(page: Page): Promise<void> {
   await page.route('**/api/v1/auth/me', async (route: Route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
         id: 71,
-        email: 'contributor-report-e2e@example.com',
-        fullName: 'Contributor E2E',
+        email: 'admin-report-e2e@example.com',
+        fullName: 'Admin Report E2E',
         avatarUrl: null,
         phoneNumber: null,
         school: null,
         subject: null,
-        role: 'CONTRIBUTOR',
+        role: 'ADMIN',
         premium: true,
       }),
     });
@@ -94,8 +94,8 @@ async function mockContributorShellApis(page: Page): Promise<void> {
 
 test.describe('Report resolved notification flow', () => {
   test('resolving a question report to RESOLVED sends expected payload and shows reporter notify UX', async ({ page }) => {
-    await seedContributor(page);
-    await mockContributorShellApis(page);
+    await seedAdmin(page);
+    await mockAdminShellApis(page);
 
     let isResolved = false;
     let resolveCallCount = 0;
@@ -307,9 +307,25 @@ test.describe('Report resolved notification flow', () => {
       });
     });
 
-    await page.goto('/contributor/reports');
+    await page.route('**/api/v1/auth/subscriptions/review-queue?*', async (route: Route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          content: [],
+          totalPages: 0,
+          totalElements: 0,
+          number: 0,
+          size: 20,
+          first: true,
+          last: true,
+        }),
+      });
+    });
 
-    await expect(page.getByRole('heading', { name: 'Trung tâm báo cáo câu hỏi' })).toBeVisible();
+    await page.goto('/admin/reports');
+
+    await expect(page.getByRole('heading', { name: 'Trung tâm xử lý báo cáo câu hỏi' })).toBeVisible();
     await expect(page.getByText('Q#501 • Đề thi thông báo báo cáo')).toBeVisible();
 
     await page.getByLabel('Trạng thái mới').selectOption('RESOLVED');

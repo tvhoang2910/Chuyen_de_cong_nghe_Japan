@@ -23,7 +23,7 @@ import {
 import { formatSubscriptionStatus } from '../utils/statusLabels';
 
 type SubscriptionReviewQueueProps = {
-  mode: 'admin' | 'contributor';
+  mode: 'admin' | 'audit' | 'contributor';
 };
 
 type HistoryFilters = {
@@ -51,7 +51,7 @@ const statusBadgeClass = (status: SubscriptionStatus): string => {
   if (status === 'PENDING_REVIEW') {
     return 'bg-amber-100 text-amber-700';
   }
-  if (status === 'CANCELLED') {
+  if (status === 'REJECTED' || status === 'CANCELLED') {
     return 'bg-rose-100 text-rose-700';
   }
   if (status === 'EXPIRED') {
@@ -62,6 +62,9 @@ const statusBadgeClass = (status: SubscriptionStatus): string => {
 
 const SubscriptionReviewQueue: React.FC<SubscriptionReviewQueueProps> = ({ mode }) => {
   const isAdminMode = mode === 'admin';
+  const isAuditMode = mode === 'audit';
+  const canViewHistory = isAdminMode || isAuditMode;
+  const canManageRequests = isAdminMode || isAuditMode;
   const [rows, setRows] = useState<UserSubscriptionQueueItem[]>([]);
   const [selected, setSelected] = useState<UserSubscriptionQueueItem | null>(null);
   const [statusFilter, setStatusFilter] = useState<SubscriptionStatus>('PENDING_REVIEW');
@@ -87,7 +90,7 @@ const SubscriptionReviewQueue: React.FC<SubscriptionReviewQueueProps> = ({ mode 
   const [billPreviewUrl, setBillPreviewUrl] = useState<string | null>(null);
   const [isBillPreviewLoading, setIsBillPreviewLoading] = useState(false);
 
-  const Layout = useMemo(() => (mode === 'admin' ? AdminLayout : MainLayout), [mode]);
+  const Layout = useMemo(() => (mode === 'contributor' ? MainLayout : AdminLayout), [mode]);
 
   const loadQueue = useCallback(async () => {
     try {
@@ -140,7 +143,7 @@ const SubscriptionReviewQueue: React.FC<SubscriptionReviewQueueProps> = ({ mode 
 
   const requestHistory = useCallback(
     async (filters: HistoryFilters, page: number) => {
-      if (!isAdminMode) {
+      if (!canViewHistory) {
         return;
       }
       try {
@@ -162,7 +165,7 @@ const SubscriptionReviewQueue: React.FC<SubscriptionReviewQueueProps> = ({ mode 
         setIsHistoryLoading(false);
       }
     },
-    [historyPageSize, isAdminMode],
+    [canViewHistory, historyPageSize],
   );
 
   useEffect(() => {
@@ -173,14 +176,14 @@ const SubscriptionReviewQueue: React.FC<SubscriptionReviewQueueProps> = ({ mode 
   }, [isAdminMode, requestAnalytics]);
 
   useEffect(() => {
-    if (!isAdminMode) {
+    if (!canViewHistory) {
       return;
     }
     void requestHistory(historyFilters, historyPageIndex);
-  }, [historyFilters, historyPageIndex, isAdminMode, requestHistory]);
+  }, [canViewHistory, historyFilters, historyPageIndex, requestHistory]);
 
   const handleReview = async (approved: boolean) => {
-    if (!selected) {
+    if (!selected || !canManageRequests) {
       return;
     }
     try {
@@ -246,6 +249,9 @@ const SubscriptionReviewQueue: React.FC<SubscriptionReviewQueueProps> = ({ mode 
   };
 
   const handleOpenCancelModal = (item: SubscriptionHistoryItem) => {
+    if (!canManageRequests) {
+      return;
+    }
     setCancelTarget(item);
     setCancelReason('');
   };
@@ -286,7 +292,7 @@ const SubscriptionReviewQueue: React.FC<SubscriptionReviewQueueProps> = ({ mode 
   }, [billPreviewUrl]);
 
   const handleConfirmCancel = async () => {
-    if (!cancelTarget) {
+    if (!cancelTarget || !canManageRequests) {
       return;
     }
 
@@ -321,8 +327,14 @@ const SubscriptionReviewQueue: React.FC<SubscriptionReviewQueueProps> = ({ mode 
         <section className="rounded-[2rem] bg-gradient-to-br from-slate-900 via-slate-800 to-cyan-900 p-7 text-white shadow-xl">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h1 className="text-3xl font-black tracking-tight">Hàng chờ duyệt thanh toán Premium</h1>
-              <p className="mt-2 text-sm text-slate-200">Duyệt thủ công bill chuyển khoản, hệ thống sẽ tự đẩy web push + email khi có kết quả.</p>
+              <h1 className="text-3xl font-black tracking-tight">
+                {isAuditMode ? 'Đối soát thanh toán Premium' : 'Hàng chờ duyệt thanh toán Premium'}
+              </h1>
+              <p className="mt-2 text-sm text-slate-200">
+                {isAuditMode
+                  ? 'Audit có thể duyệt/hủy sau khi đối soát bill, đồng thời theo dõi lịch sử subscription và approval.'
+                  : 'Duyệt thủ công bill chuyển khoản, hệ thống sẽ tự đẩy web push + email khi có kết quả.'}
+              </p>
             </div>
             <button
               onClick={() => void loadQueue()}
@@ -406,7 +418,9 @@ const SubscriptionReviewQueue: React.FC<SubscriptionReviewQueueProps> = ({ mode 
 
           <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
             {!selected ? (
-              <p className="rounded-2xl bg-slate-50 p-6 text-center text-sm text-slate-500">Chọn một request để duyệt.</p>
+              <p className="rounded-2xl bg-slate-50 p-6 text-center text-sm text-slate-500">
+                {canManageRequests ? 'Chọn một request để duyệt.' : 'Chọn một request để xem chi tiết.'}
+              </p>
             ) : (
               <div className="space-y-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -414,7 +428,7 @@ const SubscriptionReviewQueue: React.FC<SubscriptionReviewQueueProps> = ({ mode 
                     <h2 className="text-xl font-bold text-slate-900">Review request #{selected.id}</h2>
                     <p className="text-sm text-slate-500">{selected.userFullName} • {selected.userEmail}</p>
                   </div>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700">
+                  <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold ${statusBadgeClass(selected.status)}`}>
                     <ShieldCheck className="h-3.5 w-3.5" /> {formatSubscriptionStatus(selected.status)}
                   </span>
                 </div>
@@ -433,18 +447,24 @@ const SubscriptionReviewQueue: React.FC<SubscriptionReviewQueueProps> = ({ mode 
                   </button>
                 </div>
 
-                <label className="block">
-                  <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">Ghi chú duyệt</span>
-                  <textarea
-                    value={reviewNote}
-                    onChange={(event) => setReviewNote(event.target.value)}
-                    rows={4}
-                    className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-cyan-500 focus:outline-none"
-                    placeholder="VD: Đã đối soát thành công với sao kê ngân hàng"
-                  />
-                </label>
+                {canManageRequests ? (
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-slate-500">Ghi chú duyệt</span>
+                    <textarea
+                      value={reviewNote}
+                      onChange={(event) => setReviewNote(event.target.value)}
+                      rows={4}
+                      className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-cyan-500 focus:outline-none"
+                      placeholder="VD: Đã đối soát thành công với sao kê ngân hàng"
+                    />
+                  </label>
+                ) : (
+                  <p className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600">
+                    Request đã xử lý, chỉ còn ở chế độ xem lịch sử.
+                  </p>
+                )}
 
-                {selected.status === 'PENDING_REVIEW' ? (
+                {canManageRequests && selected.status === 'PENDING_REVIEW' ? (
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <button
                       type="button"
@@ -465,7 +485,9 @@ const SubscriptionReviewQueue: React.FC<SubscriptionReviewQueueProps> = ({ mode 
                   </div>
                 ) : (
                   <p className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">
-                    Request này đã xử lý, chỉ còn ở chế độ xem lịch sử.
+                    {canManageRequests
+                      ? 'Request này đã xử lý, chỉ còn ở chế độ xem lịch sử.'
+                      : 'Audit đang xem request ở chế độ chỉ đọc.'}
                   </p>
                 )}
 
@@ -487,14 +509,17 @@ const SubscriptionReviewQueue: React.FC<SubscriptionReviewQueueProps> = ({ mode 
                 </div>
 
                 <p className="inline-flex items-center gap-2 text-xs font-semibold text-slate-500">
-                  <MailCheck className="h-4 w-4" /> Sau khi duyệt, RabbitMQ event sẽ được publish để gửi web push + email cho user.
+                  <MailCheck className="h-4 w-4" />
+                  {canManageRequests
+                    ? 'Sau khi duyệt, RabbitMQ event sẽ được publish để gửi web push + email cho user.'
+                    : 'Audit có thể đối chiếu lịch sử gửi notify từ bản ghi approval.'}
                 </p>
               </div>
             )}
           </div>
         </section>
 
-        {isAdminMode && (
+        {canViewHistory && (
           <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="inline-flex items-center gap-2 text-xl font-black text-slate-900">
@@ -588,7 +613,7 @@ const SubscriptionReviewQueue: React.FC<SubscriptionReviewQueueProps> = ({ mode 
                     <th className="px-4 py-3 text-left">Trạng thái</th>
                     <th className="px-4 py-3 text-left">Tạo lúc</th>
                     <th className="px-4 py-3 text-left">Lý do hủy</th>
-                    <th className="px-4 py-3 text-right">Action</th>
+                    <th className="px-4 py-3 text-right">{canManageRequests ? 'Action' : 'Bill'}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white text-slate-700">
@@ -640,14 +665,16 @@ const SubscriptionReviewQueue: React.FC<SubscriptionReviewQueueProps> = ({ mode 
                                   Bill
                                 </button>
                               ) : null}
-                              <button
-                                type="button"
-                                disabled={!canCancel}
-                                onClick={() => handleOpenCancelModal(item)}
-                                className="rounded-lg bg-rose-600 px-2 py-1 text-xs font-semibold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-rose-200"
-                              >
-                                Hủy gói
-                              </button>
+                              {canManageRequests ? (
+                                <button
+                                  type="button"
+                                  disabled={!canCancel}
+                                  onClick={() => handleOpenCancelModal(item)}
+                                  className="rounded-lg bg-rose-600 px-2 py-1 text-xs font-semibold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-rose-200"
+                                >
+                                  Hủy gói
+                                </button>
+                              ) : null}
                             </div>
                           </td>
                         </tr>

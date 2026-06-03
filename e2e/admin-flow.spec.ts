@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
+import { mockUserShellApis, seedAuthenticatedUser } from '../tests/helpers/browser-auth';
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -39,15 +40,6 @@ const MOCK_USERS_PAGE = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-async function seedAdminAuth(page: Page): Promise<void> {
-  await page.addInitScript(() => {
-    localStorage.setItem('access_token', 'mock-admin-token');
-    localStorage.setItem('refresh_token', 'mock-admin-refresh');
-    localStorage.setItem('user_email', 'admin@example.com');
-    localStorage.setItem('user_role', 'ADMIN');
-  });
-}
-
 async function mockAdminApis(page: Page): Promise<void> {
   await page.route('**/api/v1/auth/me', async (route: Route) => {
     await route.fulfill({
@@ -69,6 +61,22 @@ async function mockAdminApis(page: Page): Promise<void> {
 
   await page.route('**/api/v1/auth/subscriptions/my-requests', async (route: Route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+  });
+
+  await page.route('**/api/v1/auth/subscriptions/review-queue?*', async (route: Route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        content: [],
+        totalPages: 0,
+        totalElements: 0,
+        number: 0,
+        size: 20,
+        first: true,
+        last: true,
+      }),
+    });
   });
 
   await page.route('**/api/v1/notification**', async (route: Route) => {
@@ -136,28 +144,32 @@ test.describe('Admin Flow', () => {
   });
 
   test('admin sees admin users page', async ({ page }) => {
-    await seedAdminAuth(page);
+    await seedAuthenticatedUser(page, { role: 'ADMIN', email: ADMIN_EMAIL, fullName: ADMIN_FULL_NAME });
+    await mockUserShellApis(page, { role: 'ADMIN', email: ADMIN_EMAIL, fullName: ADMIN_FULL_NAME });
     await mockAdminApis(page);
 
     await page.goto('/admin/users');
 
-    // Should show users management page
+    await expect(page.getByRole('heading', { name: 'Quản lý người dùng' })).toBeVisible({ timeout: 10000 });
     await expect(page.getByText('User One')).toBeVisible({ timeout: 10000 });
     await expect(page.getByText('User Two')).toBeVisible();
   });
 
   test('admin can view users list', async ({ page }) => {
-    await seedAdminAuth(page);
+    await seedAuthenticatedUser(page, { role: 'ADMIN', email: ADMIN_EMAIL, fullName: ADMIN_FULL_NAME });
+    await mockUserShellApis(page, { role: 'ADMIN', email: ADMIN_EMAIL, fullName: ADMIN_FULL_NAME });
     await mockAdminApis(page);
 
     await page.goto('/admin/users');
 
+    await expect(page.getByRole('heading', { name: 'Quản lý người dùng' })).toBeVisible({ timeout: 10000 });
     await expect(page.getByText('user1@example.com')).toBeVisible({ timeout: 10000 });
     await expect(page.getByText('user2@example.com')).toBeVisible();
   });
 
   test('admin can navigate to admin dashboard', async ({ page }) => {
-    await seedAdminAuth(page);
+    await seedAuthenticatedUser(page, { role: 'ADMIN', email: ADMIN_EMAIL, fullName: ADMIN_FULL_NAME });
+    await mockUserShellApis(page, { role: 'ADMIN', email: ADMIN_EMAIL, fullName: ADMIN_FULL_NAME });
     await mockAdminApis(page);
 
     // AdminDashboard uses SSE hooks — stub them
@@ -172,7 +184,7 @@ test.describe('Admin Flow', () => {
     await page.goto('/admin/dashboard');
 
     // The admin dashboard renders stat cards and charts with static data
-    await expect(page.getByText(/dashboard/i)).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('heading', { name: 'Hệ thống Tổng quan' })).toBeVisible({ timeout: 10000 });
   });
 
   test('non-admin is redirected away from admin routes', async ({ page }) => {

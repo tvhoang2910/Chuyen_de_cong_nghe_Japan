@@ -185,6 +185,10 @@ const ExamResult: React.FC = () => {
     );
   }
 
+  const isEssayResult = (question: AttemptResult["questionResults"][number]) => {
+    return question.questionType === "ESSAY";
+  };
+
   return (
     <MainLayout>
       <div className="space-y-5">
@@ -279,51 +283,105 @@ const ExamResult: React.FC = () => {
         </header>
 
         <section className="space-y-3">
-          {result.questionResults.map((question, idx) => (
+          {result.questionResults.map((question, idx) => {
+            const essay = isEssayResult(question);
+            const essayAnswer = question.essayAnswer ?? question.textAnswer;
+            const scoreValue = question.score ?? question.earnedScore;
+            return (
             <article
               key={question.questionId}
               className={`rounded-xl border p-4 ${
-                question.correct
+                essay
+                  ? "border-slate-200 bg-white"
+                  : question.correct
                   ? "border-emerald-200 bg-emerald-50/30"
                   : "border-rose-200 bg-rose-50/30"
               }`}
             >
-              <h2 className="font-semibold text-slate-900">
-                Câu {idx + 1}: {question.content}
-              </h2>
-              <p className="text-sm mt-2 text-slate-700">
-                Điểm: {question.earnedScore}/{question.maxScore} •{" "}
-                <span
-                  className={`font-bold ${question.correct ? "text-emerald-700" : "text-rose-700"}`}
-                >
-                  {question.correct ? "Đúng" : "Sai"}
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <h2 className="font-semibold text-slate-900">
+                  Câu {idx + 1}: {question.content}
+                </h2>
+                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+                  {essay ? "Tự luận" : "Trắc nghiệm"}
                 </span>
-              </p>
-              <p
-                className={`text-xs mt-1 ${question.correct ? "text-emerald-700" : "text-rose-700"}`}
-              >
-                Đáp án chọn:{" "}
-                {question.selectedOptionIds.length > 0
-                  ? question.selectedOptionIds
+              </div>
+
+              {essay ? (
+                <div className="mt-2 space-y-2 text-sm text-slate-700">
+                  {question.answerStatus === "PENDING_REVIEW" ? (
+                    <p className="font-semibold text-amber-700">
+                      Đang chờ contributor chấm bài
+                    </p>
+                  ) : (
+                    <p>
+                      Điểm:{" "}
+                      <span className="font-semibold">
+                        {scoreValue}/{question.maxScore}
+                      </span>
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm mt-2 text-slate-700">
+                    Điểm: {question.earnedScore}/{question.maxScore} •{" "}
+                    <span
+                      className={`font-bold ${question.correct ? "text-emerald-700" : "text-rose-700"}`}
+                    >
+                      {question.correct ? "Đúng" : "Sai"}
+                    </span>
+                  </p>
+                  <p
+                    className={`text-xs mt-1 ${question.correct ? "text-emerald-700" : "text-rose-700"}`}
+                  >
+                    Đáp án chọn:{" "}
+                    {(question.selectedOptionIds ?? []).length > 0
+                      ? (question.selectedOptionIds ?? [])
+                          .map(
+                            (optionId) =>
+                              (question.options ?? []).find(
+                                (option) => option.id === optionId,
+                              )?.content || `#${optionId}`,
+                          )
+                          .join(", ")
+                      : "Bỏ trống"}
+                  </p>
+                  <p className="text-xs mt-1 text-emerald-700">
+                    Đáp án đúng:{" "}
+                    {(question.correctOptionIds ?? [])
                       .map(
                         (optionId) =>
-                          question.options.find(
-                            (option) => option.id === optionId,
-                          )?.content || `#${optionId}`,
+                          (question.options ?? []).find((option) => option.id === optionId)
+                            ?.content || `#${optionId}`,
                       )
-                      .join(", ")
-                  : "Bỏ trống"}
-              </p>
-              <p className="text-xs mt-1 text-emerald-700">
-                Đáp án đúng:{" "}
-                {question.correctOptionIds
-                  .map(
-                    (optionId) =>
-                      question.options.find((option) => option.id === optionId)
-                        ?.content || `#${optionId}`,
-                  )
-                  .join(", ")}
-              </p>
+                      .join(", ")}
+                  </p>
+                </>
+              )}
+
+              {essayAnswer?.trim() ? (
+                <div className="mt-3 rounded-xl border border-slate-200 bg-white/80 p-3">
+                  <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                    Câu trả lời tự luận
+                  </p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">
+                    {essayAnswer}
+                  </p>
+                </div>
+              ) : null}
+
+              {(question.teacherFeedback ?? question.feedback)?.trim() &&
+              (!essay || question.answerStatus === "MANUALLY_GRADED") ? (
+                <div className="mt-3 rounded-xl border border-cyan-200 bg-cyan-50 p-3">
+                  <p className="text-xs font-bold uppercase tracking-wide text-cyan-700">
+                    Feedback chấm bài
+                  </p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm text-cyan-900">
+                    {question.teacherFeedback ?? question.feedback}
+                  </p>
+                </div>
+              ) : null}
 
               {reportedQuestionIds.has(question.questionId) ? (
                 <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700">
@@ -341,7 +399,8 @@ const ExamResult: React.FC = () => {
                 </button>
               )}
             </article>
-          ))}
+          );
+          })}
         </section>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-5">

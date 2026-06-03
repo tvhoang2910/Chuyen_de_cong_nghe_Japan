@@ -37,10 +37,11 @@ const getSeverityTone = (count: number): string => {
 
 const AdminReports: React.FC<AdminReportsProps> = ({ mode }) => {
   const Layout = AdminLayout;
+  const canResolveReports = mode === 'admin';
   const pageDescription =
     mode === 'admin'
       ? 'Theo dõi câu hỏi bị báo lỗi và xử lý trực tiếp ngay trên từng cụm báo cáo.'
-      : 'Theo dõi các báo cáo câu hỏi liên quan tới kho đề và xử lý trong không gian Contributor.';
+      : 'Theo dõi các báo cáo liên quan tới kho đề của bạn. Admin sẽ xử lý trạng thái tổng.';
 
   const [queueItems, setQueueItems] = useState<ReportQueueItem[]>([]);
   const [processedItems, setProcessedItems] = useState<ReportQueueItem[]>([]);
@@ -172,7 +173,9 @@ const AdminReports: React.FC<AdminReportsProps> = ({ mode }) => {
         <section className="rounded-[2rem] bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-900 p-7 text-white shadow-xl">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h1 className="text-3xl font-black tracking-tight">Trung tâm báo cáo câu hỏi</h1>
+              <h1 className="text-3xl font-black tracking-tight">
+                {mode === 'admin' ? 'Trung tâm xử lý báo cáo câu hỏi' : 'Báo cáo câu hỏi của tôi'}
+              </h1>
               <p className="mt-2 text-sm text-slate-200">
                 {pageDescription}
               </p>
@@ -190,7 +193,9 @@ const AdminReports: React.FC<AdminReportsProps> = ({ mode }) => {
         <section className="grid grid-cols-1 gap-6 xl:grid-cols-[1.05fr,1fr]">
           <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="mb-3 flex items-center justify-between px-2">
-              <h2 className="text-lg font-bold text-slate-900">Danh sách câu hỏi cần xử lý</h2>
+              <h2 className="text-lg font-bold text-slate-900">
+                {mode === 'admin' ? 'Danh sách câu hỏi cần xử lý' : 'Danh sách báo cáo cần theo dõi'}
+              </h2>
               <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700">{queueItems.length} mục</span>
             </div>
 
@@ -332,7 +337,7 @@ const AdminReports: React.FC<AdminReportsProps> = ({ mode }) => {
                   )}
                 </div>
 
-                {hasActionableReports ? (
+                {canResolveReports && hasActionableReports ? (
                   <form className="space-y-3" onSubmit={handleResolve}>
                     <h3 className="text-sm font-bold uppercase tracking-wide text-slate-500">Cập nhật trạng thái xử lý</h3>
                     <label className="block">
@@ -397,6 +402,10 @@ const AdminReports: React.FC<AdminReportsProps> = ({ mode }) => {
                       Cập nhật xử lý
                     </button>
                   </form>
+                ) : !canResolveReports ? (
+                  <p className="rounded-xl bg-cyan-50 px-4 py-3 text-sm font-medium text-cyan-700">
+                    Contributor chỉ theo dõi báo cáo liên quan tới đề của mình. Quyền cập nhật trạng thái tổng nằm ở Admin.
+                  </p>
                 ) : (
                   <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
                     Câu hỏi này đã xử lý xong. Bạn có thể xem lại toàn bộ lịch sử xử lý bên dưới và trong mục Đã xử lý gần đây.
@@ -434,10 +443,12 @@ const AdminReports: React.FC<AdminReportsProps> = ({ mode }) => {
                   )}
                 </div>
 
-                <p className="inline-flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
-                  <AlertTriangle className="h-4 w-4" />
-                  Khi chọn "Đã xử lý", hệ thống sẽ gửi web push tới các user đã báo lỗi (nếu user có bật push notification).
-                </p>
+                {canResolveReports ? (
+                  <p className="inline-flex items-center gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+                    <AlertTriangle className="h-4 w-4" />
+                    Khi chọn "Đã xử lý", hệ thống sẽ gửi web push tới các user đã báo lỗi (nếu user có bật push notification).
+                  </p>
+                ) : null}
               </div>
             )}
           </div>

@@ -21,6 +21,8 @@ export type SystemTestContext = ServiceTargets & {
   adminToken: string;
   adminLoginEmail: string;
   adminLoginPassword: string;
+  contributorLoginEmail: string;
+  contributorLoginPassword: string;
 };
 
 let cachedDotEnvValues: Record<string, string> | null = null;
@@ -155,6 +157,12 @@ export const buildSystemTestContext = (): SystemTestContext => {
     getConfigValue('E2E_ADMIN_LOGIN_EMAIL', 'AUTH_BOOTSTRAP_ADMIN_EMAIL') ?? 'admin@exam-bank.local';
   const adminLoginPassword =
     getConfigValue('E2E_ADMIN_LOGIN_PASSWORD', 'AUTH_BOOTSTRAP_ADMIN_PASSWORD') ?? 'Admin@123456';
+  const contributorLoginEmail =
+    getConfigValue('E2E_CONTRIBUTOR_LOGIN_EMAIL', 'AUTH_BOOTSTRAP_CONTRIBUTOR_EMAIL') ??
+    'contributor@exam-bank.local';
+  const contributorLoginPassword =
+    getConfigValue('E2E_CONTRIBUTOR_LOGIN_PASSWORD', 'AUTH_BOOTSTRAP_CONTRIBUTOR_PASSWORD') ??
+    'Contributor@123456';
 
   const userToken = signHs256Jwt(userIdentity, secretBase64, issuer);
   const adminToken = signHs256Jwt(adminIdentity, secretBase64, issuer);
@@ -172,5 +180,7 @@ export const buildSystemTestContext = (): SystemTestContext => {
     adminToken,
     adminLoginEmail,
     adminLoginPassword,
+    contributorLoginEmail,
+    contributorLoginPassword,
   };
 };

@@ -31,6 +31,7 @@ const ExamAttempt: React.FC = () => {
   const [attemptId, setAttemptId] = useState<number | null>(null);
   const [expiresAt, setExpiresAt] = useState<string>('');
   const [answers, setAnswers] = useState<Record<number, number[]>>({});
+  const [textAnswers, setTextAnswers] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [showPremiumModal, setShowPremiumModal] = useState(false);
@@ -217,6 +218,10 @@ const ExamAttempt: React.FC = () => {
   const totalQuestions = useMemo(() => exam?.questions.length || 0, [exam?.questions.length]);
   const isPreviewMode = Boolean(exam?.premiumLocked) || (Boolean(exam?.premium) && !attemptId);
 
+  const isEssayQuestion = (question: ExamDetail['questions'][number]) => {
+    return question.questionType === 'ESSAY' || (question.options ?? []).length === 0;
+  };
+
   const handleChooseOption = (questionId: number, optionId: number) => {
     if (!attemptId || isPreviewMode) {
       return;
@@ -236,14 +241,56 @@ const ExamAttempt: React.FC = () => {
 
     questionMetaRef.current[questionId] = nextMeta;
 
+    const selectedOptionIds = answers[questionId] ?? [];
+    const nextSelectedOptionIds = selectedOptionIds.includes(optionId)
+      ? selectedOptionIds.filter((id) => id !== optionId)
+      : [...selectedOptionIds, optionId];
+
     setAnswers((prev) => ({
       ...prev,
-      [questionId]: [optionId],
+      [questionId]: nextSelectedOptionIds,
     }));
 
     pendingAnswersRef.current[questionId] = {
       questionId,
-      selectedOptionIds: [optionId],
+      selectedOptionId: nextSelectedOptionIds.length === 1 ? nextSelectedOptionIds[0] : undefined,
+      selectedOptionIds: nextSelectedOptionIds,
+      responseTimeMs: now - nextMeta.firstSeenAt,
+      answerChangeCount: nextMeta.changeCount,
+    };
+    scheduleFlush();
+  };
+
+  const handleTextAnswerChange = (questionId: number, value: string) => {
+    if (!attemptId || isPreviewMode) {
+      return;
+    }
+
+    const now = Date.now();
+    const currentMeta = questionMetaRef.current[questionId];
+    const nextMeta: QuestionState = currentMeta
+      ? {
+          firstSeenAt: currentMeta.firstSeenAt,
+          changeCount: currentMeta.changeCount + 1,
+        }
+      : {
+          firstSeenAt: now,
+          changeCount: 0,
+        };
+
+    questionMetaRef.current[questionId] = nextMeta;
+
+    setTextAnswers((prev) => ({
+      ...prev,
+      [questionId]: value,
+    }));
+
+    pendingAnswersRef.current[questionId] = {
+      questionId,
+      selectedOptionId: undefined,
+      selectedOptionIds: [],
+      essayAnswer: value,
+      textAnswer: value,
       responseTimeMs: now - nextMeta.firstSeenAt,
       answerChangeCount: nextMeta.changeCount,
     };
@@ -332,13 +379,30 @@ const ExamAttempt: React.FC = () => {
         )}
 
         <div className="space-y-4">
-          {exam.questions.map((question, qIndex) => (
+          {exam.questions.map((question, qIndex) => {
+            const essay = isEssayQuestion(question);
+            return (
             <section key={question.id || qIndex} className="rounded-2xl border border-slate-200 bg-white p-4">
-              <h2 className="font-semibold text-slate-900">Câu {qIndex + 1}: {question.content}</h2>
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <h2 className="font-semibold text-slate-900">Câu {qIndex + 1}: {question.content}</h2>
+                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+                  {essay ? 'Tự luận' : 'Trắc nghiệm'}
+                </span>
+              </div>
               <div className="mt-3 space-y-2">
-                {question.options.map((opt, optIndex) => {
-                  const selectedOptionId = answers[question.id || 0]?.[0];
-                  const active = selectedOptionId === opt.id;
+                {essay && question.id ? (
+                  <textarea
+                    value={textAnswers[question.id] ?? ''}
+                    disabled={isPreviewMode}
+                    onChange={(event) => handleTextAnswerChange(question.id!, event.target.value)}
+                    rows={5}
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
+                    placeholder="Nhập câu trả lời tự luận..."
+                  />
+                ) : null}
+                {!essay && (question.options ?? []).map((opt, optIndex) => {
+                  const selectedOptionIds = answers[question.id || 0] ?? [];
+                  const active = Boolean(opt.id && selectedOptionIds.includes(opt.id));
                   return (
                     <button
                       key={opt.id || optIndex}
@@ -353,13 +417,23 @@ const ExamAttempt: React.FC = () => {
                             : 'border-slate-200 hover:border-blue-300 hover:bg-blue-50/40 text-slate-700'
                       }`}
                     >
+                      <span
+                        className={`mr-2 inline-flex h-4 w-4 items-center justify-center rounded border align-[-2px] ${
+                          active
+                            ? 'border-blue-600 bg-blue-600 text-white'
+                            : 'border-slate-300 bg-white'
+                        }`}
+                      >
+                        {active ? '✓' : ''}
+                      </span>
                       {optIndex + 1}. {opt.content}
                     </button>
                   );
                 })}
               </div>
             </section>
-          ))}
+          );
+          })}
         </div>
 
         {isPreviewMode ? (

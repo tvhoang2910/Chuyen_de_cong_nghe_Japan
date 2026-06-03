@@ -143,8 +143,8 @@ export const useExamUploadFlow = (): UseExamUploadFlowResult => {
         );
         const role = getCurrentSessionRole();
         toast.success(
-          role === "CONTRIBUTOR" || role === "ADMIN"
-            ? "Tải đề thành công. Hệ thống đang xử lý."
+          role === "CONTRIBUTOR"
+            ? "Tải đề thành công. Đã vào hàng chờ duyệt."
             : "Tải đề thành công. Đang chờ duyệt.",
         );
         return completed;

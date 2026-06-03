@@ -3,9 +3,11 @@ import { Link } from "react-router-dom";
 import {
   ArrowRight,
   BookOpen,
+  ClipboardCheck,
   FileUp,
   Flag,
   LayoutDashboard,
+  ShieldCheck,
   Upload,
 } from "lucide-react";
 import AdminLayout from "../components/AdminLayout";
@@ -18,20 +20,32 @@ const contributorActions = [
     icon: BookOpen,
   },
   {
-    title: "Duyệt upload",
-    description: "Xem yêu cầu upload đang chờ duyệt và kích hoạt trích xuất AI.",
-    path: "/contributor/upload-queue",
+    title: "Upload đề",
+    description: "Gửi file đề của bạn lên hệ thống và theo dõi quá trình xử lý.",
+    path: "/upload-exam",
     icon: Upload,
   },
   {
-    title: "Báo cáo câu hỏi",
-    description: "Kiểm tra câu hỏi bị báo lỗi và cập nhật trạng thái xử lý.",
+    title: "Chấm tự luận",
+    description: "Chấm các câu tự luận đang chờ review và gửi feedback cho học viên.",
+    path: "/contributor/essay-grading",
+    icon: ClipboardCheck,
+  },
+  {
+    title: "Báo cáo của tôi",
+    description: "Theo dõi các báo cáo câu hỏi liên quan tới kho đề của bạn.",
     path: "/contributor/reports",
     icon: Flag,
   },
   {
-    title: "Đề đã upload",
-    description: "Theo dõi các file đề thi bạn đã gửi lên hệ thống.",
+    title: "Duyệt upload người dùng",
+    description: "Mở hàng chờ để duyệt các đề người dùng thường vừa gửi lên hệ thống.",
+    path: "/contributor/upload-queue",
+    icon: ShieldCheck,
+  },
+  {
+    title: "Đề tôi đã upload",
+    description: "Theo dõi riêng các file đề mà chính bạn đã upload lên hệ thống.",
     path: "/my-uploads",
     icon: FileUp,
   },
@@ -53,7 +67,7 @@ const ContributorDashboard: React.FC = () => {
               </h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
                 Không gian này chỉ tập trung vào đề thi, upload và xử lý báo
-                cáo câu hỏi. Các luồng Premium, thanh toán và quản trị hệ thống
+                cáo câu hỏi của bạn. Các luồng Premium, thanh toán và quản trị hệ thống
                 được tách khỏi vai trò Contributor.
               </p>
             </div>

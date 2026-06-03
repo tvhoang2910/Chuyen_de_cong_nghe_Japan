@@ -76,15 +76,15 @@ test('upload extract flow end-to-end', async ({ browser }) => {
     );
   }
 
-  // Admin context approves upload.
+  // Reviewer context (CONTRIBUTOR) approves upload.
   const adminContext = await browser.newContext();
   const adminPage = await adminContext.newPage();
   await adminPage.goto('/');
   await adminPage.evaluate((token) => {
     localStorage.setItem('access_token', token);
-    localStorage.setItem('user_role', 'ADMIN');
+    localStorage.setItem('user_role', 'CONTRIBUTOR');
   }, process.env.ADMIN_TOKEN as string);
-  await adminPage.goto('/admin/upload-queue');
+  await adminPage.goto('/contributor/upload-queue');
 
   const pendingRow = adminPage.locator('tr', { hasText: uploadTitle }).first();
   await expect(pendingRow).toBeVisible({ timeout: 60_000 });

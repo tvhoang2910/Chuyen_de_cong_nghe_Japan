@@ -224,7 +224,7 @@ const SubscriptionPayments: React.FC = () => {
         <section className="rounded-[2rem] bg-gradient-to-br from-sky-700 via-cyan-700 to-teal-700 p-8 text-white shadow-xl shadow-cyan-900/20">
           <h1 className="text-3xl font-black tracking-tight">Nâng cấp Premium qua QR Banking</h1>
           <p className="mt-3 max-w-2xl text-cyan-50/90">
-            Quét QR của hệ thống, chuyển khoản và tải bill. Admin/Contributor sẽ duyệt thủ công, sau đó hệ thống tự gửi web push + email kết quả.
+            Quét QR của hệ thống, chuyển khoản và tải bill. Admin sẽ duyệt thủ công, sau đó hệ thống tự gửi web push + email kết quả.
           </p>
         </section>
 
